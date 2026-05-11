@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
+import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import { KeymapLayer, parseKeymap, updateLayerBinding } from "./lib/keymapParser";
 import {
@@ -275,25 +276,74 @@ function KeyboardGrid({
           </div>
         ))}
         {kobitoKeyPhysicalLayout.map((key) => (
-          <button
-            type="button"
+          <PhysicalKeyButton
             key={`${key.side}-${key.index}`}
-            className={`physical-key ${key.side} ${key.kind} ${key.index === selectedKeyIndex ? "selected" : ""}`}
-            style={{
-              left: key.x,
-              top: key.y,
-              width: key.width ?? KEY_UNIT,
-              height: key.height ?? KEY_UNIT,
-              transform: `rotate(${key.rotation ?? 0}deg)`,
-            }}
-            onClick={() => onSelect(key.index)}
-          >
-            <span>{key.index + 1}</span>
-            {layer?.bindings[key.index] ?? ""}
-          </button>
+            binding={layer?.bindings[key.index] ?? ""}
+            index={key.index}
+            isSelected={key.index === selectedKeyIndex}
+            kind={key.kind}
+            left={key.x}
+            rotation={key.rotation ?? 0}
+            side={key.side}
+            top={key.y}
+            width={key.width ?? KEY_UNIT}
+            height={key.height ?? KEY_UNIT}
+            onSelect={onSelect}
+          />
         ))}
       </div>
     </div>
+  );
+}
+
+function PhysicalKeyButton({
+  binding,
+  height,
+  index,
+  isSelected,
+  kind,
+  left,
+  onSelect,
+  rotation,
+  side,
+  top,
+  width,
+}: {
+  binding: string;
+  height: number;
+  index: number;
+  isSelected: boolean;
+  kind: string;
+  left: number;
+  onSelect: (index: number) => void;
+  rotation: number;
+  side: string;
+  top: number;
+  width: number;
+}) {
+  const display = bindingDisplay(binding);
+
+  return (
+    <button
+      type="button"
+      key={`${side}-${index}`}
+      className={`physical-key ${side} ${kind} ${isSelected ? "selected" : ""}`}
+      style={{
+        left,
+        top,
+        width,
+        height,
+        transform: `rotate(${rotation}deg)`,
+      }}
+      title={binding}
+      onClick={() => onSelect(index)}
+    >
+      <span className="key-index">{index + 1}</span>
+      <span className="key-content">
+        {display.badge ? <em>{display.badge}</em> : null}
+        <strong>{display.label}</strong>
+      </span>
+    </button>
   );
 }
 

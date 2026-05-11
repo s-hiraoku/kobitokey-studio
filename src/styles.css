@@ -259,11 +259,11 @@ button:disabled {
   position: absolute;
   z-index: 2;
   display: grid;
-  grid-template-rows: 16px 1fr;
-  gap: 6px;
+  grid-template-rows: 13px 1fr;
+  gap: 3px;
   min-height: 0;
   border-radius: 7px;
-  padding: 8px;
+  padding: 6px;
   overflow-wrap: anywhere;
   border-color: #c99112;
   background: linear-gradient(145deg, #ffc83a 0%, #eca91f 100%);
@@ -272,14 +272,47 @@ button:disabled {
     0 6px 0 #a96f08;
   text-align: left;
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.2;
 }
 
-.physical-key span {
+.key-index {
   color: #74530a;
   font-family: inherit;
   font-size: 10px;
+}
+
+.key-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+}
+
+.key-content em {
+  max-width: 100%;
+  border-radius: 3px;
+  padding: 1px 3px;
+  overflow: hidden;
+  background: rgba(116, 83, 10, 0.15);
+  color: #654806;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.key-content strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: #1d211e;
+  font-size: 12px;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .physical-key.selected {
