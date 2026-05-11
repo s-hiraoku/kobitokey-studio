@@ -15,9 +15,12 @@ be a general ZMK editor yet.
 - Show shortened key labels on the keyboard while preserving full bindings in
   the inspector and tooltip
 - Edit a selected key binding
-- Preview a save-time diff
-- Read key trackball parameters from the left/right overlay files
-- Prepare the app surface for GitHub Actions artifact and UF2 flashing support
+- Edit common ZMK binding types with structured controls
+- Display and edit keymap combos
+- Preview file-level diffs before saving
+- Read and edit trackball parameters from the left/right overlay files
+- Trigger GitHub Actions builds through the Tauri backend
+- Download build artifacts and guide UF2 copying to bootloader volumes
 
 ## Design Direction
 
@@ -60,6 +63,13 @@ For the full desktop app, Rust and Cargo are required:
 npm run tauri dev
 ```
 
+GitHub Actions and artifact workflows use the `gh` CLI from the Tauri backend.
+Authenticate it before using those controls:
+
+```sh
+gh auth login
+```
+
 ## Fixtures
 
 The app ships with fixture copies of the current KobitoKey files in
@@ -72,18 +82,21 @@ When running inside Tauri, the default project path points at:
 /Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY
 ```
 
-## Roadmap
+## Implemented Workflows
 
-Near-term:
+- Physical keymap viewing across layers
+- Binding editing with raw and structured inputs
+- Combo display, add, edit, and delete
+- Trackball CPI, acceleration, and gesture threshold editing
+- File-level save diff for keymap and overlay files
+- Folder picker for the local `KobitoKey_QWERTY` project
+- GitHub Actions build trigger, run status, and artifact download
+- UF2 file and bootloader volume selection with confirmation before copy
 
-- Combo parser and combo display on the physical layout
-- Combo editing and serialization
-- Binding editor UI for common ZMK behavior types
-- Trackball setting editor with overlay serialization
+## Remaining Notes
 
-Later:
-
-- Folder picker and project validation
-- Safer save flow with file-level diffs
-- GitHub Actions workflow trigger and artifact download
-- Guided UF2 flashing for left/right/settings reset firmware
+- The browser dev server can show fixture data and most UI behavior.
+- File saving, folder picking, GitHub Actions, artifact download, and UF2 copy
+  require the Tauri app shell.
+- GitHub tokens are not stored in the renderer; GitHub operations are delegated
+  to the backend through `gh`.
