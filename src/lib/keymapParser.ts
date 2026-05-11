@@ -20,6 +20,13 @@ export type KeymapCombo = {
   blockEnd: number;
 };
 
+export type KeymapComboInput = {
+  id: string;
+  binding: string;
+  keyPositions: number[];
+  timeoutMs: number;
+};
+
 const KEY_COUNT = 40;
 const LAYER_PATTERN =
   /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
@@ -150,6 +157,43 @@ export function updateLayerBinding(
   );
 
   return source.slice(0, layer.blockStart) + nextBlock + source.slice(layer.blockEnd);
+}
+
+export function updateCombo(source: string, combo: KeymapCombo, input: KeymapComboInput): string {
+  const nextBlock = formatComboBlock(input);
+  return source.slice(0, combo.blockStart) + nextBlock + source.slice(combo.blockEnd);
+}
+
+export function deleteCombo(source: string, combo: KeymapCombo): string {
+  return source.slice(0, combo.blockStart).replace(/\s*$/, "\n") + source.slice(combo.blockEnd);
+}
+
+export function addCombo(source: string, input: KeymapComboInput): string {
+  const combosBlock = extractNamedBody(source, "combos");
+  if (!combosBlock) {
+    return source;
+  }
+
+  const insertAt = combosBlock.bodyStart + combosBlock.body.length;
+  return `${source.slice(0, insertAt)}\n\n${indent(formatComboBlock(input), 8)}${source.slice(insertAt)}`;
+}
+
+function formatComboBlock(input: KeymapComboInput): string {
+  return [
+    `${input.id} {`,
+    `    timeout-ms = <${input.timeoutMs}>;`,
+    `    key-positions = <${input.keyPositions.join(" ")}>;`,
+    `    bindings = <${input.binding}>;`,
+    `};`,
+  ].join("\n");
+}
+
+function indent(value: string, spaces: number): string {
+  const prefix = " ".repeat(spaces);
+  return value
+    .split("\n")
+    .map((line) => `${prefix}${line}`)
+    .join("\n");
 }
 
 export function formatBindings(bindings: string[]): string {

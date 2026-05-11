@@ -4,7 +4,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
-import { KeymapCombo, KeymapLayer, parseKeymap, updateLayerBinding } from "./lib/keymapParser";
+import {
+  KeymapCombo,
+  KeymapLayer,
+  addCombo,
+  deleteCombo,
+  parseKeymap,
+  updateCombo,
+  updateLayerBinding,
+} from "./lib/keymapParser";
 import {
   KEY_UNIT,
   LAYOUT_HEIGHT,
@@ -55,6 +63,7 @@ function App() {
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
+  const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState("fixture を読み込み中");
 
   React.useEffect(() => {
@@ -69,6 +78,10 @@ function App() {
   const selectedCombos = React.useMemo(
     () => combos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [combos, selectedKeyIndex],
+  );
+  const selectedCombo = React.useMemo(
+    () => combos.find((combo) => combo.id === selectedComboId) ?? selectedCombos[0] ?? combos[0],
+    [combos, selectedComboId, selectedCombos],
   );
   const trackball = React.useMemo(
     () => parseTrackballSettings(files?.leftOverlay ?? "", files?.rightOverlay ?? ""),
@@ -126,6 +139,63 @@ function App() {
       ...files,
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
+  }
+
+  function saveCombo(combo: KeymapCombo, input: ComboFormValue) {
+    if (!files) {
+      return;
+    }
+
+    const keyPositions = parseDisplayKeyPositions(input.keyPositions);
+    if (keyPositions.length < 2) {
+      setStatus("combo には2つ以上のキーが必要です");
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: updateCombo(files.keymap, combo, {
+        id: combo.id,
+        binding: input.binding,
+        keyPositions,
+        timeoutMs: input.timeoutMs,
+      }),
+    });
+    setSelectedComboId(combo.id);
+    setStatus(`${combo.id} を更新しました`);
+  }
+
+  function createCombo() {
+    if (!files) {
+      return;
+    }
+
+    const id = nextComboId(combos);
+    const keyPositions = [selectedKeyIndex, Math.min(selectedKeyIndex + 1, 39)];
+    setFiles({
+      ...files,
+      keymap: addCombo(files.keymap, {
+        id,
+        binding: "&kp ESC",
+        keyPositions,
+        timeoutMs: 50,
+      }),
+    });
+    setSelectedComboId(id);
+    setStatus(`${id} を追加しました`);
+  }
+
+  function removeCombo(combo: KeymapCombo) {
+    if (!files) {
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: deleteCombo(files.keymap, combo),
+    });
+    setSelectedComboId(null);
+    setStatus(`${combo.id} を削除しました`);
   }
 
   return (
@@ -211,7 +281,14 @@ function App() {
             </div>
           </section>
 
-          <ComboPanel combos={combos} selectedCombos={selectedCombos} />
+          <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
+          <ComboEditor
+            combo={selectedCombo}
+            onCreate={createCombo}
+            onDelete={removeCombo}
+            onSave={saveCombo}
+            onSelect={setSelectedComboId}
+          />
 
           <TrackballPanel settings={trackball} />
 
@@ -238,6 +315,12 @@ function App() {
     </main>
   );
 }
+
+type ComboFormValue = {
+  binding: string;
+  keyPositions: string;
+  timeoutMs: number;
+};
 
 function KeyboardGrid({
   combos,
@@ -374,9 +457,11 @@ function PhysicalKeyButton({
 
 function ComboPanel({
   combos,
+  onSelect,
   selectedCombos,
 }: {
   combos: KeymapCombo[];
+  onSelect?: (comboId: string) => void;
   selectedCombos: KeymapCombo[];
 }) {
   return (
@@ -387,31 +472,148 @@ function ComboPanel({
         {selectedCombos.length === 0 ? (
           <p className="empty-note">選択キーの combo はありません</p>
         ) : (
-          selectedCombos.map((combo) => <ComboRow combo={combo} key={combo.id} isFocused />)
+          selectedCombos.map((combo) => (
+            <ComboRow combo={combo} key={combo.id} isFocused onSelect={onSelect} />
+          ))
         )}
       </div>
       <div className="combo-list">
         {combos.map((combo) => (
-          <ComboRow combo={combo} key={combo.id} />
+          <ComboRow combo={combo} key={combo.id} onSelect={onSelect} />
         ))}
       </div>
     </section>
   );
 }
 
-function ComboRow({ combo, isFocused = false }: { combo: KeymapCombo; isFocused?: boolean }) {
+function ComboRow({
+  combo,
+  isFocused = false,
+  onSelect,
+}: {
+  combo: KeymapCombo;
+  isFocused?: boolean;
+  onSelect?: (comboId: string) => void;
+}) {
   const display = bindingDisplay(combo.binding);
 
   return (
-    <div className={`combo-row ${isFocused ? "focused" : ""}`}>
+    <button
+      type="button"
+      className={`combo-row ${isFocused ? "focused" : ""}`}
+      onClick={() => onSelect?.(combo.id)}
+    >
       <span>{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
       <strong>
         {display.badge ? `${display.badge} ` : ""}
         {display.label}
       </strong>
       <em>{combo.timeoutMs}ms</em>
-    </div>
+    </button>
   );
+}
+
+function ComboEditor({
+  combo,
+  onCreate,
+  onDelete,
+  onSave,
+  onSelect,
+}: {
+  combo?: KeymapCombo;
+  onCreate: () => void;
+  onDelete: (combo: KeymapCombo) => void;
+  onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
+  onSelect: (comboId: string) => void;
+}) {
+  const [form, setForm] = React.useState<ComboFormValue>({
+    binding: "",
+    keyPositions: "",
+    timeoutMs: 50,
+  });
+
+  React.useEffect(() => {
+    if (!combo) {
+      return;
+    }
+
+    setForm({
+      binding: combo.binding,
+      keyPositions: combo.keyPositions.map((position) => position + 1).join(" "),
+      timeoutMs: combo.timeoutMs,
+    });
+  }, [combo]);
+
+  return (
+    <section>
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">Combo Edit</p>
+          <h2>{combo?.id ?? "新規 combo"}</h2>
+        </div>
+        <button type="button" onClick={onCreate}>
+          追加
+        </button>
+      </div>
+      {combo ? (
+        <div className="combo-editor">
+          <label>
+            Keys
+            <input
+              value={form.keyPositions}
+              onChange={(event) => setForm({ ...form, keyPositions: event.target.value })}
+              onFocus={() => onSelect(combo.id)}
+            />
+          </label>
+          <label>
+            Binding
+            <input
+              value={form.binding}
+              onChange={(event) => setForm({ ...form, binding: event.target.value })}
+              onFocus={() => onSelect(combo.id)}
+            />
+          </label>
+          <label>
+            Timeout
+            <input
+              min={1}
+              type="number"
+              value={form.timeoutMs}
+              onChange={(event) => setForm({ ...form, timeoutMs: Number(event.target.value) })}
+              onFocus={() => onSelect(combo.id)}
+            />
+          </label>
+          <div className="combo-editor-actions">
+            <button type="button" onClick={() => onSave(combo, form)}>
+              更新
+            </button>
+            <button type="button" onClick={() => onDelete(combo)}>
+              削除
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="empty-note">combo がありません</p>
+      )}
+    </section>
+  );
+}
+
+function parseDisplayKeyPositions(value: string): number[] {
+  return value
+    .split(/[\s,]+/)
+    .map((item) => Number(item.trim()))
+    .filter((number) => Number.isFinite(number) && number >= 1 && number <= 40)
+    .map((number) => number - 1);
+}
+
+function nextComboId(combos: KeymapCombo[]): string {
+  const existing = new Set(combos.map((combo) => combo.id));
+  let index = combos.length + 1;
+  while (existing.has(`combo_custom_${index}`)) {
+    index += 1;
+  }
+  return `combo_custom_${index}`;
 }
 
 function TrackballPanel({ settings }: { settings: TrackballSettings }) {

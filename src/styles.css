@@ -382,6 +382,21 @@ button:disabled {
   font-weight: 700;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section-title-row button,
+.combo-editor-actions button {
+  min-height: 31px;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-weight: 700;
+}
+
 .preset-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -425,6 +440,10 @@ button:disabled {
   font-size: 12px;
 }
 
+.combo-row button {
+  display: contents;
+}
+
 .combo-row.focused {
   border-color: #2b644b;
   background: #dcebdd;
@@ -453,6 +472,22 @@ button:disabled {
   margin: 0;
   color: #66716b;
   font-size: 13px;
+}
+
+.combo-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.combo-editor label {
+  margin-top: 0;
+}
+
+.combo-editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .settings-list {
