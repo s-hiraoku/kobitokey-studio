@@ -42,6 +42,11 @@ type ProjectFiles = {
   rightOverlay: string;
 };
 
+type FileDiff = {
+  filename: string;
+  lines: string[];
+};
+
 const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
 const PRESETS = [
   "&trans",
@@ -67,6 +72,8 @@ function App() {
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
   const [savedKeymap, setSavedKeymap] = React.useState("");
+  const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
+  const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
@@ -94,8 +101,13 @@ function App() {
     [files?.leftOverlay, files?.rightOverlay],
   );
   const keymapDiff = React.useMemo(
-    () => summarizeChangedLines(savedKeymap, files?.keymap ?? ""),
-    [files?.keymap, savedKeymap],
+    () =>
+      [
+        fileDiff("KobitoKey.keymap", savedKeymap, files?.keymap ?? ""),
+        fileDiff("KobitoKey_left.overlay", savedLeftOverlay, files?.leftOverlay ?? ""),
+        fileDiff("KobitoKey_right.overlay", savedRightOverlay, files?.rightOverlay ?? ""),
+      ].filter((diff) => diff.lines.length > 0),
+    [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
   );
 
   async function loadFixture() {
@@ -106,6 +118,8 @@ function App() {
     ]);
     setFiles({ keymap, leftOverlay, rightOverlay });
     setSavedKeymap(keymap);
+    setSavedLeftOverlay(leftOverlay);
+    setSavedRightOverlay(rightOverlay);
     setStatus("fixture を表示中");
   }
 
@@ -120,6 +134,8 @@ function App() {
       const project = await invoke<ProjectFiles>("read_kobitokey_project", { root: projectRoot });
       setFiles(project);
       setSavedKeymap(project.keymap);
+      setSavedLeftOverlay(project.leftOverlay);
+      setSavedRightOverlay(project.rightOverlay);
       setStatus("ローカルプロジェクトを読み込みました");
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -143,7 +159,7 @@ function App() {
     }
   }
 
-  async function saveKeymap() {
+  async function saveProjectFiles() {
     if (!files?.keymapPath) {
       downloadText("KobitoKey.keymap", files?.keymap ?? "");
       setStatus("ブラウザ表示のため keymap をダウンロードしました");
@@ -152,8 +168,12 @@ function App() {
 
     try {
       await invoke("write_text_file", { path: files.keymapPath, contents: files.keymap });
+      await invoke("write_text_file", { path: files.leftOverlayPath, contents: files.leftOverlay });
+      await invoke("write_text_file", { path: files.rightOverlayPath, contents: files.rightOverlay });
       setSavedKeymap(files.keymap);
-      setStatus("KobitoKey.keymap を保存しました");
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+      setStatus("変更ファイルを保存しました");
     } catch (error) {
       setStatus(`保存失敗: ${String(error)}`);
     }
@@ -331,7 +351,7 @@ function App() {
               <p className="eyebrow">Layer {activeLayerIndex}</p>
               <h2>{activeLayer?.label ?? "No layer"}</h2>
             </div>
-            <button type="button" className="primary" onClick={saveKeymap}>
+            <button type="button" className="primary" onClick={saveProjectFiles}>
               {files?.keymapPath ? <Save size={17} /> : <Download size={17} />}
               {files?.keymapPath ? "保存" : "書き出し"}
             </button>
@@ -347,9 +367,15 @@ function App() {
           <section className="diff-panel">
             <div className="panel-heading compact">
               <h3>保存前 diff</h3>
-              <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length / 2} 箇所`}</span>
+              <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
             </div>
-            <pre>{keymapDiff.length === 0 ? "No changes" : keymapDiff.join("\n")}</pre>
+            <pre>
+              {keymapDiff.length === 0
+                ? "No changes"
+                : keymapDiff
+                    .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
+                    .join("\n\n")}
+            </pre>
           </section>
         </section>
 
@@ -832,6 +858,13 @@ function validateProjectRoot(projectRoot: string): string | undefined {
     return "KobitoKey_QWERTY リポジトリのパスを指定してください";
   }
   return undefined;
+}
+
+function fileDiff(filename: string, before: string, after: string): FileDiff {
+  return {
+    filename,
+    lines: summarizeChangedLines(before, after),
+  };
 }
 
 function TrackballPanel({ settings }: { settings: TrackballSettings }) {
