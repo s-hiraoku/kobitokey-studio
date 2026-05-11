@@ -25,7 +25,11 @@ import {
   trackballBasePath,
   trackballs,
 } from "./lib/kobitokeyPhysicalLayout";
-import { parseTrackballSettings, TrackballSettings } from "./lib/trackballParser";
+import {
+  TrackballSettings,
+  parseTrackballSettings,
+  updateBlockNumberSetting,
+} from "./lib/trackballParser";
 import "./styles.css";
 
 type ProjectFiles = {
@@ -199,6 +203,62 @@ function App() {
     setStatus(`${combo.id} を削除しました`);
   }
 
+  function applyTrackballSettings(nextSettings: RequiredTrackballSettings) {
+    if (!files) {
+      return;
+    }
+
+    let leftOverlay = files.leftOverlay;
+    let rightOverlay = files.rightOverlay;
+
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "tb_left", "cpi", nextSettings.leftCpi);
+    rightOverlay = updateBlockNumberSetting(rightOverlay, "tb_right", "cpi", nextSettings.rightCpi);
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "pointer_accel", "min-factor", nextSettings.pointerMinFactor);
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "pointer_accel", "max-factor", nextSettings.pointerMaxFactor);
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel",
+      "speed-threshold",
+      nextSettings.pointerSpeedThreshold,
+    );
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel",
+      "acceleration-exponent",
+      nextSettings.pointerAccelerationExponent,
+    );
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel_right",
+      "min-factor",
+      nextSettings.rightPointerMinFactor,
+    );
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel_right",
+      "max-factor",
+      nextSettings.rightPointerMaxFactor,
+    );
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel_right",
+      "speed-threshold",
+      nextSettings.rightPointerSpeedThreshold,
+    );
+    leftOverlay = updateBlockNumberSetting(
+      leftOverlay,
+      "pointer_accel_right",
+      "acceleration-exponent",
+      nextSettings.rightPointerAccelerationExponent,
+    );
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "gesture_keybind", "threshold", nextSettings.gestureThreshold);
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "tab_keybind", "threshold", nextSettings.tabThreshold);
+    leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
+
+    setFiles({ ...files, leftOverlay, rightOverlay });
+    setStatus("トラックボール設定を更新しました");
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -293,6 +353,7 @@ function App() {
           />
 
           <TrackballPanel settings={trackball} />
+          <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
 
           <section className="build-panel">
             <div>
@@ -323,6 +384,23 @@ type ComboFormValue = {
   keyPositions: string;
   timeoutMs: number;
 };
+
+type RequiredTrackballSettings = Required<Pick<
+  TrackballSettings,
+  | "leftCpi"
+  | "rightCpi"
+  | "pointerMinFactor"
+  | "pointerMaxFactor"
+  | "pointerSpeedThreshold"
+  | "pointerAccelerationExponent"
+  | "rightPointerMinFactor"
+  | "rightPointerMaxFactor"
+  | "rightPointerSpeedThreshold"
+  | "rightPointerAccelerationExponent"
+  | "gestureThreshold"
+  | "tabThreshold"
+  | "desktopThreshold"
+>>;
 
 const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
   { value: "key", label: "Key" },
@@ -722,10 +800,12 @@ function TrackballPanel({ settings }: { settings: TrackballSettings }) {
   const rows = [
     ["Left CPI", settings.leftCpi],
     ["Right CPI", settings.rightCpi],
-    ["Left accel scale", settings.pointerScaleMultiplier],
+    ["Left min factor", settings.pointerMinFactor],
+    ["Left max factor", settings.pointerMaxFactor],
     ["Left speed threshold", settings.pointerSpeedThreshold],
     ["Left accel exponent", settings.pointerAccelerationExponent],
-    ["Right accel scale", settings.rightPointerScaleMultiplier],
+    ["Right min factor", settings.rightPointerMinFactor],
+    ["Right max factor", settings.rightPointerMaxFactor],
     ["Right speed threshold", settings.rightPointerSpeedThreshold],
     ["Right accel exponent", settings.rightPointerAccelerationExponent],
     ["Gesture threshold", settings.gestureThreshold],
@@ -747,6 +827,77 @@ function TrackballPanel({ settings }: { settings: TrackballSettings }) {
       </div>
     </section>
   );
+}
+
+function TrackballEditor({
+  onApply,
+  settings,
+}: {
+  onApply: (settings: RequiredTrackballSettings) => void;
+  settings: TrackballSettings;
+}) {
+  const [form, setForm] = React.useState<RequiredTrackballSettings>(() => completeTrackballSettings(settings));
+
+  React.useEffect(() => {
+    setForm(completeTrackballSettings(settings));
+  }, [settings]);
+
+  const fields: Array<[keyof RequiredTrackballSettings, string]> = [
+    ["leftCpi", "Left CPI"],
+    ["rightCpi", "Right CPI"],
+    ["pointerMinFactor", "Left min factor"],
+    ["pointerMaxFactor", "Left max factor"],
+    ["pointerSpeedThreshold", "Left speed threshold"],
+    ["pointerAccelerationExponent", "Left exponent"],
+    ["rightPointerMinFactor", "Right min factor"],
+    ["rightPointerMaxFactor", "Right max factor"],
+    ["rightPointerSpeedThreshold", "Right speed threshold"],
+    ["rightPointerAccelerationExponent", "Right exponent"],
+    ["gestureThreshold", "Gesture threshold"],
+    ["tabThreshold", "Tab threshold"],
+    ["desktopThreshold", "Desktop threshold"],
+  ];
+
+  return (
+    <section>
+      <p className="eyebrow">Trackball Edit</p>
+      <h2>トラックボール編集</h2>
+      <div className="trackball-editor">
+        {fields.map(([key, label]) => (
+          <label key={key}>
+            {label}
+            <input
+              min={0}
+              type="number"
+              value={form[key]}
+              onChange={(event) => setForm({ ...form, [key]: Number(event.target.value) })}
+            />
+          </label>
+        ))}
+        <button type="button" onClick={() => onApply(form)}>
+          設定に反映
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function completeTrackballSettings(settings: TrackballSettings): RequiredTrackballSettings {
+  return {
+    leftCpi: settings.leftCpi ?? 200,
+    rightCpi: settings.rightCpi ?? 700,
+    pointerMinFactor: settings.pointerMinFactor ?? 800,
+    pointerMaxFactor: settings.pointerMaxFactor ?? 2500,
+    pointerSpeedThreshold: settings.pointerSpeedThreshold ?? 1400,
+    pointerAccelerationExponent: settings.pointerAccelerationExponent ?? 3,
+    rightPointerMinFactor: settings.rightPointerMinFactor ?? 620,
+    rightPointerMaxFactor: settings.rightPointerMaxFactor ?? 2200,
+    rightPointerSpeedThreshold: settings.rightPointerSpeedThreshold ?? 2500,
+    rightPointerAccelerationExponent: settings.rightPointerAccelerationExponent ?? 3,
+    gestureThreshold: settings.gestureThreshold ?? 4,
+    tabThreshold: settings.tabThreshold ?? 4,
+    desktopThreshold: settings.desktopThreshold ?? 8,
+  };
 }
 
 function downloadText(filename: string, contents: string) {
