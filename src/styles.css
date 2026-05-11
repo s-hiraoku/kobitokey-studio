@@ -316,21 +316,73 @@ button:disabled {
   white-space: nowrap;
 }
 
-.combo-dot {
+.combo-overlay {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  display: grid;
-  place-items: center;
-  min-width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: #26382f;
-  color: #fffdf8;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 9px;
+  inset: 0;
+  width: var(--layout-width);
+  height: var(--layout-height);
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.combo-link {
+  color: #26382f;
+  opacity: 0.76;
+}
+
+.combo-link path {
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  fill: none;
+  pointer-events: none;
+}
+
+.combo-link circle {
+  fill: #fbf8f1;
+  stroke: currentColor;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.combo-label {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.combo-label rect {
+  fill: #dce4f4;
+  stroke: #98a8cc;
+  stroke-width: 1;
+}
+
+.combo-label text {
+  fill: #17201b;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 1;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  user-select: none;
+}
+
+.combo-link.related {
+  opacity: 0.95;
+}
+
+.combo-link.selected {
+  color: #0f5132;
+  opacity: 1;
+}
+
+.combo-link.selected path {
+  stroke-width: 3;
+}
+
+.combo-link.selected .combo-label rect {
+  fill: #c7ecd5;
+  stroke: #0f5132;
 }
 
 .physical-key.selected {

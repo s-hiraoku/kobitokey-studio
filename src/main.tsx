@@ -432,7 +432,9 @@ function App() {
           <KeyboardGrid
             combos={combos}
             layer={activeLayer}
+            selectedComboId={selectedComboId}
             selectedKeyIndex={selectedKeyIndex}
+            onComboSelect={setSelectedComboId}
             onSelect={setSelectedKeyIndex}
           />
 
@@ -579,24 +581,18 @@ const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
 function KeyboardGrid({
   combos,
   layer,
+  selectedComboId,
   selectedKeyIndex,
+  onComboSelect,
   onSelect,
 }: {
   combos: KeymapCombo[];
   layer?: KeymapLayer;
+  selectedComboId: string | null;
   selectedKeyIndex: number;
+  onComboSelect: (comboId: string) => void;
   onSelect: (index: number) => void;
 }) {
-  const combosByKey = React.useMemo(() => {
-    const map = new Map<number, KeymapCombo[]>();
-    combos.forEach((combo) => {
-      combo.keyPositions.forEach((position) => {
-        map.set(position, [...(map.get(position) ?? []), combo]);
-      });
-    });
-    return map;
-  }, [combos]);
-
   return (
     <div className="keyboard-viewport">
       <div
@@ -633,11 +629,16 @@ function KeyboardGrid({
             <span />
           </div>
         ))}
+        <ComboOverlay
+          combos={combos}
+          selectedComboId={selectedComboId}
+          selectedKeyIndex={selectedKeyIndex}
+          onSelect={onComboSelect}
+        />
         {kobitoKeyPhysicalLayout.map((key) => (
           <PhysicalKeyButton
             key={`${key.side}-${key.index}`}
             binding={layer?.bindings[key.index] ?? ""}
-            comboCount={combosByKey.get(key.index)?.length ?? 0}
             index={key.index}
             isSelected={key.index === selectedKeyIndex}
             kind={key.kind}
@@ -657,7 +658,6 @@ function KeyboardGrid({
 
 function PhysicalKeyButton({
   binding,
-  comboCount,
   height,
   index,
   isSelected,
@@ -670,7 +670,6 @@ function PhysicalKeyButton({
   width,
 }: {
   binding: string;
-  comboCount: number;
   height: number;
   index: number;
   isSelected: boolean;
@@ -704,9 +703,133 @@ function PhysicalKeyButton({
         {display.badge ? <em>{display.badge}</em> : null}
         <strong>{display.label}</strong>
       </span>
-      {comboCount > 0 ? <span className="combo-dot">{comboCount}</span> : null}
     </button>
   );
+}
+
+function ComboOverlay({
+  combos,
+  onSelect,
+  selectedComboId,
+  selectedKeyIndex,
+}: {
+  combos: KeymapCombo[];
+  onSelect: (comboId: string) => void;
+  selectedComboId: string | null;
+  selectedKeyIndex: number;
+}) {
+  const visibleCombos = React.useMemo(
+    () =>
+      combos
+        .map((combo) => makeComboViz(combo))
+        .filter((combo): combo is ComboViz => Boolean(combo)),
+    [combos],
+  );
+
+  return (
+    <svg
+      className="combo-overlay"
+      viewBox={`0 0 ${LAYOUT_WIDTH} ${LAYOUT_HEIGHT}`}
+      aria-label="Combo map"
+    >
+      {visibleCombos.map((combo) => {
+        const isSelected = combo.id === selectedComboId;
+        const isRelated = combo.keyPositions.includes(selectedKeyIndex);
+        return (
+          <g
+            key={combo.id}
+            className={`combo-link ${isSelected ? "selected" : ""} ${isRelated ? "related" : ""}`}
+          >
+            {combo.segments.map((segment, index) => (
+              <path key={index} d={segment} />
+            ))}
+            {combo.points.map((point, index) => (
+              <circle key={index} cx={point.x} cy={point.y} r="4.2" />
+            ))}
+            <g className="combo-label" role="button" tabIndex={0} onClick={() => onSelect(combo.id)}>
+              <rect
+                x={combo.label.x - combo.label.width / 2}
+                y={combo.label.y - 13}
+                width={combo.label.width}
+                height="26"
+                rx="7"
+                ry="7"
+              />
+              <text x={combo.label.x} y={combo.label.y}>
+                {combo.label.text}
+              </text>
+            </g>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+type ComboViz = {
+  id: string;
+  keyPositions: number[];
+  label: {
+    text: string;
+    width: number;
+    x: number;
+    y: number;
+  };
+  points: Array<{ x: number; y: number }>;
+  segments: string[];
+};
+
+const physicalKeyByIndex = new Map(kobitoKeyPhysicalLayout.map((key) => [key.index, key]));
+
+function makeComboViz(combo: KeymapCombo): ComboViz | undefined {
+  const points = combo.keyPositions
+    .flatMap((position) => {
+      const key = physicalKeyByIndex.get(position);
+      return key
+        ? [
+            {
+              x: key.x + key.width / 2,
+              y: key.y + key.height / 2,
+            },
+          ]
+        : [];
+    });
+
+  if (points.length < 2) {
+    return undefined;
+  }
+
+  const orderedPoints = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  const center = {
+    x: orderedPoints.reduce((total, point) => total + point.x, 0) / orderedPoints.length,
+    y: orderedPoints.reduce((total, point) => total + point.y, 0) / orderedPoints.length,
+  };
+  const segments = orderedPoints.slice(1).map((point, index) => {
+    const start = orderedPoints[index];
+    return `M ${start.x} ${start.y} L ${point.x} ${point.y}`;
+  });
+  const display = bindingDisplay(combo.binding);
+  const text = truncateComboLabel([display.badge, display.label].filter(Boolean).join(" "), 12);
+
+  return {
+    id: combo.id,
+    keyPositions: combo.keyPositions,
+    label: {
+      text,
+      width: Math.max(34, Math.min(86, text.length * 7 + 16)),
+      x: center.x,
+      y: center.y,
+    },
+    points: orderedPoints,
+    segments,
+  };
+}
+
+function truncateComboLabel(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function ComboPanel({
