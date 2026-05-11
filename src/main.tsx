@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
+import { Download, FolderOpen, RefreshCw, Save, UploadCloud, Usb } from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
@@ -47,6 +47,31 @@ type FileDiff = {
   lines: string[];
 };
 
+type StudioPort = {
+  path: string;
+  label: string;
+  manufacturer?: string;
+  product?: string;
+  serialNumber?: string;
+  portKind: string;
+};
+
+type StudioKeymap = {
+  deviceName: string;
+  serialNumber: string;
+  lockState: string;
+  hasUnsavedChanges: boolean;
+  layers: StudioLayer[];
+};
+
+type StudioLayer = {
+  id: number;
+  name: string;
+  bindings: string[];
+};
+
+type EditorMode = "firmware" | "direct";
+
 const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
 const PRESETS = [
   "&trans",
@@ -69,8 +94,13 @@ const PRESETS = [
 ];
 
 function App() {
+  const [editorMode, setEditorMode] = React.useState<EditorMode>("firmware");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
+  const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
+  const [selectedStudioPort, setSelectedStudioPort] = React.useState("");
+  const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
+  const [bindingDraft, setBindingDraft] = React.useState("");
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
   const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
@@ -88,7 +118,12 @@ function App() {
     loadFixture();
   }, []);
 
-  const parsedKeymap = React.useMemo(() => parseKeymap(files?.keymap ?? ""), [files?.keymap]);
+  const isDirectMode = editorMode === "direct";
+  const activeKeymapSource = React.useMemo(
+    () => (isDirectMode && directKeymap ? studioKeymapToKeymapSource(directKeymap) : files?.keymap ?? ""),
+    [directKeymap, files?.keymap, isDirectMode],
+  );
+  const parsedKeymap = React.useMemo(() => parseKeymap(activeKeymapSource), [activeKeymapSource]);
   const layers = parsedKeymap.layers;
   const combos = parsedKeymap.combos;
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
@@ -114,6 +149,10 @@ function App() {
       ].filter((diff) => diff.lines.length > 0),
     [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
   );
+
+  React.useEffect(() => {
+    setBindingDraft(selectedBinding);
+  }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
 
   async function loadFixture() {
     const [keymap, leftOverlay, rightOverlay] = await Promise.all([
@@ -184,7 +223,12 @@ function App() {
     }
   }
 
-  function setBinding(nextBinding: string) {
+  async function applyBinding(nextBinding: string) {
+    if (isDirectMode) {
+      await writeDirectBinding(nextBinding);
+      return;
+    }
+
     if (!files || !activeLayer) {
       return;
     }
@@ -193,6 +237,64 @@ function App() {
       ...files,
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
+    setBindingDraft(nextBinding);
+  }
+
+  async function refreshStudioPorts() {
+    try {
+      const ports = await invoke<StudioPort[]>("list_studio_ports");
+      setStudioPorts(ports);
+      setSelectedStudioPort((current) => current || ports[0]?.path || "");
+      setStatus(`Studio device candidates: ${ports.length}`);
+    } catch (error) {
+      setStatus(`Studio device 検出失敗: ${String(error)}`);
+    }
+  }
+
+  async function readStudioDevice() {
+    if (!selectedStudioPort) {
+      setStatus("Studio device の port を選択してください");
+      return;
+    }
+
+    try {
+      const nextKeymap = await invoke<StudioKeymap>("read_studio_keymap", { portPath: selectedStudioPort });
+      setDirectKeymap(nextKeymap);
+      setEditorMode("direct");
+      setActiveLayerIndex(0);
+      setSelectedKeyIndex(0);
+      setSelectedComboId(null);
+      setStatus(`${nextKeymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+    } catch (error) {
+      setStatus(`Direct 読み込み失敗: ${String(error)}`);
+    }
+  }
+
+  async function writeDirectBinding(nextBinding: string) {
+    if (!directKeymap || !selectedStudioPort) {
+      setStatus("Direct Mode で接続中の device がありません");
+      return;
+    }
+
+    const directLayer = directKeymap.layers[activeLayerIndex];
+    if (!directLayer) {
+      setStatus("Direct Mode の layer が選択されていません");
+      return;
+    }
+
+    try {
+      const nextKeymap = await invoke<StudioKeymap>("write_studio_key", {
+        portPath: selectedStudioPort,
+        layerId: directLayer.id,
+        keyPosition: selectedKeyIndex,
+        binding: nextBinding,
+      });
+      setDirectKeymap(nextKeymap);
+      setBindingDraft(nextBinding);
+      setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+    } catch (error) {
+      setStatus(`Direct 書き込み失敗: ${String(error)}`);
+    }
   }
 
   function saveCombo(combo: KeymapCombo, input: ComboFormValue) {
@@ -382,20 +484,59 @@ function App() {
           <p className="eyebrow">KobitoKey Studio</p>
           <h1>KobitoKey 設定エディタ</h1>
         </div>
-        <div className="project-loader">
-          <input
-            aria-label="KobitoKey_QWERTY path"
-            value={projectRoot}
-            onChange={(event) => setProjectRoot(event.target.value)}
-          />
-          <button type="button" onClick={chooseProjectFolder}>
-            <FolderOpen size={17} />
-            選択
-          </button>
-          <button type="button" onClick={loadProject}>
-            <FolderOpen size={17} />
-            読み込み
-          </button>
+        <div className="topbar-tools">
+          <div className="mode-toggle" aria-label="Editor mode">
+            <button
+              type="button"
+              className={editorMode === "firmware" ? "active" : ""}
+              onClick={() => setEditorMode("firmware")}
+            >
+              Firmware
+            </button>
+            <button
+              type="button"
+              className={editorMode === "direct" ? "active" : ""}
+              onClick={() => setEditorMode("direct")}
+            >
+              Direct
+            </button>
+          </div>
+          {editorMode === "firmware" ? (
+            <div className="project-loader">
+              <input
+                aria-label="KobitoKey_QWERTY path"
+                value={projectRoot}
+                onChange={(event) => setProjectRoot(event.target.value)}
+              />
+              <button type="button" onClick={chooseProjectFolder}>
+                <FolderOpen size={17} />
+                選択
+              </button>
+              <button type="button" onClick={loadProject}>
+                <FolderOpen size={17} />
+                読み込み
+              </button>
+            </div>
+          ) : (
+            <div className="studio-loader">
+              <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
+                <option value="">Studio device 未選択</option>
+                {studioPorts.map((port) => (
+                  <option key={port.path} value={port.path}>
+                    {port.label} ({port.path})
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={refreshStudioPorts}>
+                <RefreshCw size={17} />
+                検出
+              </button>
+              <button type="button" onClick={readStudioDevice}>
+                <Usb size={17} />
+                読み込み
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -423,10 +564,17 @@ function App() {
               <p className="eyebrow">Layer {activeLayerIndex}</p>
               <h2>{activeLayer?.label ?? "No layer"}</h2>
             </div>
-            <button type="button" className="primary" onClick={saveProjectFiles}>
-              {files?.keymapPath ? <Save size={17} /> : <Download size={17} />}
-              {files?.keymapPath ? "保存" : "書き出し"}
-            </button>
+            {isDirectMode ? (
+              <button type="button" className="primary" onClick={readStudioDevice}>
+                <RefreshCw size={17} />
+                再読み込み
+              </button>
+            ) : (
+              <button type="button" className="primary" onClick={saveProjectFiles}>
+                {files?.keymapPath ? <Save size={17} /> : <Download size={17} />}
+                {files?.keymapPath ? "保存" : "書き出し"}
+              </button>
+            )}
           </div>
 
           <KeyboardGrid
@@ -438,19 +586,21 @@ function App() {
             onSelect={setSelectedKeyIndex}
           />
 
-          <section className="diff-panel">
-            <div className="panel-heading compact">
-              <h3>保存前 diff</h3>
-              <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
-            </div>
-            <pre>
-              {keymapDiff.length === 0
-                ? "No changes"
-                : keymapDiff
-                    .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
-                    .join("\n\n")}
-            </pre>
-          </section>
+          {isDirectMode ? <DirectSummaryPanel keymap={directKeymap} portPath={selectedStudioPort} /> : (
+            <section className="diff-panel">
+              <div className="panel-heading compact">
+                <h3>保存前 diff</h3>
+                <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
+              </div>
+              <pre>
+                {keymapDiff.length === 0
+                  ? "No changes"
+                  : keymapDiff
+                      .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
+                      .join("\n\n")}
+              </pre>
+            </section>
+          )}
         </section>
 
         <aside className="inspector">
@@ -459,31 +609,40 @@ function App() {
             <h2>{selectedBinding}</h2>
             <label>
               Binding
-              <input value={selectedBinding} onChange={(event) => setBinding(event.target.value)} />
+              <input value={bindingDraft} onChange={(event) => setBindingDraft(event.target.value)} />
             </label>
-            <BindingEditor binding={selectedBinding} onApply={setBinding} />
+            <button type="button" className="wide-action" onClick={() => applyBinding(bindingDraft)}>
+              {isDirectMode ? "実機へ書き込み" : "Binding に反映"}
+            </button>
+            <BindingEditor binding={bindingDraft} onApply={applyBinding} />
             <div className="preset-grid">
               {PRESETS.map((preset) => (
-                <button type="button" key={preset} onClick={() => setBinding(preset)}>
+                <button type="button" key={preset} onClick={() => applyBinding(preset)}>
                   {preset}
                 </button>
               ))}
             </div>
           </section>
 
-          <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
-          <ComboEditor
-            combo={selectedCombo}
-            onCreate={createCombo}
-            onDelete={removeCombo}
-            onSave={saveCombo}
-            onSelect={setSelectedComboId}
-          />
+          {isDirectMode ? (
+            <DirectModeNote />
+          ) : (
+            <>
+              <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
+              <ComboEditor
+                combo={selectedCombo}
+                onCreate={createCombo}
+                onDelete={removeCombo}
+                onSave={saveCombo}
+                onSelect={setSelectedComboId}
+              />
 
-          <TrackballPanel settings={trackball} />
-          <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
+              <TrackballPanel settings={trackball} />
+              <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
+            </>
+          )}
 
-          <section className="build-panel">
+          {!isDirectMode ? <section className="build-panel">
             <div>
               <p className="eyebrow">Build / Flash</p>
               <h2>アップロード支援</h2>
@@ -535,7 +694,7 @@ function App() {
                 UF2 をコピー
               </button>
             </div>
-          </section>
+          </section> : null}
         </aside>
       </section>
 
@@ -830,6 +989,52 @@ function truncateComboLabel(value: string, maxLength: number): string {
     return value;
   }
   return `${value.slice(0, maxLength - 3)}...`;
+}
+
+function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+  return (
+    <section className="direct-summary">
+      <div className="panel-heading compact">
+        <h3>Direct Mode</h3>
+        <span>{keymap ? `${keymap.layers.length} layers` : "未接続"}</span>
+      </div>
+      {keymap ? (
+        <dl>
+          <div>
+            <dt>Device</dt>
+            <dd>{keymap.deviceName || "Unknown ZMK device"}</dd>
+          </div>
+          <div>
+            <dt>Port</dt>
+            <dd>{portPath || "-"}</dd>
+          </div>
+          <div>
+            <dt>Lock</dt>
+            <dd>{keymap.lockState}</dd>
+          </div>
+          <div>
+            <dt>Unsaved</dt>
+            <dd>{keymap.hasUnsavedChanges ? "あり" : "なし"}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
+      )}
+    </section>
+  );
+}
+
+function DirectModeNote() {
+  return (
+    <section className="direct-note">
+      <p className="eyebrow">Direct Mode</p>
+      <h2>実機 keymap 書き込み</h2>
+      <p>
+        キー binding は USB 接続した ZMK Studio 対応 device に直接保存されます。combo とトラックボール設定は
+        Firmware Mode で編集して build / flash してください。
+      </p>
+    </section>
+  );
 }
 
 function ComboPanel({
@@ -1229,6 +1434,50 @@ function downloadText(filename: string, contents: string) {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
+  const layers = keymap.layers
+    .map((layer, index) => {
+      const id = sanitizeLayerId(layer.name || `layer_${index}`, index);
+      return [
+        `        ${id} {`,
+        `            display-name = "${escapeDtsString(layer.name || `Layer ${index}`)}";`,
+        "            bindings = <",
+        formatStudioBindings(layer.bindings),
+        "            >;",
+        "        };",
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
+}
+
+function formatStudioBindings(bindings: string[]): string {
+  const completeBindings = Array.from({ length: 40 }, (_, index) => bindings[index] ?? "&none");
+  const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
+
+  return Array.from({ length: 4 }, (_, row) =>
+    completeBindings
+      .slice(row * 10, row * 10 + 10)
+      .map((binding) => binding.padEnd(maxLength, " "))
+      .join("  ")
+      .trimEnd(),
+  ).join("\n");
+}
+
+function sanitizeLayerId(name: string, index: number): string {
+  const id = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return id || `layer_${index}`;
+}
+
+function escapeDtsString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

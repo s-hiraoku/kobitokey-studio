@@ -60,6 +60,40 @@ button:disabled {
   line-height: 1.1;
 }
 
+.topbar-tools {
+  display: grid;
+  grid-template-columns: auto minmax(520px, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: min(820px, 60vw);
+}
+
+.mode-toggle {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #c7c3b8;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #fffdf8;
+}
+
+.mode-toggle button {
+  min-height: 39px;
+  border: 0;
+  border-right: 1px solid #c7c3b8;
+  padding: 0 12px;
+  font-weight: 700;
+}
+
+.mode-toggle button:last-child {
+  border-right: 0;
+}
+
+.mode-toggle button.active {
+  background: #26382f;
+  color: #fffdf8;
+}
+
 .eyebrow {
   margin: 0 0 5px;
   color: #66716b;
@@ -73,10 +107,10 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) auto auto;
   gap: 10px;
-  width: min(680px, 54vw);
 }
 
 .project-loader input,
+.studio-loader select,
 .inspector input,
 .inspector select {
   width: 100%;
@@ -88,7 +122,9 @@ button:disabled {
 }
 
 .project-loader button,
+.studio-loader button,
 .primary,
+.wide-action,
 .build-panel button {
   display: inline-flex;
   align-items: center;
@@ -98,6 +134,12 @@ button:disabled {
   border-radius: 6px;
   padding: 0 14px;
   font-weight: 700;
+}
+
+.studio-loader {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto auto;
+  gap: 10px;
 }
 
 .primary {
@@ -398,6 +440,46 @@ button:disabled {
   padding-top: 16px;
 }
 
+.direct-summary {
+  border-top: 1px solid #d8d2c6;
+  padding-top: 16px;
+}
+
+.direct-summary dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.direct-summary div {
+  min-width: 0;
+  border: 1px solid #d8d2c6;
+  border-radius: 7px;
+  padding: 10px;
+  background: #fbf8f1;
+}
+
+.direct-summary dt {
+  color: #66716b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.direct-summary dd {
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.wide-action {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .diff-panel pre {
   height: 190px;
   margin: 10px 0 0;
@@ -598,6 +680,12 @@ button:disabled {
 .build-panel button {
   width: 100%;
   margin-top: 8px;
+}
+
+.direct-note p:last-child {
+  margin: 8px 0 0;
+  color: #505a54;
+  line-height: 1.5;
 }
 
 .build-status {
