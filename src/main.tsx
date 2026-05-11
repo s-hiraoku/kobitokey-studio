@@ -78,6 +78,7 @@ function App() {
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState("fixture を読み込み中");
+  const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
 
   React.useEffect(() => {
     loadFixture();
@@ -303,6 +304,33 @@ function App() {
     setStatus("トラックボール設定を更新しました");
   }
 
+  async function triggerBuild() {
+    try {
+      await invoke<string>("trigger_github_build", { root: projectRoot });
+      setBuildStatus("build workflow を起動しました");
+    } catch (error) {
+      setBuildStatus(`起動失敗: ${String(error)}`);
+    }
+  }
+
+  async function refreshBuildStatus() {
+    try {
+      const output = await invoke<string>("latest_github_run", { root: projectRoot });
+      setBuildStatus(formatRunStatus(output));
+    } catch (error) {
+      setBuildStatus(`確認失敗: ${String(error)}`);
+    }
+  }
+
+  async function downloadArtifacts() {
+    try {
+      const output = await invoke<string>("download_latest_artifact", { root: projectRoot });
+      setBuildStatus(output || "artifact を .kobitokey-studio/artifacts に保存しました");
+    } catch (error) {
+      setBuildStatus(`artifact 取得失敗: ${String(error)}`);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -420,9 +448,16 @@ function App() {
               <li>artifact から左右 UF2 を取得</li>
               <li>左右を順番に bootloader へ書き込み</li>
             </ol>
-            <button type="button" disabled>
+            <p className="build-status">{buildStatus}</p>
+            <button type="button" onClick={triggerBuild}>
               <UploadCloud size={17} />
-              GitHub 連携は次ステップ
+              Build 起動
+            </button>
+            <button type="button" onClick={refreshBuildStatus}>
+              最新 run 確認
+            </button>
+            <button type="button" onClick={downloadArtifacts}>
+              Artifact 取得
             </button>
           </section>
         </aside>
@@ -858,6 +893,25 @@ function validateProjectRoot(projectRoot: string): string | undefined {
     return "KobitoKey_QWERTY リポジトリのパスを指定してください";
   }
   return undefined;
+}
+
+function formatRunStatus(output: string): string {
+  try {
+    const runs = JSON.parse(output) as Array<{
+      conclusion?: string;
+      createdAt?: string;
+      headBranch?: string;
+      status?: string;
+      url?: string;
+    }>;
+    const run = runs[0];
+    if (!run) {
+      return "GitHub Actions run が見つかりません";
+    }
+    return `${run.status ?? "unknown"} / ${run.conclusion ?? "pending"} / ${run.headBranch ?? "-"} / ${run.createdAt ?? ""}`;
+  } catch {
+    return output || "GitHub Actions run が見つかりません";
+  }
 }
 
 function fileDiff(filename: string, before: string, after: string): FileDiff {

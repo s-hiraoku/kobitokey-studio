@@ -545,6 +545,19 @@ button:disabled {
 
 .build-panel button {
   width: 100%;
+  margin-top: 8px;
+}
+
+.build-status {
+  min-height: 34px;
+  border: 1px solid #e4ded2;
+  border-radius: 6px;
+  margin: 0 0 8px;
+  padding: 8px;
+  background: #fffdf8;
+  color: #525a55;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .statusbar {
