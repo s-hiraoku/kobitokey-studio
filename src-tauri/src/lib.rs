@@ -44,6 +44,7 @@ struct KobitoKeyProject {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             read_text_file,
             write_text_file,

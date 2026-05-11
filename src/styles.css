@@ -71,7 +71,7 @@ button:disabled {
 
 .project-loader {
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) auto;
+  grid-template-columns: minmax(420px, 1fr) auto auto;
   gap: 10px;
   width: min(680px, 54vw);
 }

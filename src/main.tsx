@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay } from "./lib/bindingDisplay";
@@ -109,6 +110,12 @@ function App() {
   }
 
   async function loadProject() {
+    const validationError = validateProjectRoot(projectRoot);
+    if (validationError) {
+      setStatus(validationError);
+      return;
+    }
+
     try {
       const project = await invoke<ProjectFiles>("read_kobitokey_project", { root: projectRoot });
       setFiles(project);
@@ -116,6 +123,23 @@ function App() {
       setStatus("ローカルプロジェクトを読み込みました");
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
+    }
+  }
+
+  async function chooseProjectFolder() {
+    try {
+      const selected = await open({
+        defaultPath: projectRoot,
+        directory: true,
+        multiple: false,
+        title: "KobitoKey_QWERTY フォルダを選択",
+      });
+      if (typeof selected === "string") {
+        setProjectRoot(selected);
+        setStatus("フォルダを選択しました");
+      }
+    } catch (error) {
+      setStatus(`フォルダ選択は Tauri アプリ内で利用できます: ${String(error)}`);
     }
   }
 
@@ -272,6 +296,10 @@ function App() {
             value={projectRoot}
             onChange={(event) => setProjectRoot(event.target.value)}
           />
+          <button type="button" onClick={chooseProjectFolder}>
+            <FolderOpen size={17} />
+            選択
+          </button>
           <button type="button" onClick={loadProject}>
             <FolderOpen size={17} />
             読み込み
@@ -794,6 +822,16 @@ function nextComboId(combos: KeymapCombo[]): string {
     index += 1;
   }
   return `combo_custom_${index}`;
+}
+
+function validateProjectRoot(projectRoot: string): string | undefined {
+  if (!projectRoot.trim()) {
+    return "KobitoKey_QWERTY のパスを入力してください";
+  }
+  if (!projectRoot.includes("KobitoKey_QWERTY")) {
+    return "KobitoKey_QWERTY リポジトリのパスを指定してください";
+  }
+  return undefined;
 }
 
 function TrackballPanel({ settings }: { settings: TrackballSettings }) {
