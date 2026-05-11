@@ -94,7 +94,7 @@ const PRESETS = [
 ];
 
 function App() {
-  const [editorMode, setEditorMode] = React.useState<EditorMode>("firmware");
+  const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
   const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
@@ -128,6 +128,7 @@ function App() {
   const combos = parsedKeymap.combos;
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
+  const showDirectEmptyState = isDirectMode && !directKeymap;
   const selectedCombos = React.useMemo(
     () => combos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [combos, selectedKeyIndex],
@@ -479,7 +480,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
+      <header className={`topbar ${isDirectMode ? "direct-active" : ""}`}>
         <div>
           <p className="eyebrow">KobitoKey Studio</p>
           <h1>KobitoKey 設定エディタ</h1>
@@ -517,7 +518,7 @@ function App() {
                 読み込み
               </button>
             </div>
-          ) : (
+          ) : directKeymap ? (
             <div className="studio-loader">
               <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
                 <option value="">Studio device 未選択</option>
@@ -536,11 +537,25 @@ function App() {
                 読み込み
               </button>
             </div>
+          ) : (
+            <div className="topbar-hint">
+              <Usb size={17} />
+              USB 接続した KobitoKey を中央のカードから読み込みます
+            </div>
           )}
         </div>
       </header>
 
-      <section className="workspace">
+      {showDirectEmptyState ? (
+        <DirectWelcome
+          ports={studioPorts}
+          selectedPort={selectedStudioPort}
+          onPortChange={setSelectedStudioPort}
+          onRefresh={refreshStudioPorts}
+          onRead={readStudioDevice}
+        />
+      ) : (
+      <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
           {layers.map((layer, index) => (
             <button
@@ -559,6 +574,7 @@ function App() {
         </nav>
 
         <section className="keyboard-panel">
+          {isDirectMode ? <DirectConnectionBar keymap={directKeymap} portPath={selectedStudioPort} /> : null}
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Layer {activeLayerIndex}</p>
@@ -604,7 +620,7 @@ function App() {
         </section>
 
         <aside className="inspector">
-          <section>
+          <section className={isDirectMode ? "direct-key-editor" : ""}>
             <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
             <h2>{selectedBinding}</h2>
             <label>
@@ -625,7 +641,7 @@ function App() {
           </section>
 
           {isDirectMode ? (
-            <DirectModeNote />
+            <DirectModeNote onFirmwareMode={() => setEditorMode("firmware")} />
           ) : (
             <>
               <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
@@ -697,6 +713,7 @@ function App() {
           </section> : null}
         </aside>
       </section>
+      )}
 
       <footer className="statusbar">{status}</footer>
     </main>
@@ -1024,7 +1041,78 @@ function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null;
   );
 }
 
-function DirectModeNote() {
+function DirectConnectionBar({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+  return (
+    <div className="direct-connection-bar">
+      <div>
+        <p className="eyebrow">Connected Keyboard</p>
+        <strong>{keymap?.deviceName || "ZMK Studio device"}</strong>
+      </div>
+      <span>{portPath || "port 未選択"}</span>
+      <span>{keymap ? `${keymap.layers.length} layers` : "未読み込み"}</span>
+      <span>{keymap?.lockState ?? "unknown"}</span>
+    </div>
+  );
+}
+
+function DirectWelcome({
+  onPortChange,
+  onRead,
+  onRefresh,
+  ports,
+  selectedPort,
+}: {
+  onPortChange: (port: string) => void;
+  onRead: () => void;
+  onRefresh: () => void;
+  ports: StudioPort[];
+  selectedPort: string;
+}) {
+  return (
+    <section className="direct-welcome">
+      <div className="direct-welcome-card">
+        <div>
+          <p className="eyebrow">Direct Mode</p>
+          <h2>キーボードを接続</h2>
+          <p>
+            USB で KobitoKey を接続して、実機の keymap を読み込みます。読み込んだ後は、キーを選んでその場で
+            binding を書き込めます。
+          </p>
+        </div>
+        <div className="direct-connect-controls">
+          <label>
+            Device
+            <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+              <option value="">Studio device 未選択</option>
+              {ports.map((port) => (
+                <option key={port.path} value={port.path}>
+                  {port.label} ({port.path})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="direct-connect-actions">
+            <button type="button" onClick={onRefresh}>
+              <RefreshCw size={17} />
+              検出
+            </button>
+            <button type="button" className="primary" onClick={onRead}>
+              <Usb size={17} />
+              読み込み
+            </button>
+          </div>
+        </div>
+        <div className="direct-capability-strip">
+          <span>Keymap: 直接編集</span>
+          <span>Combo: Firmware Mode</span>
+          <span>Trackball: Firmware Mode</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DirectModeNote({ onFirmwareMode }: { onFirmwareMode: () => void }) {
   return (
     <section className="direct-note">
       <p className="eyebrow">Direct Mode</p>
@@ -1033,6 +1121,9 @@ function DirectModeNote() {
         キー binding は USB 接続した ZMK Studio 対応 device に直接保存されます。combo とトラックボール設定は
         Firmware Mode で編集して build / flash してください。
       </p>
+      <button type="button" className="wide-action" onClick={onFirmwareMode}>
+        Firmware Mode を開く
+      </button>
     </section>
   );
 }

@@ -49,6 +49,10 @@ button:disabled {
   background: #fbf8f1;
 }
 
+.topbar.direct-active {
+  background: #f7faf6;
+}
+
 .topbar h1,
 .panel-heading h2,
 .inspector h2 {
@@ -142,6 +146,17 @@ button:disabled {
   gap: 10px;
 }
 
+.topbar-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 39px;
+  color: #505a54;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .primary {
   border-color: #26382f;
   background: #26382f;
@@ -152,6 +167,94 @@ button:disabled {
   display: grid;
   grid-template-columns: 184px minmax(0, 1fr) 360px;
   min-height: 0;
+}
+
+.workspace.direct-workspace {
+  grid-template-columns: 184px minmax(0, 1fr) 330px;
+}
+
+.direct-welcome {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 134px);
+  padding: 42px;
+}
+
+.direct-welcome-card {
+  display: grid;
+  gap: 24px;
+  width: min(760px, 100%);
+  border: 1px solid #d8d2c6;
+  border-radius: 8px;
+  padding: 28px;
+  background: #fbf8f1;
+}
+
+.direct-welcome-card h2 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.direct-welcome-card p {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: #505a54;
+  line-height: 1.55;
+}
+
+.direct-connect-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.direct-connect-controls label {
+  display: grid;
+  gap: 7px;
+  color: #66716b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.direct-connect-controls select {
+  min-height: 43px;
+  border: 1px solid #c7c3b8;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #fffdf8;
+  font: inherit;
+}
+
+.direct-connect-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.direct-connect-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 43px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.direct-capability-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.direct-capability-strip span {
+  border: 1px solid #d8d2c6;
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: #fffdf8;
+  color: #505a54;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .sidebar {
@@ -197,6 +300,35 @@ button:disabled {
   gap: 18px;
   min-width: 0;
   padding: 22px;
+}
+
+.direct-connection-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.8fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d8d2c6;
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: #fbf8f1;
+}
+
+.direct-connection-bar strong {
+  display: block;
+  font-size: 15px;
+}
+
+.direct-connection-bar span {
+  overflow: hidden;
+  border: 1px solid #e4ded2;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #fffdf8;
+  color: #505a54;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-heading {
@@ -480,6 +612,13 @@ button:disabled {
   margin-top: 10px;
 }
 
+.direct-key-editor {
+  border: 1px solid #d8d2c6;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fffdf8;
+}
+
 .diff-panel pre {
   height: 190px;
   margin: 10px 0 0;
@@ -686,6 +825,10 @@ button:disabled {
   margin: 8px 0 0;
   color: #505a54;
   line-height: 1.5;
+}
+
+.direct-note button {
+  margin-top: 12px;
 }
 
 .build-status {
