@@ -1,0 +1,143 @@
+export type KeymapLayer = {
+  id: string;
+  label: string;
+  bindings: string[];
+  blockStart: number;
+  blockEnd: number;
+};
+
+export type ParsedKeymap = {
+  layers: KeymapLayer[];
+};
+
+const KEY_COUNT = 40;
+const LAYER_PATTERN =
+  /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
+
+export function parseKeymap(source: string): ParsedKeymap {
+  const keymapBlock = extractKeymapBody(source);
+  const keymapSource = keymapBlock.body;
+  const offset = keymapBlock.bodyStart;
+  const layers: KeymapLayer[] = [];
+
+  for (const match of keymapSource.matchAll(LAYER_PATTERN)) {
+    const id = match.groups?.id ?? `layer${layers.length}`;
+    const body = match.groups?.body ?? "";
+    const bindingsSource = match.groups?.bindings ?? "";
+    const bindings = tokenizeBindings(bindingsSource);
+
+    if (bindings.length !== KEY_COUNT) {
+      continue;
+    }
+
+    layers.push({
+      id,
+      label: parseLabel(body) ?? defaultLayerLabel(id, layers.length),
+      bindings,
+      blockStart: offset + (match.index ?? 0),
+      blockEnd: offset + (match.index ?? 0) + match[0].length,
+    });
+  }
+
+  return { layers };
+}
+
+function extractKeymapBody(source: string): { body: string; bodyStart: number } {
+  const keymapStart = source.indexOf("keymap {");
+  if (keymapStart < 0) {
+    return { body: source, bodyStart: 0 };
+  }
+
+  const openBrace = source.indexOf("{", keymapStart);
+  let depth = 0;
+
+  for (let index = openBrace; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          body: source.slice(openBrace + 1, index),
+          bodyStart: openBrace + 1,
+        };
+      }
+    }
+  }
+
+  return { body: source.slice(openBrace + 1), bodyStart: openBrace + 1 };
+}
+
+export function updateLayerBinding(
+  source: string,
+  layer: KeymapLayer,
+  keyIndex: number,
+  nextBinding: string,
+): string {
+  const nextBindings = [...layer.bindings];
+  nextBindings[keyIndex] = normalizeBinding(nextBinding);
+
+  const block = source.slice(layer.blockStart, layer.blockEnd);
+  const nextBlock = block.replace(
+    /bindings\s*=\s*<[\s\S]*?>\s*;/,
+    `bindings = <\n${formatBindings(nextBindings)}\n            >;`,
+  );
+
+  return source.slice(0, layer.blockStart) + nextBlock + source.slice(layer.blockEnd);
+}
+
+export function formatBindings(bindings: string[]): string {
+  const rows: string[] = [];
+  const maxLength = Math.max(...bindings.map((binding) => binding.length), 7);
+
+  for (let row = 0; row < 4; row += 1) {
+    const cells = bindings
+      .slice(row * 10, row * 10 + 10)
+      .map((binding) => binding.padEnd(maxLength, " "));
+    rows.push(cells.join("  ").trimEnd());
+  }
+
+  return rows.join("\n");
+}
+
+export function tokenizeBindings(source: string): string[] {
+  const tokens = source
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  const bindings: string[] = [];
+  let current: string[] = [];
+
+  for (const token of tokens) {
+    if (token.startsWith("&")) {
+      if (current.length > 0) {
+        bindings.push(current.join(" "));
+      }
+      current = [token];
+    } else if (current.length > 0) {
+      current.push(token);
+    }
+  }
+
+  if (current.length > 0) {
+    bindings.push(current.join(" "));
+  }
+
+  return bindings;
+}
+
+function parseLabel(layerBody: string): string | undefined {
+  return layerBody.match(/label\s*=\s*"([^"]+)"/)?.[1];
+}
+
+function defaultLayerLabel(id: string, index: number): string {
+  return id === "default_layer" ? "DEFAULT" : `Layer ${index}`;
+}
+
+function normalizeBinding(binding: string): string {
+  const normalized = binding.trim().replace(/\s+/g, " ");
+  return normalized.startsWith("&") ? normalized : `&kp ${normalized}`;
+}
