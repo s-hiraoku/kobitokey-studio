@@ -560,6 +560,18 @@ button:disabled {
   line-height: 1.4;
 }
 
+.flash-wizard {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  border-top: 1px solid #ece6da;
+  padding-top: 10px;
+}
+
+.flash-wizard label {
+  margin-top: 0;
+}
+
 .statusbar {
   min-height: 32px;
   border-top: 1px solid #d8d2c6;

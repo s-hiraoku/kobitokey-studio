@@ -79,6 +79,10 @@ function App() {
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
+  const [uf2Files, setUf2Files] = React.useState<string[]>([]);
+  const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
+  const [selectedUf2, setSelectedUf2] = React.useState("");
+  const [selectedVolume, setSelectedVolume] = React.useState("");
 
   React.useEffect(() => {
     loadFixture();
@@ -331,6 +335,46 @@ function App() {
     }
   }
 
+  async function refreshFlashTargets() {
+    try {
+      const [nextUf2Files, nextVolumes] = await Promise.all([
+        invoke<string[]>("list_uf2_files", { root: projectRoot }),
+        invoke<string[]>("list_bootloader_volumes"),
+      ]);
+      setUf2Files(nextUf2Files);
+      setBootloaderVolumes(nextVolumes);
+      setSelectedUf2(nextUf2Files[0] ?? "");
+      setSelectedVolume(nextVolumes[0] ?? "");
+      setBuildStatus(`UF2 ${nextUf2Files.length} 件 / bootloader ${nextVolumes.length} 件`);
+    } catch (error) {
+      setBuildStatus(`UF2/volume 確認失敗: ${String(error)}`);
+    }
+  }
+
+  async function copySelectedUf2() {
+    if (!selectedUf2 || !selectedVolume) {
+      setBuildStatus("UF2 と bootloader volume を選択してください");
+      return;
+    }
+
+    const fileName = selectedUf2.split("/").pop() ?? selectedUf2;
+    const volumeName = selectedVolume.split("/").pop() ?? selectedVolume;
+    const confirmed = window.confirm(`${fileName} を ${volumeName} にコピーします。左右を確認してください。`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const destination = await invoke<string>("copy_uf2_to_volume", {
+        uf2Path: selectedUf2,
+        volumePath: selectedVolume,
+      });
+      setBuildStatus(`書き込みコピー完了: ${destination}`);
+    } catch (error) {
+      setBuildStatus(`UF2 コピー失敗: ${String(error)}`);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -459,6 +503,36 @@ function App() {
             <button type="button" onClick={downloadArtifacts}>
               Artifact 取得
             </button>
+            <div className="flash-wizard">
+              <button type="button" onClick={refreshFlashTargets}>
+                UF2 / Volume 更新
+              </button>
+              <label>
+                UF2
+                <select value={selectedUf2} onChange={(event) => setSelectedUf2(event.target.value)}>
+                  <option value="">未選択</option>
+                  {uf2Files.map((file) => (
+                    <option key={file} value={file}>
+                      {file.split("/").pop()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Bootloader
+                <select value={selectedVolume} onChange={(event) => setSelectedVolume(event.target.value)}>
+                  <option value="">未選択</option>
+                  {bootloaderVolumes.map((volume) => (
+                    <option key={volume} value={volume}>
+                      {volume.split("/").pop()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={copySelectedUf2}>
+                UF2 をコピー
+              </button>
+            </div>
           </section>
         </aside>
       </section>

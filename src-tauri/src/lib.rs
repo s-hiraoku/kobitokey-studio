@@ -75,6 +75,59 @@ fn download_latest_artifact(root: String) -> Result<String, String> {
     )
 }
 
+#[tauri::command]
+fn list_uf2_files(root: String) -> Result<Vec<String>, String> {
+    let artifacts_dir = PathBuf::from(root).join(".kobitokey-studio/artifacts");
+    let mut files = Vec::new();
+    collect_uf2_files(&artifacts_dir, &mut files)?;
+    Ok(files)
+}
+
+#[tauri::command]
+fn list_bootloader_volumes() -> Result<Vec<String>, String> {
+    let volumes = PathBuf::from("/Volumes");
+    let entries = fs::read_dir(volumes).map_err(|error| error.to_string())?;
+    let mut candidates = Vec::new();
+
+    for entry in entries {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if path.join("INFO_UF2.TXT").exists() || path.join("CURRENT.UF2").exists() {
+            candidates.push(display_path(&path));
+        }
+    }
+
+    Ok(candidates)
+}
+
+#[tauri::command]
+fn copy_uf2_to_volume(uf2_path: String, volume_path: String) -> Result<String, String> {
+    let source = PathBuf::from(&uf2_path);
+    let file_name = source
+        .file_name()
+        .ok_or_else(|| "Invalid UF2 path".to_string())?;
+    let destination = PathBuf::from(volume_path).join(file_name);
+    fs::copy(&source, &destination).map_err(|error| error.to_string())?;
+    Ok(display_path(&destination))
+}
+
+fn collect_uf2_files(dir: &Path, files: &mut Vec<String>) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir).map_err(|error| error.to_string())? {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if path.is_dir() {
+            collect_uf2_files(&path, files)?;
+        } else if path.extension().is_some_and(|extension| extension == "uf2") {
+            files.push(display_path(&path));
+        }
+    }
+
+    files.sort();
+    Ok(())
+}
+
 fn run_gh(root: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new("gh")
         .current_dir(root)
@@ -126,7 +179,10 @@ pub fn run() {
             read_kobitokey_project,
             trigger_github_build,
             latest_github_run,
-            download_latest_artifact
+            download_latest_artifact,
+            list_uf2_files,
+            list_bootloader_volumes,
+            copy_uf2_to_volume
         ])
         .run(tauri::generate_context!())
         .expect("error while running KobitoKey Studio");
