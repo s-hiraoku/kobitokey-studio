@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
+import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
@@ -272,6 +273,7 @@ function App() {
               Binding
               <input value={selectedBinding} onChange={(event) => setBinding(event.target.value)} />
             </label>
+            <BindingEditor binding={selectedBinding} onApply={setBinding} />
             <div className="preset-grid">
               {PRESETS.map((preset) => (
                 <button type="button" key={preset} onClick={() => setBinding(preset)}>
@@ -321,6 +323,17 @@ type ComboFormValue = {
   keyPositions: string;
   timeoutMs: number;
 };
+
+const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
+  { value: "key", label: "Key" },
+  { value: "layer-tap", label: "Layer Tap" },
+  { value: "mod-tap", label: "Mod Tap" },
+  { value: "momentary", label: "Momentary" },
+  { value: "to-layer", label: "To Layer" },
+  { value: "mouse", label: "Mouse" },
+  { value: "bluetooth", label: "Bluetooth" },
+  { value: "raw", label: "Raw" },
+];
 
 function KeyboardGrid({
   combos,
@@ -597,6 +610,95 @@ function ComboEditor({
       )}
     </section>
   );
+}
+
+function BindingEditor({ binding, onApply }: { binding: string; onApply: (binding: string) => void }) {
+  const [form, setForm] = React.useState<BindingForm>(() => parseBindingForm(binding));
+
+  React.useEffect(() => {
+    setForm(parseBindingForm(binding));
+  }, [binding]);
+
+  const primaryLabel = bindingPrimaryLabel(form.kind);
+  const secondaryLabel = bindingSecondaryLabel(form.kind);
+
+  return (
+    <div className="binding-editor">
+      <label>
+        Type
+        <select
+          value={form.kind}
+          onChange={(event) => {
+            const kind = event.target.value as BindingKind;
+            setForm({ ...form, kind });
+          }}
+        >
+          {BINDING_KIND_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {form.kind === "raw" ? (
+        <label>
+          Raw
+          <input value={form.raw} onChange={(event) => setForm({ ...form, raw: event.target.value })} />
+        </label>
+      ) : (
+        <>
+          <label>
+            {primaryLabel}
+            <input
+              value={form.primary}
+              onChange={(event) => setForm({ ...form, primary: event.target.value })}
+            />
+          </label>
+          {secondaryLabel ? (
+            <label>
+              {secondaryLabel}
+              <input
+                value={form.secondary}
+                onChange={(event) => setForm({ ...form, secondary: event.target.value })}
+              />
+            </label>
+          ) : null}
+        </>
+      )}
+      <button type="button" onClick={() => onApply(buildBindingFromForm(form))}>
+        Binding に反映
+      </button>
+    </div>
+  );
+}
+
+function bindingPrimaryLabel(kind: BindingKind): string {
+  switch (kind) {
+    case "layer-tap":
+    case "momentary":
+    case "to-layer":
+      return "Layer";
+    case "mod-tap":
+      return "Modifier";
+    case "mouse":
+      return "Button";
+    case "bluetooth":
+      return "Action";
+    default:
+      return "Key";
+  }
+}
+
+function bindingSecondaryLabel(kind: BindingKind): string | undefined {
+  switch (kind) {
+    case "layer-tap":
+    case "mod-tap":
+      return "Tap key";
+    case "bluetooth":
+      return "Parameter";
+    default:
+      return undefined;
+  }
 }
 
 function parseDisplayKeyPositions(value: string): number[] {
