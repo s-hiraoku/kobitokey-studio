@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
-import { KeymapLayer, parseKeymap, updateLayerBinding } from "./lib/keymapParser";
+import { KeymapCombo, KeymapLayer, parseKeymap, updateLayerBinding } from "./lib/keymapParser";
 import {
   KEY_UNIT,
   LAYOUT_HEIGHT,
@@ -61,9 +61,15 @@ function App() {
     loadFixture();
   }, []);
 
-  const layers = React.useMemo(() => parseKeymap(files?.keymap ?? "").layers, [files?.keymap]);
+  const parsedKeymap = React.useMemo(() => parseKeymap(files?.keymap ?? ""), [files?.keymap]);
+  const layers = parsedKeymap.layers;
+  const combos = parsedKeymap.combos;
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
+  const selectedCombos = React.useMemo(
+    () => combos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
+    [combos, selectedKeyIndex],
+  );
   const trackball = React.useMemo(
     () => parseTrackballSettings(files?.leftOverlay ?? "", files?.rightOverlay ?? ""),
     [files?.leftOverlay, files?.rightOverlay],
@@ -173,6 +179,7 @@ function App() {
           </div>
 
           <KeyboardGrid
+            combos={combos}
             layer={activeLayer}
             selectedKeyIndex={selectedKeyIndex}
             onSelect={setSelectedKeyIndex}
@@ -204,6 +211,8 @@ function App() {
             </div>
           </section>
 
+          <ComboPanel combos={combos} selectedCombos={selectedCombos} />
+
           <TrackballPanel settings={trackball} />
 
           <section className="build-panel">
@@ -231,14 +240,26 @@ function App() {
 }
 
 function KeyboardGrid({
+  combos,
   layer,
   selectedKeyIndex,
   onSelect,
 }: {
+  combos: KeymapCombo[];
   layer?: KeymapLayer;
   selectedKeyIndex: number;
   onSelect: (index: number) => void;
 }) {
+  const combosByKey = React.useMemo(() => {
+    const map = new Map<number, KeymapCombo[]>();
+    combos.forEach((combo) => {
+      combo.keyPositions.forEach((position) => {
+        map.set(position, [...(map.get(position) ?? []), combo]);
+      });
+    });
+    return map;
+  }, [combos]);
+
   return (
     <div className="keyboard-viewport">
       <div
@@ -279,6 +300,7 @@ function KeyboardGrid({
           <PhysicalKeyButton
             key={`${key.side}-${key.index}`}
             binding={layer?.bindings[key.index] ?? ""}
+            comboCount={combosByKey.get(key.index)?.length ?? 0}
             index={key.index}
             isSelected={key.index === selectedKeyIndex}
             kind={key.kind}
@@ -298,6 +320,7 @@ function KeyboardGrid({
 
 function PhysicalKeyButton({
   binding,
+  comboCount,
   height,
   index,
   isSelected,
@@ -310,6 +333,7 @@ function PhysicalKeyButton({
   width,
 }: {
   binding: string;
+  comboCount: number;
   height: number;
   index: number;
   isSelected: boolean;
@@ -343,7 +367,50 @@ function PhysicalKeyButton({
         {display.badge ? <em>{display.badge}</em> : null}
         <strong>{display.label}</strong>
       </span>
+      {comboCount > 0 ? <span className="combo-dot">{comboCount}</span> : null}
     </button>
+  );
+}
+
+function ComboPanel({
+  combos,
+  selectedCombos,
+}: {
+  combos: KeymapCombo[];
+  selectedCombos: KeymapCombo[];
+}) {
+  return (
+    <section>
+      <p className="eyebrow">Combos</p>
+      <h2>コンボ</h2>
+      <div className="combo-focus-list">
+        {selectedCombos.length === 0 ? (
+          <p className="empty-note">選択キーの combo はありません</p>
+        ) : (
+          selectedCombos.map((combo) => <ComboRow combo={combo} key={combo.id} isFocused />)
+        )}
+      </div>
+      <div className="combo-list">
+        {combos.map((combo) => (
+          <ComboRow combo={combo} key={combo.id} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ComboRow({ combo, isFocused = false }: { combo: KeymapCombo; isFocused?: boolean }) {
+  const display = bindingDisplay(combo.binding);
+
+  return (
+    <div className={`combo-row ${isFocused ? "focused" : ""}`}>
+      <span>{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
+      <strong>
+        {display.badge ? `${display.badge} ` : ""}
+        {display.label}
+      </strong>
+      <em>{combo.timeoutMs}ms</em>
+    </div>
   );
 }
 

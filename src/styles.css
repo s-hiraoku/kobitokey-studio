@@ -315,6 +315,23 @@ button:disabled {
   white-space: nowrap;
 }
 
+.combo-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #26382f;
+  color: #fffdf8;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .physical-key.selected {
   border-color: #26382f;
   box-shadow:
@@ -380,6 +397,62 @@ button:disabled {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
   text-align: left;
+}
+
+.combo-focus-list,
+.combo-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.combo-list {
+  max-height: 150px;
+  overflow: auto;
+}
+
+.combo-row {
+  display: grid;
+  grid-template-columns: minmax(62px, auto) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid #e4ded2;
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: #fffdf8;
+  color: #525a55;
+  font-size: 12px;
+}
+
+.combo-row.focused {
+  border-color: #2b644b;
+  background: #dcebdd;
+}
+
+.combo-row span,
+.combo-row strong,
+.combo-row em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo-row strong {
+  color: #17201b;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.combo-row em {
+  color: #66716b;
+  font-style: normal;
+}
+
+.empty-note {
+  margin: 0;
+  color: #66716b;
+  font-size: 13px;
 }
 
 .settings-list {

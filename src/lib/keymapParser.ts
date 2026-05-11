@@ -8,11 +8,22 @@ export type KeymapLayer = {
 
 export type ParsedKeymap = {
   layers: KeymapLayer[];
+  combos: KeymapCombo[];
+};
+
+export type KeymapCombo = {
+  id: string;
+  binding: string;
+  keyPositions: number[];
+  timeoutMs: number;
+  blockStart: number;
+  blockEnd: number;
 };
 
 const KEY_COUNT = 40;
 const LAYER_PATTERN =
   /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
+const COMBO_PATTERN = /(?<id>combo_[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?)\};/g;
 
 export function parseKeymap(source: string): ParsedKeymap {
   const keymapBlock = extractKeymapBody(source);
@@ -39,18 +50,69 @@ export function parseKeymap(source: string): ParsedKeymap {
     });
   }
 
-  return { layers };
+  return { layers, combos: parseCombos(source) };
+}
+
+function parseCombos(source: string): KeymapCombo[] {
+  const combosBlock = extractNamedBody(source, "combos");
+  if (!combosBlock) {
+    return [];
+  }
+
+  const combos: KeymapCombo[] = [];
+  for (const match of combosBlock.body.matchAll(COMBO_PATTERN)) {
+    const id = match.groups?.id;
+    const body = match.groups?.body ?? "";
+    const keyPositions = body
+      .match(/key-positions\s*=\s*<([^>]+)>/)?.[1]
+      .trim()
+      .split(/\s+/)
+      .map(Number)
+      .filter((value) => Number.isFinite(value)) ?? [];
+    const binding = tokenizeBindings(body.match(/bindings\s*=\s*<([^>]+)>/)?.[1] ?? "")[0] ?? "";
+    const timeoutMs = Number(body.match(/timeout-ms\s*=\s*<(\d+)>/)?.[1] ?? 0);
+
+    if (!id || keyPositions.length === 0 || !binding) {
+      continue;
+    }
+
+    combos.push({
+      id,
+      binding,
+      keyPositions,
+      timeoutMs,
+      blockStart: combosBlock.bodyStart + (match.index ?? 0),
+      blockEnd: combosBlock.bodyStart + (match.index ?? 0) + match[0].length,
+    });
+  }
+
+  return combos;
 }
 
 function extractKeymapBody(source: string): { body: string; bodyStart: number } {
-  const keymapStart = source.indexOf("keymap {");
-  if (keymapStart < 0) {
-    return { body: source, bodyStart: 0 };
+  return extractNamedBody(source, "keymap") ?? { body: source, bodyStart: 0 };
+}
+
+function extractNamedBody(source: string, name: string): { body: string; bodyStart: number } | undefined {
+  const nodeStart = source.indexOf(`${name} {`);
+  if (nodeStart < 0) {
+    return undefined;
   }
 
-  const openBrace = source.indexOf("{", keymapStart);
-  let depth = 0;
+  const openBrace = source.indexOf("{", nodeStart);
+  if (openBrace < 0) {
+    return undefined;
+  }
 
+  return extractBodyAtBrace(source, openBrace);
+}
+
+function extractBodyAtBrace(source: string, openBrace: number): { body: string; bodyStart: number } | undefined {
+  if (openBrace < 0) {
+    return undefined;
+  }
+
+  let depth = 0;
   for (let index = openBrace; index < source.length; index += 1) {
     const char = source[index];
     if (char === "{") {
@@ -66,7 +128,10 @@ function extractKeymapBody(source: string): { body: string; bodyStart: number } 
     }
   }
 
-  return { body: source.slice(openBrace + 1), bodyStart: openBrace + 1 };
+  return {
+    body: source.slice(openBrace + 1),
+    bodyStart: openBrace + 1,
+  };
 }
 
 export function updateLayerBinding(
