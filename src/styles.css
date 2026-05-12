@@ -224,7 +224,8 @@ button:disabled {
   font: inherit;
 }
 
-.runtime-warning {
+.runtime-warning,
+.runtime-notice {
   display: grid;
   gap: 4px;
   border: 1px solid #d9a23a;
@@ -234,11 +235,19 @@ button:disabled {
   color: #4f3a0d;
 }
 
-.runtime-warning strong {
+.runtime-notice {
+  border-color: #9cbba9;
+  background: #eef7f0;
+  color: #26382f;
+}
+
+.runtime-warning strong,
+.runtime-notice strong {
   font-size: 13px;
 }
 
-.runtime-warning span {
+.runtime-warning span,
+.runtime-notice span {
   font-size: 12px;
   line-height: 1.4;
 }

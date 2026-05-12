@@ -31,6 +31,12 @@ import {
   parseTrackballSettings,
   updateBlockNumberSetting,
 } from "./lib/trackballParser";
+import {
+  connectWebStudioDevice,
+  readWebStudioKeymap,
+  supportsWebSerial,
+  writeWebStudioKey,
+} from "./lib/zmkStudioWeb";
 import "./styles.css";
 
 type ProjectFiles = {
@@ -120,6 +126,7 @@ function App() {
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
   const isDesktopRuntime = isTauriRuntime();
+  const canUseWebSerial = supportsWebSerial();
 
   React.useEffect(() => {
     loadFixture();
@@ -250,7 +257,11 @@ function App() {
 
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      setStatus("Direct の device 検出は Tauri アプリ内で利用できます。ブラウザ版では OS の serial port にアクセスできません。");
+      if (canUseWebSerial) {
+        setStatus("ブラウザ版では 検出 ではなく 読み込み で device 選択ダイアログを開きます。");
+      } else {
+        setStatus("このブラウザは Web Serial に対応していません。Direct Mode は Tauri アプリ内で利用してください。");
+      }
       return;
     }
 
@@ -266,7 +277,22 @@ function App() {
 
   async function readStudioDevice() {
     if (!isDesktopRuntime) {
-      setStatus("Direct の読み込みは Tauri アプリ内で利用できます。npm run tauri dev で起動してください。");
+      if (!canUseWebSerial) {
+        setStatus("このブラウザは Web Serial に対応していません。Direct Mode は Tauri アプリ内で利用してください。");
+        return;
+      }
+
+      try {
+        const session = await connectWebStudioDevice();
+        setSelectedStudioPort(session.label);
+        setDirectKeymap(session.keymap);
+        setActiveLayerIndex(0);
+        setSelectedKeyIndex(0);
+        setSelectedComboId(null);
+        setStatus(`${session.keymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+      } catch (error) {
+        setStatus(`Web Serial 読み込み失敗: ${String(error)}`);
+      }
       return;
     }
 
@@ -290,7 +316,27 @@ function App() {
 
   async function writeDirectBinding(nextBinding: string) {
     if (!isDesktopRuntime) {
-      setStatus("Direct の書き込みは Tauri アプリ内で利用できます。");
+      if (!canUseWebSerial) {
+        setStatus("このブラウザは Web Serial に対応していません。");
+        return;
+      }
+      if (!directKeymap) {
+        setStatus("Web Serial で device を読み込んでから書き込んでください");
+        return;
+      }
+      const directLayer = directKeymap.layers[activeLayerIndex];
+      if (!directLayer) {
+        setStatus("Direct Mode の layer が選択されていません");
+        return;
+      }
+      try {
+        const nextKeymap = await writeWebStudioKey(directLayer.id, selectedKeyIndex, nextBinding);
+        setDirectKeymap(nextKeymap);
+        setBindingDraft(nextBinding);
+        setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+      } catch (error) {
+        setStatus(`Web Serial 書き込み失敗: ${String(error)}`);
+      }
       return;
     }
 
@@ -562,7 +608,9 @@ function App() {
           ) : (
             <div className="topbar-hint">
               <Usb size={17} />
-              USB 接続した KobitoKey を中央のカードから読み込みます
+              {canUseWebSerial
+                ? "USB 接続した KobitoKey を中央のカードから読み込みます"
+                : "Direct Mode は Tauri アプリまたは Web Serial 対応ブラウザで利用します"}
             </div>
           )}
         </div>
@@ -570,6 +618,7 @@ function App() {
 
       {showDirectEmptyState ? (
         <DirectWelcome
+          canUseWebSerial={canUseWebSerial}
           isDesktopRuntime={isDesktopRuntime}
           ports={studioPorts}
           selectedPort={selectedStudioPort}
@@ -1079,6 +1128,7 @@ function DirectConnectionBar({ keymap, portPath }: { keymap: StudioKeymap | null
 }
 
 function DirectWelcome({
+  canUseWebSerial,
   isDesktopRuntime,
   onPortChange,
   onRead,
@@ -1086,6 +1136,7 @@ function DirectWelcome({
   ports,
   selectedPort,
 }: {
+  canUseWebSerial: boolean;
   isDesktopRuntime: boolean;
   onPortChange: (port: string) => void;
   onRead: () => void;
@@ -1105,10 +1156,16 @@ function DirectWelcome({
           </p>
         </div>
         <div className="direct-connect-controls">
-          {!isDesktopRuntime ? (
+          {!isDesktopRuntime && !canUseWebSerial ? (
             <div className="runtime-warning">
-              <strong>ブラウザ版では device 検出できません</strong>
-              <span>Direct Mode は Tauri アプリ内で OS の serial port を読み取ります。</span>
+              <strong>このブラウザでは device 検出できません</strong>
+              <span>Direct Mode は Tauri アプリか Web Serial 対応ブラウザで利用できます。</span>
+            </div>
+          ) : null}
+          {!isDesktopRuntime && canUseWebSerial ? (
+            <div className="runtime-notice">
+              <strong>Web Serial で接続します</strong>
+              <span>読み込みを押すと、ブラウザの device 選択ダイアログが開きます。</span>
             </div>
           ) : null}
           <label>
@@ -1123,11 +1180,11 @@ function DirectWelcome({
             </select>
           </label>
           <div className="direct-connect-actions">
-            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
+            <button type="button" disabled={!isDesktopRuntime && canUseWebSerial} onClick={onRefresh}>
               <RefreshCw size={17} />
               検出
             </button>
-            <button type="button" className="primary" disabled={!isDesktopRuntime} onClick={onRead}>
+            <button type="button" className="primary" disabled={!isDesktopRuntime && !canUseWebSerial} onClick={onRead}>
               <Usb size={17} />
               読み込み
             </button>
