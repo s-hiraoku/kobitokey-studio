@@ -15,7 +15,7 @@ be a general ZMK editor yet.
 - Show shortened key labels on the keyboard while preserving full bindings in
   the inspector and tooltip
 - Edit a selected key binding
-- Edit common ZMK binding types with structured controls
+- Edit common ZMK binding types with click/tap based structured controls
 - Detect and read ZMK Studio compatible devices over USB serial
 - Write supported key bindings directly to a connected keyboard
 - Display and edit keymap combos
@@ -88,9 +88,10 @@ When running inside Tauri, the default project path points at:
 ## Implemented Workflows
 
 - Physical keymap viewing across layers
-- Binding editing with raw and structured inputs
+- Binding editing with keycode, layer, mouse, Bluetooth, and special binding
+  pickers
 - Direct Mode device detection, keymap read, and supported key binding write
-- Combo display, add, edit, and delete
+- Combo display, add, edit, delete, and key-position selection
 - Trackball CPI, acceleration, and gesture threshold editing
 - File-level save diff for keymap and overlay files
 - Folder picker for the local `KobitoKey_QWERTY` project
@@ -110,7 +111,8 @@ USB. It is separate from the firmware file workflow.
 5. If multiple candidates are shown, choose the target port and click
    `読み込み` again.
 6. Select a key in the physical layout.
-7. Change the binding and click `実機へ書き込み`.
+7. Choose the binding type and keycode from the on-screen picker, then click
+   `実機へ書き込み`.
 
 The write is sent through the ZMK Studio RPC API and saved on the device. The
 app then reloads the keymap from the device so the screen reflects the
@@ -144,6 +146,24 @@ Direct Mode currently supports these binding families:
 Use Firmware Mode for combo editing, trackball CPI/acceleration/gesture
 settings, and any binding that Direct Mode does not support yet. Those settings
 live in keymap/overlay/conf files and still need build + UF2 flashing.
+
+## Binding Picker
+
+The keymap editor avoids relying on physical keyboard input for normal edits.
+Use the on-screen binding picker to choose:
+
+- keycodes such as letters, numbers, symbols, navigation, modifiers, function
+  keys, and system/media keys
+- layer targets for `&lt`, `&mo`, and `&to`
+- hold/tap combinations for `&mt`
+- mouse buttons for `&mkp`
+- Bluetooth actions for `&bt`
+- special bindings such as `&trans`, `&none`, `&bootloader`, and
+  `&studio_unlock`
+
+Combo keys are also selected from a 1-40 key grid instead of typing key
+positions manually. The advanced text field remains available for unsupported
+or custom ZMK bindings.
 
 ## Remaining Notes
 

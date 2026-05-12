@@ -7,6 +7,17 @@ import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
+  BLUETOOTH_ACTION_CHOICES,
+  BLUETOOTH_PROFILE_CHOICES,
+  KEY_CHOICE_GROUPS,
+  KeyChoice,
+  KeyChoiceGroup,
+  LAYER_CHOICES,
+  MODIFIER_CHOICES,
+  MOUSE_CHOICES,
+  SPECIAL_BINDING_CHOICES,
+} from "./lib/keycodeCatalog";
+import {
   KeymapCombo,
   KeymapLayer,
   addCombo,
@@ -85,26 +96,6 @@ declare global {
 }
 
 const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
-const PRESETS = [
-  "&trans",
-  "&none",
-  "&kp ESC",
-  "&kp TAB",
-  "&kp SPACE",
-  "&kp ENTER",
-  "&kp BSPC",
-  "&kp DEL",
-  "&kp LEFT",
-  "&kp DOWN",
-  "&kp UP",
-  "&kp RIGHT",
-  "&mo 1",
-  "&lt 1 SPACE",
-  "&mkp MB1",
-  "&mkp MB2",
-  "&to 0",
-];
-
 function App() {
   const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
@@ -708,21 +699,11 @@ function App() {
           <section className={isDirectMode ? "direct-key-editor" : ""}>
             <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
             <h2>{selectedBinding}</h2>
-            <label>
-              Binding
-              <input value={bindingDraft} onChange={(event) => setBindingDraft(event.target.value)} />
-            </label>
-            <button type="button" className="wide-action" onClick={() => applyBinding(bindingDraft)}>
-              {isDirectMode ? "実機へ書き込み" : "Binding に反映"}
-            </button>
-            <BindingEditor binding={bindingDraft} onApply={applyBinding} />
-            <div className="preset-grid">
-              {PRESETS.map((preset) => (
-                <button type="button" key={preset} onClick={() => applyBinding(preset)}>
-                  {preset}
-                </button>
-              ))}
-            </div>
+            <BindingEditor
+              actionLabel={isDirectMode ? "実機へ書き込み" : "Binding に反映"}
+              binding={bindingDraft}
+              onApply={applyBinding}
+            />
           </section>
 
           {isDirectMode ? (
@@ -1331,22 +1312,19 @@ function ComboEditor({
       </div>
       {combo ? (
         <div className="combo-editor">
-          <label>
-            Keys
-            <input
-              value={form.keyPositions}
-              onChange={(event) => setForm({ ...form, keyPositions: event.target.value })}
-              onFocus={() => onSelect(combo.id)}
-            />
-          </label>
-          <label>
-            Binding
-            <input
-              value={form.binding}
-              onChange={(event) => setForm({ ...form, binding: event.target.value })}
-              onFocus={() => onSelect(combo.id)}
-            />
-          </label>
+          <ComboKeyPicker
+            value={form.keyPositions}
+            onFocus={() => onSelect(combo.id)}
+            onChange={(keyPositions) => setForm({ ...form, keyPositions })}
+          />
+          <BindingEditor
+            actionLabel="Combo binding に反映"
+            binding={form.binding}
+            onApply={(binding) => {
+              onSelect(combo.id);
+              setForm({ ...form, binding });
+            }}
+          />
           <label>
             Timeout
             <input
@@ -1373,93 +1351,327 @@ function ComboEditor({
   );
 }
 
-function BindingEditor({ binding, onApply }: { binding: string; onApply: (binding: string) => void }) {
+function ComboKeyPicker({
+  onChange,
+  onFocus,
+  value,
+}: {
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  value: string;
+}) {
+  const selectedPositions = parseDisplayKeyPositions(value);
+  const selectedSet = new Set(selectedPositions);
+
+  return (
+    <div className="combo-key-picker">
+      <div className="binding-preview">
+        <span>Keys</span>
+        <strong>{selectedPositions.map((position) => position + 1).join(" + ") || "未選択"}</strong>
+      </div>
+      <div className="combo-key-grid" onFocus={onFocus}>
+        {Array.from({ length: 40 }, (_, index) => (
+          <button
+            type="button"
+            key={index}
+            className={selectedSet.has(index) ? "selected" : ""}
+            onClick={() => {
+              onFocus();
+              onChange(toggleDisplayKeyPosition(selectedPositions, index));
+            }}
+          >
+            <strong>{index + 1}</strong>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BindingEditor({
+  actionLabel,
+  binding,
+  onApply,
+}: {
+  actionLabel: string;
+  binding: string;
+  onApply: (binding: string) => void;
+}) {
   const [form, setForm] = React.useState<BindingForm>(() => parseBindingForm(binding));
+  const builtBinding = React.useMemo(() => buildBindingFromForm(form), [form]);
 
   React.useEffect(() => {
     setForm(parseBindingForm(binding));
   }, [binding]);
 
-  const primaryLabel = bindingPrimaryLabel(form.kind);
-  const secondaryLabel = bindingSecondaryLabel(form.kind);
-
   return (
     <div className="binding-editor">
-      <label>
-        Type
-        <select
-          value={form.kind}
-          onChange={(event) => {
-            const kind = event.target.value as BindingKind;
-            setForm({ ...form, kind });
-          }}
-        >
-          {BINDING_KIND_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {form.kind === "raw" ? (
+      <div className="binding-preview">
+        <span>Preview</span>
+        <strong>{builtBinding}</strong>
+      </div>
+
+      <ChoiceStrip
+        label="Type"
+        choices={BINDING_KIND_OPTIONS}
+        selectedValue={form.kind}
+        onSelect={(kind) => setForm(withBindingKindDefaults(form, kind as BindingKind))}
+      />
+
+      <BindingValuePicker form={form} onChange={setForm} />
+
+      <details className="advanced-binding">
+        <summary>詳細編集</summary>
         <label>
-          Raw
-          <input value={form.raw} onChange={(event) => setForm({ ...form, raw: event.target.value })} />
+          Binding
+          <input value={form.raw || builtBinding} onChange={(event) => setForm(parseBindingForm(event.target.value))} />
         </label>
-      ) : (
-        <>
-          <label>
-            {primaryLabel}
-            <input
-              value={form.primary}
-              onChange={(event) => setForm({ ...form, primary: event.target.value })}
-            />
-          </label>
-          {secondaryLabel ? (
-            <label>
-              {secondaryLabel}
-              <input
-                value={form.secondary}
-                onChange={(event) => setForm({ ...form, secondary: event.target.value })}
-              />
-            </label>
-          ) : null}
-        </>
-      )}
-      <button type="button" onClick={() => onApply(buildBindingFromForm(form))}>
-        Binding に反映
+      </details>
+
+      <button type="button" className="wide-action" onClick={() => onApply(builtBinding)}>
+        {actionLabel}
       </button>
     </div>
   );
 }
 
-function bindingPrimaryLabel(kind: BindingKind): string {
-  switch (kind) {
+function BindingValuePicker({
+  form,
+  onChange,
+}: {
+  form: BindingForm;
+  onChange: (form: BindingForm) => void;
+}) {
+  switch (form.kind) {
+    case "key":
+      return (
+        <KeyPalette
+          label="Key"
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "layer-tap":
+      return (
+        <>
+          <ChoiceStrip
+            label="Layer"
+            choices={LAYER_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) => onChange({ ...form, primary })}
+          />
+          <KeyPalette
+            label="Tap key"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
+        </>
+      );
+    case "mod-tap":
+      return (
+        <>
+          <ChoiceStrip
+            label="Hold modifier"
+            choices={MODIFIER_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) => onChange({ ...form, primary })}
+          />
+          <KeyPalette
+            label="Tap key"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
+        </>
+      );
     case "momentary":
     case "to-layer":
-      return "Layer";
-    case "mod-tap":
-      return "Modifier";
+      return (
+        <ChoiceStrip
+          label="Layer"
+          choices={LAYER_CHOICES}
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "mouse":
-      return "Button";
+      return (
+        <ChoiceStrip
+          label="Mouse button"
+          choices={MOUSE_CHOICES}
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "bluetooth":
-      return "Action";
-    default:
-      return "Key";
+      return (
+        <>
+          <ChoiceStrip
+            label="Action"
+            choices={BLUETOOTH_ACTION_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) =>
+              onChange({
+                ...form,
+                primary,
+                secondary: primary === "BT_SEL" || primary === "BT_CLR" ? form.secondary || "0" : "",
+              })
+            }
+          />
+          {form.primary === "BT_SEL" || form.primary === "BT_CLR" ? (
+            <ChoiceStrip
+              label="Profile"
+              choices={BLUETOOTH_PROFILE_CHOICES}
+              selectedValue={form.secondary}
+              onSelect={(secondary) => onChange({ ...form, secondary })}
+            />
+          ) : null}
+        </>
+      );
+    case "raw":
+      return (
+        <ChoiceStrip
+          label="Special"
+          choices={SPECIAL_BINDING_CHOICES}
+          selectedValue={form.raw}
+          onSelect={(raw) => onChange({ ...form, raw })}
+        />
+      );
   }
 }
 
-function bindingSecondaryLabel(kind: BindingKind): string | undefined {
-  switch (kind) {
-    case "layer-tap":
-    case "mod-tap":
-      return "Tap key";
-    case "bluetooth":
-      return "Parameter";
-    default:
-      return undefined;
+function KeyPalette({
+  label,
+  onSelect,
+  selectedValue,
+}: {
+  label: string;
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  const [groupId, setGroupId] = React.useState(KEY_CHOICE_GROUPS[0]?.id ?? "");
+  const activeGroup = KEY_CHOICE_GROUPS.find((group) => group.id === groupId) ?? KEY_CHOICE_GROUPS[0];
+
+  React.useEffect(() => {
+    const ownerGroup = KEY_CHOICE_GROUPS.find((group) =>
+      group.choices.some((choice) => choice.value === selectedValue),
+    );
+    if (ownerGroup) {
+      setGroupId(ownerGroup.id);
+    }
+  }, [selectedValue]);
+
+  return (
+    <div className="key-palette">
+      <ChoiceStrip
+        label={label}
+        choices={KEY_CHOICE_GROUPS.map((group) => ({ value: group.id, label: group.label }))}
+        selectedValue={activeGroup.id}
+        onSelect={setGroupId}
+      />
+      <ChoiceGrid choices={activeGroup.choices} selectedValue={selectedValue} onSelect={onSelect} />
+    </div>
+  );
+}
+
+function ChoiceStrip({
+  choices,
+  label,
+  onSelect,
+  selectedValue,
+}: {
+  choices: KeyChoice[];
+  label: string;
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  return (
+    <div className="choice-strip">
+      <span>{label}</span>
+      <div>
+        {choices.map((choice) => (
+          <button
+            type="button"
+            key={choice.value}
+            className={choice.value === selectedValue ? "selected" : ""}
+            onClick={() => onSelect(choice.value)}
+            title={choice.value}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChoiceGrid({
+  choices,
+  onSelect,
+  selectedValue,
+}: {
+  choices: KeyChoice[];
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  return (
+    <div className="choice-grid">
+      {choices.map((choice) => (
+        <button
+          type="button"
+          key={choice.value}
+          className={choice.value === selectedValue ? "selected" : ""}
+          onClick={() => onSelect(choice.value)}
+          title={choice.value}
+        >
+          <strong>{choice.label}</strong>
+          <span>{choice.value}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function withBindingKindDefaults(form: BindingForm, kind: BindingKind): BindingForm {
+  if (kind === form.kind) {
+    return form;
   }
+
+  switch (kind) {
+    case "key":
+      return { ...form, kind, primary: form.primary || "A", secondary: "", raw: "" };
+    case "layer-tap":
+      return { ...form, kind, primary: layerValue(form.primary, "1"), secondary: keyValue(form.secondary, "SPACE"), raw: "" };
+    case "mod-tap":
+      return { ...form, kind, primary: modifierValue(form.primary, "LCTRL"), secondary: keyValue(form.secondary, "A"), raw: "" };
+    case "momentary":
+      return { ...form, kind, primary: layerValue(form.primary, "1"), secondary: "", raw: "" };
+    case "to-layer":
+      return { ...form, kind, primary: layerValue(form.primary, "0"), secondary: "", raw: "" };
+    case "mouse":
+      return { ...form, kind, primary: mouseValue(form.primary, "MB1"), secondary: "", raw: "" };
+    case "bluetooth":
+      return { ...form, kind, primary: "BT_SEL", secondary: "0", raw: "" };
+    case "raw":
+      return { ...form, kind, primary: "", secondary: "", raw: form.raw || "&trans" };
+  }
+}
+
+function keyValue(value: string, fallback: string): string {
+  return KEY_CHOICE_GROUPS.some((group: KeyChoiceGroup) => group.choices.some((choice) => choice.value === value))
+    ? value
+    : fallback;
+}
+
+function layerValue(value: string, fallback: string): string {
+  return LAYER_CHOICES.some((choice) => choice.value === value) ? value : fallback;
+}
+
+function modifierValue(value: string, fallback: string): string {
+  return MODIFIER_CHOICES.some((choice) => choice.value === value) ? value : fallback;
+}
+
+function mouseValue(value: string, fallback: string): string {
+  return MOUSE_CHOICES.some((choice) => choice.value === value) ? value : fallback;
 }
 
 function parseDisplayKeyPositions(value: string): number[] {
@@ -1468,6 +1680,16 @@ function parseDisplayKeyPositions(value: string): number[] {
     .map((item) => Number(item.trim()))
     .filter((number) => Number.isFinite(number) && number >= 1 && number <= 40)
     .map((number) => number - 1);
+}
+
+function toggleDisplayKeyPosition(currentPositions: number[], position: number): string {
+  const nextPositions = currentPositions.includes(position)
+    ? currentPositions.filter((currentPosition) => currentPosition !== position)
+    : [...currentPositions, position];
+  return nextPositions
+    .sort((left, right) => left - right)
+    .map((currentPosition) => currentPosition + 1)
+    .join(" ");
 }
 
 function nextComboId(combos: KeymapCombo[]): string {

@@ -699,23 +699,6 @@ button:disabled {
   font-weight: 700;
 }
 
-.preset-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-  margin-top: 12px;
-}
-
-.preset-grid button {
-  min-height: 32px;
-  border-radius: 6px;
-  padding: 0 8px;
-  overflow-wrap: anywhere;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 12px;
-  text-align: left;
-}
-
 .binding-editor,
 .trackball-editor {
   display: grid;
@@ -730,12 +713,118 @@ button:disabled {
   margin-top: 0;
 }
 
-.binding-editor button,
 .trackball-editor button {
   min-height: 33px;
   border-radius: 6px;
   padding: 0 10px;
   font-weight: 700;
+}
+
+.binding-preview {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e5dccf;
+  border-radius: 7px;
+  background: #fffdf8;
+  padding: 9px 10px;
+}
+
+.binding-preview span,
+.choice-strip > span {
+  color: #69746d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.binding-preview strong {
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+}
+
+.choice-strip {
+  display: grid;
+  gap: 7px;
+}
+
+.choice-strip > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice-strip button,
+.choice-grid button {
+  border: 1px solid #e0d5c3;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #26382f;
+  font-weight: 800;
+}
+
+.choice-strip button {
+  min-height: 31px;
+  padding: 0 9px;
+}
+
+.choice-strip button.selected,
+.choice-grid button.selected {
+  border-color: #163426;
+  background: #26382f;
+  color: #fffdf8;
+}
+
+.key-palette {
+  display: grid;
+  gap: 9px;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 210px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.choice-grid button {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: 46px;
+  padding: 5px 4px;
+}
+
+.choice-grid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.choice-grid span {
+  overflow: hidden;
+  color: inherit;
+  opacity: 0.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.advanced-binding {
+  border-top: 1px solid #ece6da;
+  padding-top: 8px;
+}
+
+.advanced-binding summary {
+  cursor: pointer;
+  color: #59645d;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .combo-focus-list,
@@ -802,6 +891,33 @@ button:disabled {
   display: grid;
   gap: 10px;
   margin-top: 12px;
+}
+
+.combo-key-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.combo-key-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.combo-key-grid button {
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid #e0d5c3;
+  border-radius: 5px;
+  background: #fffaf0;
+  color: #26382f;
+  font-weight: 800;
+}
+
+.combo-key-grid button.selected {
+  border-color: #163426;
+  background: #26382f;
+  color: #fffdf8;
 }
 
 .combo-editor label {
