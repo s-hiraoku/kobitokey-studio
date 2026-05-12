@@ -2,10 +2,21 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Download, FolderOpen, Save, UploadCloud } from "lucide-react";
+import { Download, FolderOpen, RefreshCw, Save, UploadCloud, Usb } from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
+import {
+  BLUETOOTH_ACTION_CHOICES,
+  BLUETOOTH_PROFILE_CHOICES,
+  KEY_CHOICE_GROUPS,
+  KeyChoice,
+  KeyChoiceGroup,
+  LAYER_CHOICES,
+  MODIFIER_CHOICES,
+  MOUSE_CHOICES,
+  SPECIAL_BINDING_CHOICES,
+} from "./lib/keycodeCatalog";
 import {
   KeymapCombo,
   KeymapLayer,
@@ -31,6 +42,12 @@ import {
   parseTrackballSettings,
   updateBlockNumberSetting,
 } from "./lib/trackballParser";
+import {
+  connectWebStudioDevice,
+  readWebStudioKeymap,
+  supportsWebSerial,
+  writeWebStudioKey,
+} from "./lib/zmkStudioWeb";
 import "./styles.css";
 
 type ProjectFiles = {
@@ -47,30 +64,46 @@ type FileDiff = {
   lines: string[];
 };
 
-const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
-const PRESETS = [
-  "&trans",
-  "&none",
-  "&kp ESC",
-  "&kp TAB",
-  "&kp SPACE",
-  "&kp ENTER",
-  "&kp BSPC",
-  "&kp DEL",
-  "&kp LEFT",
-  "&kp DOWN",
-  "&kp UP",
-  "&kp RIGHT",
-  "&mo 1",
-  "&lt 1 SPACE",
-  "&mkp MB1",
-  "&mkp MB2",
-  "&to 0",
-];
+type StudioPort = {
+  path: string;
+  label: string;
+  manufacturer?: string;
+  product?: string;
+  serialNumber?: string;
+  portKind: string;
+};
 
+type StudioKeymap = {
+  deviceName: string;
+  serialNumber: string;
+  lockState: string;
+  hasUnsavedChanges: boolean;
+  layers: StudioLayer[];
+};
+
+type StudioLayer = {
+  id: number;
+  name: string;
+  bindings: string[];
+};
+
+type EditorMode = "firmware" | "direct";
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
+const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
 function App() {
+  const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
+  const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
+  const [selectedStudioPort, setSelectedStudioPort] = React.useState("");
+  const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
+  const [bindingDraft, setBindingDraft] = React.useState("");
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
   const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
@@ -83,16 +116,24 @@ function App() {
   const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
+  const isDesktopRuntime = isTauriRuntime();
+  const canUseWebSerial = supportsWebSerial();
 
   React.useEffect(() => {
     loadFixture();
   }, []);
 
-  const parsedKeymap = React.useMemo(() => parseKeymap(files?.keymap ?? ""), [files?.keymap]);
+  const isDirectMode = editorMode === "direct";
+  const activeKeymapSource = React.useMemo(
+    () => (isDirectMode && directKeymap ? studioKeymapToKeymapSource(directKeymap) : files?.keymap ?? ""),
+    [directKeymap, files?.keymap, isDirectMode],
+  );
+  const parsedKeymap = React.useMemo(() => parseKeymap(activeKeymapSource), [activeKeymapSource]);
   const layers = parsedKeymap.layers;
   const combos = parsedKeymap.combos;
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
+  const showDirectEmptyState = isDirectMode && !directKeymap;
   const selectedCombos = React.useMemo(
     () => combos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [combos, selectedKeyIndex],
@@ -114,6 +155,10 @@ function App() {
       ].filter((diff) => diff.lines.length > 0),
     [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
   );
+
+  React.useEffect(() => {
+    setBindingDraft(selectedBinding);
+  }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
 
   async function loadFixture() {
     const [keymap, leftOverlay, rightOverlay] = await Promise.all([
@@ -184,7 +229,12 @@ function App() {
     }
   }
 
-  function setBinding(nextBinding: string) {
+  async function applyBinding(nextBinding: string) {
+    if (isDirectMode) {
+      await writeDirectBinding(nextBinding);
+      return;
+    }
+
     if (!files || !activeLayer) {
       return;
     }
@@ -193,6 +243,131 @@ function App() {
       ...files,
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
+    setBindingDraft(nextBinding);
+  }
+
+  async function detectStudioPorts() {
+    const ports = await invoke<StudioPort[]>("list_studio_ports");
+    setStudioPorts(ports);
+    setSelectedStudioPort((current) => current || ports[0]?.path || "");
+    return ports;
+  }
+
+  async function refreshStudioPorts() {
+    if (!isDesktopRuntime) {
+      setStatus("Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。");
+      return;
+    }
+
+    try {
+      const ports = await detectStudioPorts();
+      setStatus(`Studio device candidates: ${ports.length}`);
+    } catch (error) {
+      setStatus(`Studio device 検出失敗: ${String(error)}`);
+    }
+  }
+
+  async function readStudioDevice() {
+    if (!isDesktopRuntime) {
+      if (!canUseWebSerial) {
+        setStatus("このブラウザは Web Serial に対応していません。Direct Mode は Tauri アプリ内で利用してください。");
+        return;
+      }
+
+      try {
+        const session = await connectWebStudioDevice();
+        setSelectedStudioPort(session.label);
+        setDirectKeymap(session.keymap);
+        setActiveLayerIndex(0);
+        setSelectedKeyIndex(0);
+        setSelectedComboId(null);
+        setStatus(`${session.keymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+      } catch (error) {
+        setStatus(`Web Serial 読み込み失敗: ${String(error)}`);
+      }
+      return;
+    }
+
+    let portPath = selectedStudioPort;
+    if (!portPath) {
+      try {
+        const ports = await detectStudioPorts();
+        portPath = ports[0]?.path || "";
+      } catch (error) {
+        setStatus(`Studio device 検出失敗: ${String(error)}`);
+        return;
+      }
+    }
+
+    if (!portPath) {
+      setStatus("Studio device が見つかりません。USB で接続し、ZMK Studio を有効にした firmware を書き込んでください。");
+      return;
+    }
+
+    try {
+      const nextKeymap = await invoke<StudioKeymap>("read_studio_keymap", { portPath });
+      setDirectKeymap(nextKeymap);
+      setSelectedStudioPort(portPath);
+      setEditorMode("direct");
+      setActiveLayerIndex(0);
+      setSelectedKeyIndex(0);
+      setSelectedComboId(null);
+      setStatus(`${nextKeymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+    } catch (error) {
+      setStatus(`Direct 読み込み失敗: ${String(error)}`);
+    }
+  }
+
+  async function writeDirectBinding(nextBinding: string) {
+    if (!isDesktopRuntime) {
+      if (!canUseWebSerial) {
+        setStatus("このブラウザは Web Serial に対応していません。");
+        return;
+      }
+      if (!directKeymap) {
+        setStatus("Web Serial で device を読み込んでから書き込んでください");
+        return;
+      }
+      const directLayer = directKeymap.layers[activeLayerIndex];
+      if (!directLayer) {
+        setStatus("Direct Mode の layer が選択されていません");
+        return;
+      }
+      try {
+        const nextKeymap = await writeWebStudioKey(directLayer.id, selectedKeyIndex, nextBinding);
+        setDirectKeymap(nextKeymap);
+        setBindingDraft(nextBinding);
+        setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+      } catch (error) {
+        setStatus(`Web Serial 書き込み失敗: ${String(error)}`);
+      }
+      return;
+    }
+
+    if (!directKeymap || !selectedStudioPort) {
+      setStatus("Direct Mode で接続中の device がありません");
+      return;
+    }
+
+    const directLayer = directKeymap.layers[activeLayerIndex];
+    if (!directLayer) {
+      setStatus("Direct Mode の layer が選択されていません");
+      return;
+    }
+
+    try {
+      const nextKeymap = await invoke<StudioKeymap>("write_studio_key", {
+        portPath: selectedStudioPort,
+        layerId: directLayer.id,
+        keyPosition: selectedKeyIndex,
+        binding: nextBinding,
+      });
+      setDirectKeymap(nextKeymap);
+      setBindingDraft(nextBinding);
+      setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+    } catch (error) {
+      setStatus(`Direct 書き込み失敗: ${String(error)}`);
+    }
   }
 
   function saveCombo(combo: KeymapCombo, input: ComboFormValue) {
@@ -377,29 +552,86 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
+      <header className={`topbar ${isDirectMode ? "direct-active" : ""}`}>
         <div>
           <p className="eyebrow">KobitoKey Studio</p>
           <h1>KobitoKey 設定エディタ</h1>
         </div>
-        <div className="project-loader">
-          <input
-            aria-label="KobitoKey_QWERTY path"
-            value={projectRoot}
-            onChange={(event) => setProjectRoot(event.target.value)}
-          />
-          <button type="button" onClick={chooseProjectFolder}>
-            <FolderOpen size={17} />
-            選択
-          </button>
-          <button type="button" onClick={loadProject}>
-            <FolderOpen size={17} />
-            読み込み
-          </button>
+        <div className="topbar-tools">
+          <div className="mode-toggle" aria-label="Editor mode">
+            <button
+              type="button"
+              className={editorMode === "firmware" ? "active" : ""}
+              onClick={() => setEditorMode("firmware")}
+            >
+              Firmware
+            </button>
+            <button
+              type="button"
+              className={editorMode === "direct" ? "active" : ""}
+              onClick={() => setEditorMode("direct")}
+            >
+              Direct
+            </button>
+          </div>
+          {editorMode === "firmware" ? (
+            <div className="project-loader">
+              <input
+                aria-label="KobitoKey_QWERTY path"
+                value={projectRoot}
+                onChange={(event) => setProjectRoot(event.target.value)}
+              />
+              <button type="button" onClick={chooseProjectFolder}>
+                <FolderOpen size={17} />
+                選択
+              </button>
+              <button type="button" onClick={loadProject}>
+                <FolderOpen size={17} />
+                読み込み
+              </button>
+            </div>
+          ) : directKeymap ? (
+            <div className="studio-loader">
+              <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
+                <option value="">Studio device 未選択</option>
+                {studioPorts.map((port) => (
+                  <option key={port.path} value={port.path}>
+                    {port.label} ({port.path})
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={refreshStudioPorts}>
+                <RefreshCw size={17} />
+                検出
+              </button>
+              <button type="button" onClick={readStudioDevice}>
+                <Usb size={17} />
+                読み込み
+              </button>
+            </div>
+          ) : (
+            <div className="topbar-hint">
+              <Usb size={17} />
+              {canUseWebSerial
+                ? "USB 接続した KobitoKey を中央のカードから読み込みます"
+                : "Direct Mode の実機読み書きは Tauri デスクトップアプリで利用します"}
+            </div>
+          )}
         </div>
       </header>
 
-      <section className="workspace">
+      {showDirectEmptyState ? (
+        <DirectWelcome
+          canUseWebSerial={canUseWebSerial}
+          isDesktopRuntime={isDesktopRuntime}
+          ports={studioPorts}
+          selectedPort={selectedStudioPort}
+          onPortChange={setSelectedStudioPort}
+          onRefresh={refreshStudioPorts}
+          onRead={readStudioDevice}
+        />
+      ) : (
+      <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
           {layers.map((layer, index) => (
             <button
@@ -418,15 +650,23 @@ function App() {
         </nav>
 
         <section className="keyboard-panel">
+          {isDirectMode ? <DirectConnectionBar keymap={directKeymap} portPath={selectedStudioPort} /> : null}
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Layer {activeLayerIndex}</p>
               <h2>{activeLayer?.label ?? "No layer"}</h2>
             </div>
-            <button type="button" className="primary" onClick={saveProjectFiles}>
-              {files?.keymapPath ? <Save size={17} /> : <Download size={17} />}
-              {files?.keymapPath ? "保存" : "書き出し"}
-            </button>
+            {isDirectMode ? (
+              <button type="button" className="primary" onClick={readStudioDevice}>
+                <RefreshCw size={17} />
+                再読み込み
+              </button>
+            ) : (
+              <button type="button" className="primary" onClick={saveProjectFiles}>
+                {files?.keymapPath ? <Save size={17} /> : <Download size={17} />}
+                {files?.keymapPath ? "保存" : "書き出し"}
+              </button>
+            )}
           </div>
 
           <KeyboardGrid
@@ -438,52 +678,53 @@ function App() {
             onSelect={setSelectedKeyIndex}
           />
 
-          <section className="diff-panel">
-            <div className="panel-heading compact">
-              <h3>保存前 diff</h3>
-              <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
-            </div>
-            <pre>
-              {keymapDiff.length === 0
-                ? "No changes"
-                : keymapDiff
-                    .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
-                    .join("\n\n")}
-            </pre>
-          </section>
+          {isDirectMode ? <DirectSummaryPanel keymap={directKeymap} portPath={selectedStudioPort} /> : (
+            <section className="diff-panel">
+              <div className="panel-heading compact">
+                <h3>保存前 diff</h3>
+                <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
+              </div>
+              <pre>
+                {keymapDiff.length === 0
+                  ? "No changes"
+                  : keymapDiff
+                      .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
+                      .join("\n\n")}
+              </pre>
+            </section>
+          )}
         </section>
 
         <aside className="inspector">
-          <section>
+          <section className={isDirectMode ? "direct-key-editor" : ""}>
             <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
             <h2>{selectedBinding}</h2>
-            <label>
-              Binding
-              <input value={selectedBinding} onChange={(event) => setBinding(event.target.value)} />
-            </label>
-            <BindingEditor binding={selectedBinding} onApply={setBinding} />
-            <div className="preset-grid">
-              {PRESETS.map((preset) => (
-                <button type="button" key={preset} onClick={() => setBinding(preset)}>
-                  {preset}
-                </button>
-              ))}
-            </div>
+            <BindingEditor
+              actionLabel={isDirectMode ? "実機へ書き込み" : "Binding に反映"}
+              binding={bindingDraft}
+              onApply={applyBinding}
+            />
           </section>
 
-          <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
-          <ComboEditor
-            combo={selectedCombo}
-            onCreate={createCombo}
-            onDelete={removeCombo}
-            onSave={saveCombo}
-            onSelect={setSelectedComboId}
-          />
+          {isDirectMode ? (
+            <DirectModeNote onFirmwareMode={() => setEditorMode("firmware")} />
+          ) : (
+            <>
+              <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
+              <ComboEditor
+                combo={selectedCombo}
+                onCreate={createCombo}
+                onDelete={removeCombo}
+                onSave={saveCombo}
+                onSelect={setSelectedComboId}
+              />
 
-          <TrackballPanel settings={trackball} />
-          <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
+              <TrackballPanel settings={trackball} />
+              <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
+            </>
+          )}
 
-          <section className="build-panel">
+          {!isDirectMode ? <section className="build-panel">
             <div>
               <p className="eyebrow">Build / Flash</p>
               <h2>アップロード支援</h2>
@@ -535,9 +776,10 @@ function App() {
                 UF2 をコピー
               </button>
             </div>
-          </section>
+          </section> : null}
         </aside>
       </section>
+      )}
 
       <footer className="statusbar">{status}</footer>
     </main>
@@ -832,6 +1074,142 @@ function truncateComboLabel(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
+function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+  return (
+    <section className="direct-summary">
+      <div className="panel-heading compact">
+        <h3>Direct Mode</h3>
+        <span>{keymap ? `${keymap.layers.length} layers` : "未接続"}</span>
+      </div>
+      {keymap ? (
+        <dl>
+          <div>
+            <dt>Device</dt>
+            <dd>{keymap.deviceName || "Unknown ZMK device"}</dd>
+          </div>
+          <div>
+            <dt>Port</dt>
+            <dd>{portPath || "-"}</dd>
+          </div>
+          <div>
+            <dt>Lock</dt>
+            <dd>{keymap.lockState}</dd>
+          </div>
+          <div>
+            <dt>Unsaved</dt>
+            <dd>{keymap.hasUnsavedChanges ? "あり" : "なし"}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
+      )}
+    </section>
+  );
+}
+
+function DirectConnectionBar({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+  return (
+    <div className="direct-connection-bar">
+      <div>
+        <p className="eyebrow">Connected Keyboard</p>
+        <strong>{keymap?.deviceName || "ZMK Studio device"}</strong>
+      </div>
+      <span>{portPath || "port 未選択"}</span>
+      <span>{keymap ? `${keymap.layers.length} layers` : "未読み込み"}</span>
+      <span>{keymap?.lockState ?? "unknown"}</span>
+    </div>
+  );
+}
+
+function DirectWelcome({
+  canUseWebSerial,
+  isDesktopRuntime,
+  onPortChange,
+  onRead,
+  onRefresh,
+  ports,
+  selectedPort,
+}: {
+  canUseWebSerial: boolean;
+  isDesktopRuntime: boolean;
+  onPortChange: (port: string) => void;
+  onRead: () => void;
+  onRefresh: () => void;
+  ports: StudioPort[];
+  selectedPort: string;
+}) {
+  return (
+    <section className="direct-welcome">
+      <div className="direct-welcome-card">
+        <div>
+          <p className="eyebrow">Direct Mode</p>
+          <h2>キーボードを接続</h2>
+          <p>
+            USB で KobitoKey を接続して、実機の keymap を読み込みます。読み込んだ後は、キーを選んでその場で
+            binding を書き込めます。
+          </p>
+        </div>
+        <div className="direct-connect-controls">
+          {!isDesktopRuntime && !canUseWebSerial ? (
+            <div className="runtime-warning">
+              <strong>このブラウザでは device 検出できません</strong>
+              <span>Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。</span>
+            </div>
+          ) : null}
+          {!isDesktopRuntime && canUseWebSerial ? (
+            <div className="runtime-notice">
+              <strong>Web Serial で接続します</strong>
+              <span>読み込みを押すと、ブラウザの device 選択ダイアログが開きます。</span>
+            </div>
+          ) : null}
+          <label>
+            Device
+            <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+              <option value="">Studio device 未選択</option>
+              {ports.map((port) => (
+                <option key={port.path} value={port.path}>
+                  {port.label} ({port.path})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="direct-connect-actions">
+            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
+              <RefreshCw size={17} />
+              検出
+            </button>
+            <button type="button" className="primary" disabled={!isDesktopRuntime && !canUseWebSerial} onClick={onRead}>
+              <Usb size={17} />
+              読み込み
+            </button>
+          </div>
+        </div>
+        <div className="direct-capability-strip">
+          <span>Keymap: 直接編集</span>
+          <span>Combo: Firmware Mode</span>
+          <span>Trackball: Firmware Mode</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DirectModeNote({ onFirmwareMode }: { onFirmwareMode: () => void }) {
+  return (
+    <section className="direct-note">
+      <p className="eyebrow">Direct Mode</p>
+      <h2>実機 keymap 書き込み</h2>
+      <p>
+        キー binding は USB 接続した ZMK Studio 対応 device に直接保存されます。combo とトラックボール設定は
+        Firmware Mode で編集して build / flash してください。
+      </p>
+      <button type="button" className="wide-action" onClick={onFirmwareMode}>
+        Firmware Mode を開く
+      </button>
+    </section>
+  );
+}
+
 function ComboPanel({
   combos,
   onSelect,
@@ -934,22 +1312,19 @@ function ComboEditor({
       </div>
       {combo ? (
         <div className="combo-editor">
-          <label>
-            Keys
-            <input
-              value={form.keyPositions}
-              onChange={(event) => setForm({ ...form, keyPositions: event.target.value })}
-              onFocus={() => onSelect(combo.id)}
-            />
-          </label>
-          <label>
-            Binding
-            <input
-              value={form.binding}
-              onChange={(event) => setForm({ ...form, binding: event.target.value })}
-              onFocus={() => onSelect(combo.id)}
-            />
-          </label>
+          <ComboKeyPicker
+            value={form.keyPositions}
+            onFocus={() => onSelect(combo.id)}
+            onChange={(keyPositions) => setForm({ ...form, keyPositions })}
+          />
+          <BindingEditor
+            actionLabel="Combo binding に反映"
+            binding={form.binding}
+            onApply={(binding) => {
+              onSelect(combo.id);
+              setForm({ ...form, binding });
+            }}
+          />
           <label>
             Timeout
             <input
@@ -976,93 +1351,327 @@ function ComboEditor({
   );
 }
 
-function BindingEditor({ binding, onApply }: { binding: string; onApply: (binding: string) => void }) {
+function ComboKeyPicker({
+  onChange,
+  onFocus,
+  value,
+}: {
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  value: string;
+}) {
+  const selectedPositions = parseDisplayKeyPositions(value);
+  const selectedSet = new Set(selectedPositions);
+
+  return (
+    <div className="combo-key-picker">
+      <div className="binding-preview">
+        <span>Keys</span>
+        <strong>{selectedPositions.map((position) => position + 1).join(" + ") || "未選択"}</strong>
+      </div>
+      <div className="combo-key-grid" onFocus={onFocus}>
+        {Array.from({ length: 40 }, (_, index) => (
+          <button
+            type="button"
+            key={index}
+            className={selectedSet.has(index) ? "selected" : ""}
+            onClick={() => {
+              onFocus();
+              onChange(toggleDisplayKeyPosition(selectedPositions, index));
+            }}
+          >
+            <strong>{index + 1}</strong>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BindingEditor({
+  actionLabel,
+  binding,
+  onApply,
+}: {
+  actionLabel: string;
+  binding: string;
+  onApply: (binding: string) => void;
+}) {
   const [form, setForm] = React.useState<BindingForm>(() => parseBindingForm(binding));
+  const builtBinding = React.useMemo(() => buildBindingFromForm(form), [form]);
 
   React.useEffect(() => {
     setForm(parseBindingForm(binding));
   }, [binding]);
 
-  const primaryLabel = bindingPrimaryLabel(form.kind);
-  const secondaryLabel = bindingSecondaryLabel(form.kind);
-
   return (
     <div className="binding-editor">
-      <label>
-        Type
-        <select
-          value={form.kind}
-          onChange={(event) => {
-            const kind = event.target.value as BindingKind;
-            setForm({ ...form, kind });
-          }}
-        >
-          {BINDING_KIND_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {form.kind === "raw" ? (
+      <div className="binding-preview">
+        <span>Preview</span>
+        <strong>{builtBinding}</strong>
+      </div>
+
+      <ChoiceStrip
+        label="Type"
+        choices={BINDING_KIND_OPTIONS}
+        selectedValue={form.kind}
+        onSelect={(kind) => setForm(withBindingKindDefaults(form, kind as BindingKind))}
+      />
+
+      <BindingValuePicker form={form} onChange={setForm} />
+
+      <details className="advanced-binding">
+        <summary>詳細編集</summary>
         <label>
-          Raw
-          <input value={form.raw} onChange={(event) => setForm({ ...form, raw: event.target.value })} />
+          Binding
+          <input value={form.raw || builtBinding} onChange={(event) => setForm(parseBindingForm(event.target.value))} />
         </label>
-      ) : (
-        <>
-          <label>
-            {primaryLabel}
-            <input
-              value={form.primary}
-              onChange={(event) => setForm({ ...form, primary: event.target.value })}
-            />
-          </label>
-          {secondaryLabel ? (
-            <label>
-              {secondaryLabel}
-              <input
-                value={form.secondary}
-                onChange={(event) => setForm({ ...form, secondary: event.target.value })}
-              />
-            </label>
-          ) : null}
-        </>
-      )}
-      <button type="button" onClick={() => onApply(buildBindingFromForm(form))}>
-        Binding に反映
+      </details>
+
+      <button type="button" className="wide-action" onClick={() => onApply(builtBinding)}>
+        {actionLabel}
       </button>
     </div>
   );
 }
 
-function bindingPrimaryLabel(kind: BindingKind): string {
-  switch (kind) {
+function BindingValuePicker({
+  form,
+  onChange,
+}: {
+  form: BindingForm;
+  onChange: (form: BindingForm) => void;
+}) {
+  switch (form.kind) {
+    case "key":
+      return (
+        <KeyPalette
+          label="Key"
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "layer-tap":
+      return (
+        <>
+          <ChoiceStrip
+            label="Layer"
+            choices={LAYER_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) => onChange({ ...form, primary })}
+          />
+          <KeyPalette
+            label="Tap key"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
+        </>
+      );
+    case "mod-tap":
+      return (
+        <>
+          <ChoiceStrip
+            label="Hold modifier"
+            choices={MODIFIER_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) => onChange({ ...form, primary })}
+          />
+          <KeyPalette
+            label="Tap key"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
+        </>
+      );
     case "momentary":
     case "to-layer":
-      return "Layer";
-    case "mod-tap":
-      return "Modifier";
+      return (
+        <ChoiceStrip
+          label="Layer"
+          choices={LAYER_CHOICES}
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "mouse":
-      return "Button";
+      return (
+        <ChoiceStrip
+          label="Mouse button"
+          choices={MOUSE_CHOICES}
+          selectedValue={form.primary}
+          onSelect={(primary) => onChange({ ...form, primary })}
+        />
+      );
     case "bluetooth":
-      return "Action";
-    default:
-      return "Key";
+      return (
+        <>
+          <ChoiceStrip
+            label="Action"
+            choices={BLUETOOTH_ACTION_CHOICES}
+            selectedValue={form.primary}
+            onSelect={(primary) =>
+              onChange({
+                ...form,
+                primary,
+                secondary: primary === "BT_SEL" || primary === "BT_CLR" ? form.secondary || "0" : "",
+              })
+            }
+          />
+          {form.primary === "BT_SEL" || form.primary === "BT_CLR" ? (
+            <ChoiceStrip
+              label="Profile"
+              choices={BLUETOOTH_PROFILE_CHOICES}
+              selectedValue={form.secondary}
+              onSelect={(secondary) => onChange({ ...form, secondary })}
+            />
+          ) : null}
+        </>
+      );
+    case "raw":
+      return (
+        <ChoiceStrip
+          label="Special"
+          choices={SPECIAL_BINDING_CHOICES}
+          selectedValue={form.raw}
+          onSelect={(raw) => onChange({ ...form, raw })}
+        />
+      );
   }
 }
 
-function bindingSecondaryLabel(kind: BindingKind): string | undefined {
-  switch (kind) {
-    case "layer-tap":
-    case "mod-tap":
-      return "Tap key";
-    case "bluetooth":
-      return "Parameter";
-    default:
-      return undefined;
+function KeyPalette({
+  label,
+  onSelect,
+  selectedValue,
+}: {
+  label: string;
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  const [groupId, setGroupId] = React.useState(KEY_CHOICE_GROUPS[0]?.id ?? "");
+  const activeGroup = KEY_CHOICE_GROUPS.find((group) => group.id === groupId) ?? KEY_CHOICE_GROUPS[0];
+
+  React.useEffect(() => {
+    const ownerGroup = KEY_CHOICE_GROUPS.find((group) =>
+      group.choices.some((choice) => choice.value === selectedValue),
+    );
+    if (ownerGroup) {
+      setGroupId(ownerGroup.id);
+    }
+  }, [selectedValue]);
+
+  return (
+    <div className="key-palette">
+      <ChoiceStrip
+        label={label}
+        choices={KEY_CHOICE_GROUPS.map((group) => ({ value: group.id, label: group.label }))}
+        selectedValue={activeGroup.id}
+        onSelect={setGroupId}
+      />
+      <ChoiceGrid choices={activeGroup.choices} selectedValue={selectedValue} onSelect={onSelect} />
+    </div>
+  );
+}
+
+function ChoiceStrip({
+  choices,
+  label,
+  onSelect,
+  selectedValue,
+}: {
+  choices: KeyChoice[];
+  label: string;
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  return (
+    <div className="choice-strip">
+      <span>{label}</span>
+      <div>
+        {choices.map((choice) => (
+          <button
+            type="button"
+            key={choice.value}
+            className={choice.value === selectedValue ? "selected" : ""}
+            onClick={() => onSelect(choice.value)}
+            title={choice.value}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChoiceGrid({
+  choices,
+  onSelect,
+  selectedValue,
+}: {
+  choices: KeyChoice[];
+  onSelect: (value: string) => void;
+  selectedValue: string;
+}) {
+  return (
+    <div className="choice-grid">
+      {choices.map((choice) => (
+        <button
+          type="button"
+          key={choice.value}
+          className={choice.value === selectedValue ? "selected" : ""}
+          onClick={() => onSelect(choice.value)}
+          title={choice.value}
+        >
+          <strong>{choice.label}</strong>
+          <span>{choice.value}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function withBindingKindDefaults(form: BindingForm, kind: BindingKind): BindingForm {
+  if (kind === form.kind) {
+    return form;
   }
+
+  switch (kind) {
+    case "key":
+      return { ...form, kind, primary: form.primary || "A", secondary: "", raw: "" };
+    case "layer-tap":
+      return { ...form, kind, primary: layerValue(form.primary, "1"), secondary: keyValue(form.secondary, "SPACE"), raw: "" };
+    case "mod-tap":
+      return { ...form, kind, primary: modifierValue(form.primary, "LCTRL"), secondary: keyValue(form.secondary, "A"), raw: "" };
+    case "momentary":
+      return { ...form, kind, primary: layerValue(form.primary, "1"), secondary: "", raw: "" };
+    case "to-layer":
+      return { ...form, kind, primary: layerValue(form.primary, "0"), secondary: "", raw: "" };
+    case "mouse":
+      return { ...form, kind, primary: mouseValue(form.primary, "MB1"), secondary: "", raw: "" };
+    case "bluetooth":
+      return { ...form, kind, primary: "BT_SEL", secondary: "0", raw: "" };
+    case "raw":
+      return { ...form, kind, primary: "", secondary: "", raw: form.raw || "&trans" };
+  }
+}
+
+function keyValue(value: string, fallback: string): string {
+  return KEY_CHOICE_GROUPS.some((group: KeyChoiceGroup) => group.choices.some((choice) => choice.value === value))
+    ? value
+    : fallback;
+}
+
+function layerValue(value: string, fallback: string): string {
+  return LAYER_CHOICES.some((choice) => choice.value === value) ? value : fallback;
+}
+
+function modifierValue(value: string, fallback: string): string {
+  return MODIFIER_CHOICES.some((choice) => choice.value === value) ? value : fallback;
+}
+
+function mouseValue(value: string, fallback: string): string {
+  return MOUSE_CHOICES.some((choice) => choice.value === value) ? value : fallback;
 }
 
 function parseDisplayKeyPositions(value: string): number[] {
@@ -1071,6 +1680,16 @@ function parseDisplayKeyPositions(value: string): number[] {
     .map((item) => Number(item.trim()))
     .filter((number) => Number.isFinite(number) && number >= 1 && number <= 40)
     .map((number) => number - 1);
+}
+
+function toggleDisplayKeyPosition(currentPositions: number[], position: number): string {
+  const nextPositions = currentPositions.includes(position)
+    ? currentPositions.filter((currentPosition) => currentPosition !== position)
+    : [...currentPositions, position];
+  return nextPositions
+    .sort((left, right) => left - right)
+    .map((currentPosition) => currentPosition + 1)
+    .join(" ");
 }
 
 function nextComboId(combos: KeymapCombo[]): string {
@@ -1229,6 +1848,54 @@ function downloadText(filename: string, contents: string) {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
+  const layers = keymap.layers
+    .map((layer, index) => {
+      const id = sanitizeLayerId(layer.name || `layer_${index}`, index);
+      return [
+        `        ${id} {`,
+        `            display-name = "${escapeDtsString(layer.name || `Layer ${index}`)}";`,
+        "            bindings = <",
+        formatStudioBindings(layer.bindings),
+        "            >;",
+        "        };",
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
+}
+
+function formatStudioBindings(bindings: string[]): string {
+  const completeBindings = Array.from({ length: 40 }, (_, index) => bindings[index] ?? "&none");
+  const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
+
+  return Array.from({ length: 4 }, (_, row) =>
+    completeBindings
+      .slice(row * 10, row * 10 + 10)
+      .map((binding) => binding.padEnd(maxLength, " "))
+      .join("  ")
+      .trimEnd(),
+  ).join("\n");
+}
+
+function sanitizeLayerId(name: string, index: number): string {
+  const id = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return id || `layer_${index}`;
+}
+
+function escapeDtsString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -15,7 +15,9 @@ be a general ZMK editor yet.
 - Show shortened key labels on the keyboard while preserving full bindings in
   the inspector and tooltip
 - Edit a selected key binding
-- Edit common ZMK binding types with structured controls
+- Edit common ZMK binding types with click/tap based structured controls
+- Detect and read ZMK Studio compatible devices over USB serial
+- Write supported key bindings directly to a connected keyboard
 - Display and edit keymap combos
 - Preview file-level diffs before saving
 - Read and edit trackball parameters from the left/right overlay files
@@ -41,6 +43,7 @@ The source of truth for the visual layout currently lives in
 - React 18
 - TypeScript
 - Vite
+- `zmk-studio-api` for direct ZMK Studio RPC access
 
 ## Development
 
@@ -85,18 +88,90 @@ When running inside Tauri, the default project path points at:
 ## Implemented Workflows
 
 - Physical keymap viewing across layers
-- Binding editing with raw and structured inputs
-- Combo display, add, edit, and delete
+- Binding editing with keycode, layer, mouse, Bluetooth, and special binding
+  pickers
+- Direct Mode device detection, keymap read, and supported key binding write
+- Combo display, add, edit, delete, and key-position selection
 - Trackball CPI, acceleration, and gesture threshold editing
 - File-level save diff for keymap and overlay files
 - Folder picker for the local `KobitoKey_QWERTY` project
 - GitHub Actions build trigger, run status, and artifact download
 - UF2 file and bootloader volume selection with confirmation before copy
 
+## Direct Mode
+
+Direct Mode is for ZMK Studio style editing against a keyboard connected over
+USB. It is separate from the firmware file workflow.
+
+1. Build and run the Tauri app with `npm run tauri dev`.
+2. Connect the ZMK Studio enabled half of the keyboard over USB.
+3. Switch the top toolbar from `Firmware` to `Direct`.
+4. Click `読み込み`. If no port is selected yet, the app first detects likely
+   Studio serial ports and uses the first candidate.
+5. If multiple candidates are shown, choose the target port and click
+   `読み込み` again.
+6. Select a key in the physical layout.
+7. Choose the binding type and keycode from the on-screen picker, then click
+   `実機へ書き込み`.
+
+The write is sent through the ZMK Studio RPC API and saved on the device. The
+app then reloads the keymap from the device so the screen reflects the
+persistent state.
+
+Direct Mode currently supports these binding families:
+
+- `&kp KEY`
+- `&kt KEY`
+- `&lt LAYER KEY`
+- `&mt HOLD_KEY TAP_KEY`
+- `&sk KEY`
+- `&sl LAYER`
+- `&mo LAYER`
+- `&tog LAYER`
+- `&to LAYER`
+- `&bt COMMAND VALUE`
+- `&mkp VALUE`
+- `&mmv VALUE`
+- `&msc VALUE`
+- `&trans`
+- `&none`
+- `&studio_unlock`
+- `&caps_word`
+- `&key_repeat`
+- `&sys_reset`
+- `&bootloader`
+- `&soft_off`
+- `&gresc`
+
+Use Firmware Mode for combo editing, trackball CPI/acceleration/gesture
+settings, and any binding that Direct Mode does not support yet. Those settings
+live in keymap/overlay/conf files and still need build + UF2 flashing.
+
+## Binding Picker
+
+The keymap editor avoids relying on physical keyboard input for normal edits.
+Use the on-screen binding picker to choose:
+
+- keycodes such as letters, numbers, symbols, navigation, modifiers, function
+  keys, and system/media keys
+- layer targets for `&lt`, `&mo`, and `&to`
+- hold/tap combinations for `&mt`
+- mouse buttons for `&mkp`
+- Bluetooth actions for `&bt`
+- special bindings such as `&trans`, `&none`, `&bootloader`, and
+  `&studio_unlock`
+
+Combo keys are also selected from a 1-40 key grid instead of typing key
+positions manually. The advanced text field remains available for unsupported
+or custom ZMK bindings.
+
 ## Remaining Notes
 
-- The browser dev server can show fixture data and most UI behavior.
+- The browser dev server can show fixture data and most UI behavior, but it
+  does not perform Direct Mode device reads/writes.
 - File saving, folder picking, GitHub Actions, artifact download, and UF2 copy
   require the Tauri app shell.
+- Direct Mode also requires the Tauri app shell, Rust/Cargo, a ZMK Studio
+  enabled firmware, and USB serial access to the connected keyboard.
 - GitHub tokens are not stored in the renderer; GitHub operations are delegated
   to the backend through `gh`.
