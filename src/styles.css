@@ -224,6 +224,25 @@ button:disabled {
   font: inherit;
 }
 
+.runtime-warning {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #d9a23a;
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: #fff6df;
+  color: #4f3a0d;
+}
+
+.runtime-warning strong {
+  font-size: 13px;
+}
+
+.runtime-warning span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .direct-connect-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -72,6 +72,12 @@ type StudioLayer = {
 
 type EditorMode = "firmware" | "direct";
 
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
 const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
 const PRESETS = [
   "&trans",
@@ -113,6 +119,7 @@ function App() {
   const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
+  const isDesktopRuntime = isTauriRuntime();
 
   React.useEffect(() => {
     loadFixture();
@@ -242,6 +249,11 @@ function App() {
   }
 
   async function refreshStudioPorts() {
+    if (!isDesktopRuntime) {
+      setStatus("Direct の device 検出は Tauri アプリ内で利用できます。ブラウザ版では OS の serial port にアクセスできません。");
+      return;
+    }
+
     try {
       const ports = await invoke<StudioPort[]>("list_studio_ports");
       setStudioPorts(ports);
@@ -253,6 +265,11 @@ function App() {
   }
 
   async function readStudioDevice() {
+    if (!isDesktopRuntime) {
+      setStatus("Direct の読み込みは Tauri アプリ内で利用できます。npm run tauri dev で起動してください。");
+      return;
+    }
+
     if (!selectedStudioPort) {
       setStatus("Studio device の port を選択してください");
       return;
@@ -272,6 +289,11 @@ function App() {
   }
 
   async function writeDirectBinding(nextBinding: string) {
+    if (!isDesktopRuntime) {
+      setStatus("Direct の書き込みは Tauri アプリ内で利用できます。");
+      return;
+    }
+
     if (!directKeymap || !selectedStudioPort) {
       setStatus("Direct Mode で接続中の device がありません");
       return;
@@ -548,6 +570,7 @@ function App() {
 
       {showDirectEmptyState ? (
         <DirectWelcome
+          isDesktopRuntime={isDesktopRuntime}
           ports={studioPorts}
           selectedPort={selectedStudioPort}
           onPortChange={setSelectedStudioPort}
@@ -1056,12 +1079,14 @@ function DirectConnectionBar({ keymap, portPath }: { keymap: StudioKeymap | null
 }
 
 function DirectWelcome({
+  isDesktopRuntime,
   onPortChange,
   onRead,
   onRefresh,
   ports,
   selectedPort,
 }: {
+  isDesktopRuntime: boolean;
   onPortChange: (port: string) => void;
   onRead: () => void;
   onRefresh: () => void;
@@ -1080,6 +1105,12 @@ function DirectWelcome({
           </p>
         </div>
         <div className="direct-connect-controls">
+          {!isDesktopRuntime ? (
+            <div className="runtime-warning">
+              <strong>ブラウザ版では device 検出できません</strong>
+              <span>Direct Mode は Tauri アプリ内で OS の serial port を読み取ります。</span>
+            </div>
+          ) : null}
           <label>
             Device
             <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
@@ -1092,11 +1123,11 @@ function DirectWelcome({
             </select>
           </label>
           <div className="direct-connect-actions">
-            <button type="button" onClick={onRefresh}>
+            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
               <RefreshCw size={17} />
               検出
             </button>
-            <button type="button" className="primary" onClick={onRead}>
+            <button type="button" className="primary" disabled={!isDesktopRuntime} onClick={onRead}>
               <Usb size={17} />
               読み込み
             </button>
@@ -1569,6 +1600,10 @@ function sanitizeLayerId(name: string, index: number): string {
 
 function escapeDtsString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
