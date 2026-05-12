@@ -1149,7 +1149,6 @@ select {
   transition: background 0.1s ease, border-color 0.1s ease;
 }
 .combo-row:hover { border-color: var(--honey-deep); background: var(--honey-wash); }
-.combo-row button { display: contents; }
 .combo-row.focused {
   border-color: var(--pine-line);
   background: var(--pine-wash);
