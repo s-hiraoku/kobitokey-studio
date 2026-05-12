@@ -255,20 +255,21 @@ function App() {
     setBindingDraft(nextBinding);
   }
 
+  async function detectStudioPorts() {
+    const ports = await invoke<StudioPort[]>("list_studio_ports");
+    setStudioPorts(ports);
+    setSelectedStudioPort((current) => current || ports[0]?.path || "");
+    return ports;
+  }
+
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      if (canUseWebSerial) {
-        setStatus("ブラウザ版では 検出 ではなく 読み込み で device 選択ダイアログを開きます。");
-      } else {
-        setStatus("このブラウザは Web Serial に対応していません。Direct Mode は Tauri アプリ内で利用してください。");
-      }
+      setStatus("Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。");
       return;
     }
 
     try {
-      const ports = await invoke<StudioPort[]>("list_studio_ports");
-      setStudioPorts(ports);
-      setSelectedStudioPort((current) => current || ports[0]?.path || "");
+      const ports = await detectStudioPorts();
       setStatus(`Studio device candidates: ${ports.length}`);
     } catch (error) {
       setStatus(`Studio device 検出失敗: ${String(error)}`);
@@ -296,14 +297,26 @@ function App() {
       return;
     }
 
-    if (!selectedStudioPort) {
-      setStatus("Studio device の port を選択してください");
+    let portPath = selectedStudioPort;
+    if (!portPath) {
+      try {
+        const ports = await detectStudioPorts();
+        portPath = ports[0]?.path || "";
+      } catch (error) {
+        setStatus(`Studio device 検出失敗: ${String(error)}`);
+        return;
+      }
+    }
+
+    if (!portPath) {
+      setStatus("Studio device が見つかりません。USB で接続し、ZMK Studio を有効にした firmware を書き込んでください。");
       return;
     }
 
     try {
-      const nextKeymap = await invoke<StudioKeymap>("read_studio_keymap", { portPath: selectedStudioPort });
+      const nextKeymap = await invoke<StudioKeymap>("read_studio_keymap", { portPath });
       setDirectKeymap(nextKeymap);
+      setSelectedStudioPort(portPath);
       setEditorMode("direct");
       setActiveLayerIndex(0);
       setSelectedKeyIndex(0);
@@ -610,7 +623,7 @@ function App() {
               <Usb size={17} />
               {canUseWebSerial
                 ? "USB 接続した KobitoKey を中央のカードから読み込みます"
-                : "Direct Mode は Tauri アプリまたは Web Serial 対応ブラウザで利用します"}
+                : "Direct Mode の実機読み書きは Tauri デスクトップアプリで利用します"}
             </div>
           )}
         </div>
@@ -1159,7 +1172,7 @@ function DirectWelcome({
           {!isDesktopRuntime && !canUseWebSerial ? (
             <div className="runtime-warning">
               <strong>このブラウザでは device 検出できません</strong>
-              <span>Direct Mode は Tauri アプリか Web Serial 対応ブラウザで利用できます。</span>
+              <span>Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。</span>
             </div>
           ) : null}
           {!isDesktopRuntime && canUseWebSerial ? (
@@ -1180,7 +1193,7 @@ function DirectWelcome({
             </select>
           </label>
           <div className="direct-connect-actions">
-            <button type="button" disabled={!isDesktopRuntime && canUseWebSerial} onClick={onRefresh}>
+            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
               <RefreshCw size={17} />
               検出
             </button>

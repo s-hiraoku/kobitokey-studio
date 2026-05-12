@@ -24,8 +24,10 @@ let activeConnection: RpcConnection | null = null;
 let activeBehaviorCatalog: Map<number, string> = new Map();
 let behaviorIdByRole: Map<string, number> = new Map();
 
+const ENABLE_WEB_SERIAL_DIRECT = false;
+
 export function supportsWebSerial(): boolean {
-  return typeof navigator !== "undefined" && "serial" in navigator;
+  return ENABLE_WEB_SERIAL_DIRECT && typeof navigator !== "undefined" && "serial" in navigator;
 }
 
 export async function connectWebStudioDevice(): Promise<WebStudioSession> {

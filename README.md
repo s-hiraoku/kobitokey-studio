@@ -105,8 +105,10 @@ USB. It is separate from the firmware file workflow.
 1. Build and run the Tauri app with `npm run tauri dev`.
 2. Connect the ZMK Studio enabled half of the keyboard over USB.
 3. Switch the top toolbar from `Firmware` to `Direct`.
-4. Click `検出` to list likely Studio serial ports.
-5. Select the device port and click `読み込み`.
+4. Click `読み込み`. If no port is selected yet, the app first detects likely
+   Studio serial ports and uses the first candidate.
+5. If multiple candidates are shown, choose the target port and click
+   `読み込み` again.
 6. Select a key in the physical layout.
 7. Change the binding and click `実機へ書き込み`.
 
@@ -145,7 +147,8 @@ live in keymap/overlay/conf files and still need build + UF2 flashing.
 
 ## Remaining Notes
 
-- The browser dev server can show fixture data and most UI behavior.
+- The browser dev server can show fixture data and most UI behavior, but it
+  does not perform Direct Mode device reads/writes.
 - File saving, folder picking, GitHub Actions, artifact download, and UF2 copy
   require the Tauri app shell.
 - Direct Mode also requires the Tauri app shell, Rust/Cargo, a ZMK Studio
