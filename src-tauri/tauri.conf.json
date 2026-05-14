@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "KobitoKey Studio",
-        "width": 1280,
-        "height": 820,
-        "minWidth": 1040,
-        "minHeight": 700
+        "width": 1920,
+        "height": 1160,
+        "minWidth": 1520,
+        "minHeight": 920
       }
     ]
   },
