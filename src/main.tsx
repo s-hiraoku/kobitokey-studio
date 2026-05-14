@@ -110,6 +110,7 @@ function App() {
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
+  const [workbenchTab, setWorkbenchTab] = React.useState<WorkbenchTabId>("combos");
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
   const [uf2Files, setUf2Files] = React.useState<string[]>([]);
@@ -611,10 +612,12 @@ function App() {
             </div>
           ) : (
             <div className="topbar-hint">
-              <Usb size={17} />
-              {canUseWebSerial
-                ? "USB 接続した KobitoKey を中央のカードから読み込みます"
-                : "Direct Mode の実機読み書きは Tauri デスクトップアプリで利用します"}
+              <Usb size={16} />
+              <span>
+                {canUseWebSerial
+                  ? "中央カードから device を読み込み"
+                  : "実機操作は Tauri アプリで利用"}
+              </span>
             </div>
           )}
         </div>
@@ -678,25 +681,52 @@ function App() {
             onSelect={setSelectedKeyIndex}
           />
 
-          {isDirectMode ? <DirectSummaryPanel keymap={directKeymap} portPath={selectedStudioPort} /> : (
-            <section className="diff-panel">
-              <div className="panel-heading compact">
-                <h3>保存前 diff</h3>
-                <span>{keymapDiff.length === 0 ? "変更なし" : `${keymapDiff.length} ファイル`}</span>
-              </div>
-              <pre>
-                {keymapDiff.length === 0
-                  ? "No changes"
-                  : keymapDiff
-                      .map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n"))
-                      .join("\n\n")}
-              </pre>
-            </section>
+          {isDirectMode ? (
+            <DirectSummaryPanel keymap={directKeymap} portPath={selectedStudioPort} />
+          ) : (
+            <WorkbenchTabs
+              activeTab={workbenchTab}
+              onTabChange={setWorkbenchTab}
+              comboCount={combos.length}
+              diffCount={keymapDiff.length}
+            >
+              {workbenchTab === "combos" ? (
+                <ComboWorkbench
+                  combos={combos}
+                  selectedCombos={selectedCombos}
+                  selectedCombo={selectedCombo}
+                  onSelect={setSelectedComboId}
+                  onCreate={createCombo}
+                  onDelete={removeCombo}
+                  onSave={saveCombo}
+                />
+              ) : null}
+              {workbenchTab === "trackball" ? (
+                <TrackballWorkbench settings={trackball} onApply={applyTrackballSettings} />
+              ) : null}
+              {workbenchTab === "build" ? (
+                <BuildWorkbench
+                  buildStatus={buildStatus}
+                  uf2Files={uf2Files}
+                  bootloaderVolumes={bootloaderVolumes}
+                  selectedUf2={selectedUf2}
+                  selectedVolume={selectedVolume}
+                  onSelectUf2={setSelectedUf2}
+                  onSelectVolume={setSelectedVolume}
+                  onTriggerBuild={triggerBuild}
+                  onRefreshBuildStatus={refreshBuildStatus}
+                  onDownloadArtifacts={downloadArtifacts}
+                  onRefreshFlashTargets={refreshFlashTargets}
+                  onCopySelectedUf2={copySelectedUf2}
+                />
+              ) : null}
+              {workbenchTab === "diff" ? <DiffWorkbench diffs={keymapDiff} /> : null}
+            </WorkbenchTabs>
           )}
         </section>
 
         <aside className="inspector">
-          <section className={isDirectMode ? "direct-key-editor" : ""}>
+          <section className={isDirectMode ? "direct-key-editor" : "key-editor"}>
             <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
             <h2>{selectedBinding}</h2>
             <BindingEditor
@@ -708,75 +738,7 @@ function App() {
 
           {isDirectMode ? (
             <DirectModeNote onFirmwareMode={() => setEditorMode("firmware")} />
-          ) : (
-            <>
-              <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={setSelectedComboId} />
-              <ComboEditor
-                combo={selectedCombo}
-                onCreate={createCombo}
-                onDelete={removeCombo}
-                onSave={saveCombo}
-                onSelect={setSelectedComboId}
-              />
-
-              <TrackballPanel settings={trackball} />
-              <TrackballEditor settings={trackball} onApply={applyTrackballSettings} />
-            </>
-          )}
-
-          {!isDirectMode ? <section className="build-panel">
-            <div>
-              <p className="eyebrow">Build / Flash</p>
-              <h2>アップロード支援</h2>
-            </div>
-            <ol>
-              <li>Git diff を確認して保存</li>
-              <li>GitHub Actions の build を起動</li>
-              <li>artifact から左右 UF2 を取得</li>
-              <li>左右を順番に bootloader へ書き込み</li>
-            </ol>
-            <p className="build-status">{buildStatus}</p>
-            <button type="button" onClick={triggerBuild}>
-              <UploadCloud size={17} />
-              Build 起動
-            </button>
-            <button type="button" onClick={refreshBuildStatus}>
-              最新 run 確認
-            </button>
-            <button type="button" onClick={downloadArtifacts}>
-              Artifact 取得
-            </button>
-            <div className="flash-wizard">
-              <button type="button" onClick={refreshFlashTargets}>
-                UF2 / Volume 更新
-              </button>
-              <label>
-                UF2
-                <select value={selectedUf2} onChange={(event) => setSelectedUf2(event.target.value)}>
-                  <option value="">未選択</option>
-                  {uf2Files.map((file) => (
-                    <option key={file} value={file}>
-                      {file.split("/").pop()}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Bootloader
-                <select value={selectedVolume} onChange={(event) => setSelectedVolume(event.target.value)}>
-                  <option value="">未選択</option>
-                  {bootloaderVolumes.map((volume) => (
-                    <option key={volume} value={volume}>
-                      {volume.split("/").pop()}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" onClick={copySelectedUf2}>
-                UF2 をコピー
-              </button>
-            </div>
-          </section> : null}
+          ) : null}
         </aside>
       </section>
       )}
@@ -1210,6 +1172,248 @@ function DirectModeNote({ onFirmwareMode }: { onFirmwareMode: () => void }) {
   );
 }
 
+type WorkbenchTabId = "combos" | "trackball" | "build" | "diff";
+
+const WORKBENCH_TABS: Array<{ id: WorkbenchTabId; label: string }> = [
+  { id: "combos", label: "Combos" },
+  { id: "trackball", label: "Trackball" },
+  { id: "build", label: "Build & Flash" },
+  { id: "diff", label: "Diff" },
+];
+
+function WorkbenchTabs({
+  activeTab,
+  children,
+  comboCount,
+  diffCount,
+  onTabChange,
+}: {
+  activeTab: WorkbenchTabId;
+  children: React.ReactNode;
+  comboCount: number;
+  diffCount: number;
+  onTabChange: (tab: WorkbenchTabId) => void;
+}) {
+  const counts: Partial<Record<WorkbenchTabId, number>> = {
+    combos: comboCount,
+    diff: diffCount,
+  };
+
+  return (
+    <section className="workbench-tabs">
+      <div className="workbench-tablist" role="tablist">
+        {WORKBENCH_TABS.map((tab) => {
+          const count = counts[tab.id];
+          return (
+            <button
+              type="button"
+              key={tab.id}
+              role="tab"
+              aria-selected={tab.id === activeTab}
+              className={tab.id === activeTab ? "active" : ""}
+              onClick={() => onTabChange(tab.id)}
+            >
+              <span>{tab.label}</span>
+              {typeof count === "number" ? <em>{count}</em> : null}
+            </button>
+          );
+        })}
+      </div>
+      <div className="workbench-panel">{children}</div>
+    </section>
+  );
+}
+
+function ComboWorkbench({
+  combos,
+  onCreate,
+  onDelete,
+  onSave,
+  onSelect,
+  selectedCombo,
+  selectedCombos,
+}: {
+  combos: KeymapCombo[];
+  onCreate: () => void;
+  onDelete: (combo: KeymapCombo) => void;
+  onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
+  onSelect: (comboId: string) => void;
+  selectedCombo?: KeymapCombo;
+  selectedCombos: KeymapCombo[];
+}) {
+  return (
+    <div className="workbench-grid combo-workbench">
+      <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
+      <ComboEditor
+        combo={selectedCombo}
+        onCreate={onCreate}
+        onDelete={onDelete}
+        onSave={onSave}
+        onSelect={onSelect}
+      />
+    </div>
+  );
+}
+
+function TrackballWorkbench({
+  onApply,
+  settings,
+}: {
+  onApply: (settings: RequiredTrackballSettings) => void;
+  settings: TrackballSettings;
+}) {
+  return (
+    <div className="workbench-grid trackball-workbench">
+      <TrackballPanel settings={settings} />
+      <TrackballEditor settings={settings} onApply={onApply} />
+    </div>
+  );
+}
+
+function BuildWorkbench({
+  bootloaderVolumes,
+  buildStatus,
+  onCopySelectedUf2,
+  onDownloadArtifacts,
+  onRefreshBuildStatus,
+  onRefreshFlashTargets,
+  onSelectUf2,
+  onSelectVolume,
+  onTriggerBuild,
+  selectedUf2,
+  selectedVolume,
+  uf2Files,
+}: {
+  bootloaderVolumes: string[];
+  buildStatus: string;
+  onCopySelectedUf2: () => void;
+  onDownloadArtifacts: () => void;
+  onRefreshBuildStatus: () => void;
+  onRefreshFlashTargets: () => void;
+  onSelectUf2: (value: string) => void;
+  onSelectVolume: (value: string) => void;
+  onTriggerBuild: () => void;
+  selectedUf2: string;
+  selectedVolume: string;
+  uf2Files: string[];
+}) {
+  return (
+    <div className="workbench-grid build-workbench">
+      <section className="build-panel">
+        <div>
+          <p className="eyebrow">Build</p>
+          <h2>GitHub Actions</h2>
+        </div>
+        <ol>
+          <li>Diff を確認して保存</li>
+          <li>build workflow を起動</li>
+          <li>最新 run のステータスを確認</li>
+          <li>artifact から左右 UF2 を取得</li>
+        </ol>
+        <p className="build-status">{buildStatus}</p>
+        <div className="build-actions">
+          <button type="button" className="primary" onClick={onTriggerBuild}>
+            <UploadCloud size={16} />
+            Build 起動
+          </button>
+          <button type="button" onClick={onRefreshBuildStatus}>
+            最新 run
+          </button>
+          <button type="button" onClick={onDownloadArtifacts}>
+            Artifact 取得
+          </button>
+        </div>
+      </section>
+      <section className="flash-panel">
+        <div>
+          <p className="eyebrow">Flash</p>
+          <h2>UF2 → Bootloader</h2>
+        </div>
+        <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
+          UF2 / Volume を更新
+        </button>
+        <label>
+          UF2
+          <select value={selectedUf2} onChange={(event) => onSelectUf2(event.target.value)}>
+            <option value="">未選択</option>
+            {uf2Files.map((file) => (
+              <option key={file} value={file}>
+                {file.split("/").pop()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Bootloader
+          <select value={selectedVolume} onChange={(event) => onSelectVolume(event.target.value)}>
+            <option value="">未選択</option>
+            {bootloaderVolumes.map((volume) => (
+              <option key={volume} value={volume}>
+                {volume.split("/").pop()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="primary wide-action" onClick={onCopySelectedUf2}>
+          UF2 を bootloader にコピー
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function DiffWorkbench({ diffs }: { diffs: FileDiff[] }) {
+  return (
+    <section className="diff-panel">
+      <div className="panel-heading compact">
+        <h3>保存前 diff</h3>
+        <span>{diffs.length === 0 ? "変更なし" : `${diffs.length} ファイル`}</span>
+      </div>
+      {diffs.length === 0 ? (
+        <p className="diff-empty">変更はまだありません</p>
+      ) : (
+        <div className="diff-viewer">
+          {diffs.map((diff) => {
+            const added = diff.lines.filter((line) => line.startsWith("+")).length;
+            const removed = diff.lines.filter((line) => line.startsWith("-")).length;
+            return (
+              <article className="diff-file" key={diff.filename}>
+                <header className="diff-file-header">
+                  <span>{diff.filename}</span>
+                  <span className="diff-file-counts">
+                    <span className="added">+{added}</span>
+                    <span className="removed">−{removed}</span>
+                  </span>
+                </header>
+                <ol className="diff-lines">
+                  {diff.lines.map((line, index) => {
+                    const kind = classifyDiffLine(line);
+                    const sign = kind === "add" ? "+" : kind === "del" ? "−" : kind === "elide" ? "…" : " ";
+                    const body = kind === "elide" ? "(中略)" : line.slice(1);
+                    return (
+                      <li key={`${diff.filename}-${index}`} className={kind}>
+                        <span className="sign">{sign}</span>
+                        <span className="content">{body}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function classifyDiffLine(line: string): "add" | "del" | "elide" | "ctx" {
+  if (line === "...") return "elide";
+  if (line.startsWith("+")) return "add";
+  if (line.startsWith("-")) return "del";
+  return "ctx";
+}
+
 function ComboPanel({
   combos,
   onSelect,
@@ -1221,8 +1425,13 @@ function ComboPanel({
 }) {
   return (
     <section>
-      <p className="eyebrow">Combos</p>
-      <h2>コンボ</h2>
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">Combos</p>
+          <h2>コンボ一覧</h2>
+        </div>
+        <span className="section-count">{combos.length}</span>
+      </div>
       <div className="combo-focus-list">
         {selectedCombos.length === 0 ? (
           <p className="empty-note">選択キーの combo はありません</p>
@@ -1306,7 +1515,7 @@ function ComboEditor({
           <p className="eyebrow">Combo Edit</p>
           <h2>{combo?.id ?? "新規 combo"}</h2>
         </div>
-        <button type="button" onClick={onCreate}>
+        <button type="button" className="primary" onClick={onCreate}>
           追加
         </button>
       </div>
@@ -1336,10 +1545,10 @@ function ComboEditor({
             />
           </label>
           <div className="combo-editor-actions">
-            <button type="button" onClick={() => onSave(combo, form)}>
+            <button type="button" className="primary" onClick={() => onSave(combo, form)}>
               更新
             </button>
-            <button type="button" onClick={() => onDelete(combo)}>
+            <button type="button" className="danger" onClick={() => onDelete(combo)}>
               削除
             </button>
           </div>
@@ -1428,7 +1637,7 @@ function BindingEditor({
         </label>
       </details>
 
-      <button type="button" className="wide-action" onClick={() => onApply(builtBinding)}>
+      <button type="button" className="primary wide-action" onClick={() => onApply(builtBinding)}>
         {actionLabel}
       </button>
     </div>
@@ -1815,7 +2024,7 @@ function TrackballEditor({
             />
           </label>
         ))}
-        <button type="button" onClick={() => onApply(form)}>
+        <button type="button" className="primary" onClick={() => onApply(form)}>
           設定に反映
         </button>
       </div>
