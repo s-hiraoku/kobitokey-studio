@@ -612,10 +612,12 @@ function App() {
             </div>
           ) : (
             <div className="topbar-hint">
-              <Usb size={17} />
-              {canUseWebSerial
-                ? "USB 接続した KobitoKey を中央のカードから読み込みます"
-                : "Direct Mode の実機読み書きは Tauri デスクトップアプリで利用します"}
+              <Usb size={16} />
+              <span>
+                {canUseWebSerial
+                  ? "中央カードから device を読み込み"
+                  : "実機操作は Tauri アプリで利用"}
+              </span>
             </div>
           )}
         </div>
@@ -724,7 +726,7 @@ function App() {
         </section>
 
         <aside className="inspector">
-          <section className={isDirectMode ? "direct-key-editor" : ""}>
+          <section className={isDirectMode ? "direct-key-editor" : "key-editor"}>
             <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
             <h2>{selectedBinding}</h2>
             <BindingEditor
@@ -1310,7 +1312,7 @@ function BuildWorkbench({
         </ol>
         <p className="build-status">{buildStatus}</p>
         <div className="build-actions">
-          <button type="button" onClick={onTriggerBuild}>
+          <button type="button" className="primary" onClick={onTriggerBuild}>
             <UploadCloud size={16} />
             Build 起動
           </button>
@@ -1367,13 +1369,49 @@ function DiffWorkbench({ diffs }: { diffs: FileDiff[] }) {
         <h3>保存前 diff</h3>
         <span>{diffs.length === 0 ? "変更なし" : `${diffs.length} ファイル`}</span>
       </div>
-      <pre>
-        {diffs.length === 0
-          ? "No changes"
-          : diffs.map((diff) => [`# ${diff.filename}`, ...diff.lines].join("\n")).join("\n\n")}
-      </pre>
+      {diffs.length === 0 ? (
+        <p className="diff-empty">変更はまだありません</p>
+      ) : (
+        <div className="diff-viewer">
+          {diffs.map((diff) => {
+            const added = diff.lines.filter((line) => line.startsWith("+")).length;
+            const removed = diff.lines.filter((line) => line.startsWith("-")).length;
+            return (
+              <article className="diff-file" key={diff.filename}>
+                <header className="diff-file-header">
+                  <span>{diff.filename}</span>
+                  <span className="diff-file-counts">
+                    <span className="added">+{added}</span>
+                    <span className="removed">−{removed}</span>
+                  </span>
+                </header>
+                <ol className="diff-lines">
+                  {diff.lines.map((line, index) => {
+                    const kind = classifyDiffLine(line);
+                    const sign = kind === "add" ? "+" : kind === "del" ? "−" : kind === "elide" ? "…" : " ";
+                    const body = kind === "elide" ? "(中略)" : line.slice(1);
+                    return (
+                      <li key={`${diff.filename}-${index}`} className={kind}>
+                        <span className="sign">{sign}</span>
+                        <span className="content">{body}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
+}
+
+function classifyDiffLine(line: string): "add" | "del" | "elide" | "ctx" {
+  if (line === "...") return "elide";
+  if (line.startsWith("+")) return "add";
+  if (line.startsWith("-")) return "del";
+  return "ctx";
 }
 
 function ComboPanel({
@@ -1387,8 +1425,13 @@ function ComboPanel({
 }) {
   return (
     <section>
-      <p className="eyebrow">Combos</p>
-      <h2>コンボ</h2>
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">Combos</p>
+          <h2>コンボ一覧</h2>
+        </div>
+        <span className="section-count">{combos.length}</span>
+      </div>
       <div className="combo-focus-list">
         {selectedCombos.length === 0 ? (
           <p className="empty-note">選択キーの combo はありません</p>
@@ -1472,7 +1515,7 @@ function ComboEditor({
           <p className="eyebrow">Combo Edit</p>
           <h2>{combo?.id ?? "新規 combo"}</h2>
         </div>
-        <button type="button" onClick={onCreate}>
+        <button type="button" className="primary" onClick={onCreate}>
           追加
         </button>
       </div>
@@ -1502,10 +1545,10 @@ function ComboEditor({
             />
           </label>
           <div className="combo-editor-actions">
-            <button type="button" onClick={() => onSave(combo, form)}>
+            <button type="button" className="primary" onClick={() => onSave(combo, form)}>
               更新
             </button>
-            <button type="button" onClick={() => onDelete(combo)}>
+            <button type="button" className="danger" onClick={() => onDelete(combo)}>
               削除
             </button>
           </div>
@@ -1594,7 +1637,7 @@ function BindingEditor({
         </label>
       </details>
 
-      <button type="button" className="wide-action" onClick={() => onApply(builtBinding)}>
+      <button type="button" className="primary wide-action" onClick={() => onApply(builtBinding)}>
         {actionLabel}
       </button>
     </div>
@@ -1981,7 +2024,7 @@ function TrackballEditor({
             />
           </label>
         ))}
-        <button type="button" onClick={() => onApply(form)}>
+        <button type="button" className="primary" onClick={() => onApply(form)}>
           設定に反映
         </button>
       </div>

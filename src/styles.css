@@ -386,6 +386,18 @@ select {
 }
 .primary:focus-visible { border-color: var(--pine-deep); }
 
+.danger {
+  border-color: #a83a2b;
+  background: var(--card);
+  color: #8a2918;
+  font-weight: 600;
+}
+.danger:hover {
+  border-color: #8a2918;
+  background: #fbe8e2;
+  color: #5a1d10;
+}
+
 /* ----------------------------------------------------------------
    Workspace grid
    ---------------------------------------------------------------- */
@@ -958,6 +970,102 @@ select {
   box-shadow: inset 0 2px 12px -4px rgba(0, 0, 0, 0.4);
 }
 
+/* ----------------------------------------------------------------
+   Structured diff viewer (replaces <pre>)
+   ---------------------------------------------------------------- */
+.diff-viewer {
+  display: grid;
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.diff-empty {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  margin-top: var(--sp-3);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink-faint);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.diff-file {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  background: #fbfaf5;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+.diff-file-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  border-bottom: 1px solid var(--hairline);
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-strong);
+  letter-spacing: -0.005em;
+}
+.diff-file-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.diff-file-counts .added { color: #2f7c4f; }
+.diff-file-counts .removed { color: #ad3a2b; }
+.diff-lines {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.diff-lines li {
+  display: contents;
+}
+.diff-lines .sign,
+.diff-lines .content {
+  padding: 1px var(--sp-3);
+}
+.diff-lines .sign {
+  text-align: center;
+  padding: 1px 0;
+  color: var(--ink-faint);
+  background: var(--paper-2);
+  border-right: 1px solid var(--hairline-fine);
+  user-select: none;
+  font-weight: 700;
+}
+.diff-lines .content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-soft);
+}
+.diff-lines li.add .sign  { background: #d6efdd; color: #1f6c3c; }
+.diff-lines li.add .content { background: #ecf8ef; color: #14401f; }
+.diff-lines li.del .sign  { background: #f5d9d2; color: #8a2918; }
+.diff-lines li.del .content { background: #fbe8e2; color: #5a1d10; }
+.diff-lines li.elide .sign,
+.diff-lines li.elide .content {
+  background: var(--paper-2);
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
 .wide-action { width: 100%; margin-top: var(--sp-3); }
 
 /* ----------------------------------------------------------------
@@ -1061,22 +1169,44 @@ select {
 .workbench-grid .build-panel ol { margin-top: var(--sp-3); }
 .workbench-grid .build-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-2);
 }
-.workbench-grid .build-actions button { width: 100%; margin-top: 0; }
+.workbench-grid .build-actions button {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 0;
+  font-size: 12px;
+}
+.workbench-grid .build-actions button:first-child { /* primary slot */
+  /* leave as-is; user can promote later */
+}
 .workbench-grid .flash-panel { display: grid; gap: var(--sp-2); }
 .workbench-grid .flash-panel > div { margin-bottom: var(--sp-1); }
 .workbench-grid .flash-panel label { margin-top: var(--sp-2); }
 
 .workbench-grid .settings-list { max-height: 256px; overflow: auto; padding-right: 2px; }
 .workbench-grid .trackball-editor {
-  margin-top: 0;
+  margin-top: var(--sp-3);
   border-top: 0;
   padding-top: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-3);
 }
-.workbench-grid .trackball-editor button { grid-column: 1 / -1; }
+.workbench-grid .trackball-editor label {
+  gap: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+}
+.workbench-grid .trackball-editor label > span,
+.workbench-grid .trackball-editor label > * { min-width: 0; }
+.workbench-grid .trackball-editor input { font-size: 12px; }
+.workbench-grid .trackball-editor button {
+  grid-column: 1 / -1;
+  min-height: 38px;
+  margin-top: var(--sp-2);
+}
 
 .workbench-grid .diff-panel {
   border: 0;
@@ -1123,14 +1253,20 @@ select {
   text-transform: uppercase;
 }
 
-.direct-key-editor {
-  border: 1px solid var(--pine-line);
+.direct-key-editor,
+.key-editor {
+  border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-4) var(--sp-5);
-  background: linear-gradient(180deg, #f3f7ef 0%, #ebf0e4 100%);
+  background: var(--card);
   box-shadow: var(--shadow-1);
 }
-.direct-key-editor h2 {
+.direct-key-editor {
+  border-color: var(--pine-line);
+  background: linear-gradient(180deg, #f3f7ef 0%, #ebf0e4 100%);
+}
+.direct-key-editor h2,
+.key-editor h2 {
   font-family: "JetBrains Mono", monospace;
   font-size: 15px;
   font-weight: 700;
@@ -1155,6 +1291,7 @@ select {
   justify-content: space-between;
   gap: var(--sp-3);
 }
+.section-title-row > div { min-width: 0; }
 .section-title-row button,
 .combo-editor-actions button {
   min-height: 30px;
@@ -1164,6 +1301,21 @@ select {
   font-size: 11.5px;
   letter-spacing: 0.005em;
   white-space: nowrap;
+}
+
+.section-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  border-radius: var(--r-full);
+  padding: 0 8px;
+  background: var(--ink-strong);
+  color: var(--honey-glow);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .binding-editor,
@@ -1220,7 +1372,11 @@ select {
    Choice strips / grids
    ---------------------------------------------------------------- */
 .choice-strip { display: grid; gap: var(--sp-2); }
-.choice-strip > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.choice-strip > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 4px;
+}
 
 .choice-strip button,
 .choice-grid button {
@@ -1240,9 +1396,11 @@ select {
 }
 .choice-strip button {
   min-height: 28px;
-  padding: 0 10px;
-  font-size: 11.5px;
+  padding: 0 8px;
+  font-size: 11px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .choice-strip button.selected,
 .choice-grid button.selected {
