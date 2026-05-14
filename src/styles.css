@@ -146,13 +146,98 @@ button:disabled:hover {
   border-color: var(--hairline);
 }
 
+/* ----------------------------------------------------------------
+   Form controls — input / select / number
+   ---------------------------------------------------------------- */
 input,
-select {
+select,
+textarea {
   -webkit-appearance: none;
   appearance: none;
+  min-height: 36px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 0 var(--sp-3);
+  background: linear-gradient(180deg, #ffffff 0%, var(--card) 100%);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 1px 0 rgba(31, 29, 23, 0.04);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 
-input::placeholder { color: var(--ink-faint); }
+textarea {
+  min-height: 96px;
+  padding: var(--sp-2) var(--sp-3);
+  line-height: 1.5;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--ink-soft);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--pine);
+  background: #ffffff;
+  box-shadow: var(--focus-ring);
+  color: var(--ink-strong);
+}
+
+input::placeholder,
+textarea::placeholder { color: var(--ink-faint); }
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: var(--paper-2);
+}
+
+/* number — hide native spinners (we provide custom feel via larger hit zone) */
+input[type="number"] {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding-right: var(--sp-3);
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+  opacity: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]:hover::-webkit-inner-spin-button,
+input[type="number"]:focus::-webkit-inner-spin-button {
+  -webkit-appearance: inner-spin-button;
+  opacity: 0.55;
+  height: 22px;
+}
+
+/* search/text/email — slight monospace polish via inherited family */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="url"] {
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
 
 /* ----------------------------------------------------------------
    Shell
@@ -293,6 +378,20 @@ input::placeholder { color: var(--ink-faint); }
   gap: var(--sp-2);
   min-width: 0;
 }
+.project-loader input {
+  padding-left: 32px;
+  background-image:
+    linear-gradient(180deg, #ffffff 0%, var(--card) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23837b65' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, 10px center;
+  background-size: 100% 100%, 14px 14px;
+}
+.project-loader input:focus {
+  background-image:
+    linear-gradient(180deg, #ffffff 0%, #ffffff 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231d2e24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
+}
 
 .project-loader input,
 .studio-loader select,
@@ -300,37 +399,31 @@ input::placeholder { color: var(--ink-faint); }
 .inspector select {
   width: 100%;
   min-width: 0;
-  min-height: 36px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  padding: 0 var(--sp-3);
-  background: var(--card);
-  font-size: 13px;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 .project-loader input {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11.5px;
   letter-spacing: -0.005em;
-}
-
-.project-loader input:focus,
-.inspector input:focus,
-.inspector select:focus,
-.studio-loader select:focus,
-.direct-connect-controls select:focus {
-  outline: none;
-  border-color: var(--pine);
-  box-shadow: var(--focus-ring);
-  background: #fff;
+  text-align: left;
 }
 
 select {
+  cursor: pointer;
   background-image:
+    linear-gradient(180deg, #ffffff 0%, var(--card) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%234b463a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 30px !important;
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 12px center;
+  background-size: 100% 100%, 12px 8px;
+  padding-right: 32px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+select:focus,
+select:focus-visible {
+  background-image:
+    linear-gradient(180deg, #ffffff 0%, #ffffff 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231d2e24' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .project-loader button,
@@ -479,16 +572,11 @@ select {
 }
 
 .direct-connect-controls select {
-  min-height: 42px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  padding: 0 var(--sp-3);
-  background: var(--card);
+  min-height: 44px;
   font-family: "Hanken Grotesk", sans-serif;
   font-size: 13.5px;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--ink);
 }
 
 .runtime-warning,
@@ -1195,13 +1283,45 @@ select {
   row-gap: var(--sp-3);
 }
 .workbench-grid .trackball-editor label {
-  gap: 4px;
+  display: grid;
+  gap: 5px;
+  color: var(--ink-faint);
+  font-family: "JetBrains Mono", monospace;
   font-size: 9.5px;
+  font-weight: 500;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .workbench-grid .trackball-editor label > span,
 .workbench-grid .trackball-editor label > * { min-width: 0; }
-.workbench-grid .trackball-editor input { font-size: 12px; }
+.workbench-grid .trackball-editor input { font-size: 12.5px; min-height: 34px; }
+
+.workbench-grid label,
+.combo-editor label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-faint);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.workbench-grid label > input,
+.workbench-grid label > select,
+.combo-editor label > input,
+.combo-editor label > select {
+  color: var(--ink-strong);
+  font-family: "Hanken Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.workbench-grid label > input[type="number"],
+.combo-editor label > input[type="number"] {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
 .workbench-grid .trackball-editor button {
   grid-column: 1 / -1;
   min-height: 38px;
@@ -1243,7 +1363,7 @@ select {
 
 .inspector label {
   display: grid;
-  gap: var(--sp-2);
+  gap: 6px;
   margin-top: var(--sp-4);
   color: var(--ink-faint);
   font-family: "JetBrains Mono", monospace;
@@ -1251,6 +1371,19 @@ select {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+.inspector label > input,
+.inspector label > select,
+.inspector label > textarea {
+  color: var(--ink-strong);
+  font-family: "Hanken Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.inspector label > input[type="number"] {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 
 .direct-key-editor,
@@ -1466,8 +1599,9 @@ select {
 .advanced-binding summary:hover { color: var(--ink-soft); }
 .advanced-binding label { margin-top: var(--sp-3); }
 .advanced-binding input {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
+  text-align: left;
 }
 
 /* ----------------------------------------------------------------
