@@ -78,9 +78,16 @@
 
 * { box-sizing: border-box; }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 1180px;
+  overflow: hidden;
   background-color: var(--paper);
   /* a much fainter engineering dot grid */
   background-image:
@@ -244,8 +251,10 @@ input[type="url"] {
    ---------------------------------------------------------------- */
 .app-shell {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ----------------------------------------------------------------
@@ -498,6 +507,7 @@ select:focus-visible {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr) 392px;
   min-height: 0;
+  overflow: hidden;
 }
 .workspace.direct-workspace {
   grid-template-columns: 200px minmax(0, 1fr) 360px;
@@ -601,10 +611,27 @@ select:focus-visible {
 .runtime-warning span,
 .runtime-notice span { font-size: 12px; line-height: 1.5; }
 
+.runtime-diagnostics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.runtime-diagnostics span {
+  min-width: max-content;
+}
+
 .direct-connect-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
 }
 .direct-connect-actions button {
   display: inline-flex;
@@ -615,6 +642,14 @@ select:focus-visible {
   border-radius: var(--r-md);
   font-weight: 600;
   font-size: 13px;
+}
+.direct-connect-actions .bluetooth-action {
+  border-color: #27425d;
+  background: linear-gradient(180deg, #3f6f95 0%, #274b6d 100%);
+}
+.direct-connect-actions .bluetooth-action:hover {
+  border-color: #1c344d;
+  background: linear-gradient(180deg, #315c7e 0%, #1f3c58 100%);
 }
 
 .direct-capability-strip {
@@ -641,13 +676,22 @@ select:focus-visible {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--sp-5) var(--sp-3);
+  gap: 5px;
+  min-height: 0;
+  padding: 20px 14px;
   border-right: 1px solid var(--hairline);
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
 }
 
-.sidebar button {
+.layer-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+}
+
+.layer-list button {
   display: grid;
   grid-template-columns: 22px 1fr;
   align-items: center;
@@ -663,13 +707,13 @@ select:focus-visible {
   color: var(--ink-muted);
   letter-spacing: -0.005em;
 }
-.sidebar button:hover {
-  background: var(--card);
+.layer-list button:hover {
+  background: var(--honey-wash);
   border-color: var(--hairline-soft);
   color: var(--ink);
 }
 
-.sidebar button span {
+.layer-list button span {
   display: grid;
   place-items: center;
   width: 22px;
@@ -682,15 +726,73 @@ select:focus-visible {
   font-weight: 700;
 }
 
-.sidebar button.active {
-  border-color: var(--ink-strong);
-  background: var(--ink-strong);
-  color: #f6f1de;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+.layer-list button.active {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+  color: var(--pine-deep);
+  box-shadow: 0 1px 2px rgba(28, 26, 14, 0.08);
 }
-.sidebar button.active span {
-  background: var(--honey);
-  color: var(--ink-strong);
+.layer-list button.active span {
+  background: var(--pine);
+  color: var(--honey-glow);
+}
+
+.sidebar-connection {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+  border-top: 1px dashed var(--hairline);
+  padding-top: 14px;
+}
+.sidebar-connection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.sidebar-connection-head span,
+.sidebar-connection-head a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sidebar-connection-head a {
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+.sidebar-connection p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sidebar-connection button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.sidebar-connection .sidebar-connect-primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--card);
+}
+.sidebar-connection .sidebar-connect-primary:hover {
+  border-color: var(--pine-deep);
+  background: var(--pine-deep);
+}
+.sidebar-connection > span {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  line-height: 1.55;
 }
 
 /* ----------------------------------------------------------------
@@ -701,12 +803,14 @@ select:focus-visible {
   flex-direction: column;
   gap: var(--sp-5);
   min-width: 0;
-  padding: var(--sp-6) var(--sp-7);
+  min-height: 0;
+  overflow: auto;
+  padding: 26px 28px;
 }
 
 .direct-connection-bar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.8fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(180px, 0.8fr) auto auto;
   align-items: center;
   gap: var(--sp-3);
   border: 1px solid var(--hairline);
@@ -1341,8 +1445,9 @@ select:focus-visible {
 .inspector {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  padding: var(--sp-6) var(--sp-5);
+  gap: 22px;
+  min-height: 0;
+  padding: 26px 22px;
   border-left: 1px solid var(--hairline);
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
   overflow: auto;
@@ -1407,7 +1512,199 @@ select:focus-visible {
   word-break: break-all;
 }
 
-/* inspector "Key N — &kp X" headline */
+.direct-inspector,
+.direct-settings,
+.firmware-inspector,
+.firmware-tab-stack {
+  display: grid;
+  gap: 16px;
+}
+.direct-inspector-tabs,
+.direct-settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card);
+}
+.direct-inspector-tabs button,
+.direct-settings-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+.direct-inspector-tabs button:last-child,
+.direct-settings-tabs button:last-child { border-right: 0; }
+.direct-inspector-tabs button.active,
+.direct-settings-tabs button.active {
+  background: var(--pine);
+  color: var(--honey-glow);
+}
+.direct-settings-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--card);
+}
+.direct-settings-panel strong {
+  color: var(--pine-deep);
+  font-size: 13.5px;
+}
+.direct-settings-panel p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.direct-settings-panel button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-weight: 700;
+}
+.direct-settings-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+.direct-settings-heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border-radius: 8px;
+}
+.coming-soon-badge {
+  align-self: start;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.direct-trackball-panel {
+  gap: 16px;
+}
+.direct-combo-panel {
+  display: grid;
+  gap: 14px;
+}
+.direct-combo-meter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.direct-combo-meter span {
+  border: 1px solid var(--hairline-soft);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.direct-number-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+.direct-number-field input {
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+.timing-panel {
+  gap: 18px;
+}
+.timing-field {
+  display: grid;
+  gap: 8px;
+}
+.timing-field > div:first-child,
+.timing-range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.timing-field > div:first-child span,
+.timing-presets > span {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.timing-field > div:first-child strong {
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+}
+.timing-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--ink);
+}
+.timing-range-labels {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.timing-presets {
+  display: grid;
+  gap: 8px;
+}
+.timing-presets > div {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.timing-presets button {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 6px;
+  background: var(--card);
+  font-size: 11px;
+}
+.timing-presets button.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--card);
+  opacity: 1;
+}
+.compact-presets > div {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.timing-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+/* the inspector "Key N — &kp X" headline */
 .inspector section > h2 {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 15px;

@@ -1,7 +1,9 @@
 import { call_rpc, create_rpc_connection, RpcConnection } from "@zmkfirmware/zmk-studio-ts-client";
-import { connect } from "@zmkfirmware/zmk-studio-ts-client/transport/serial";
+import { connect as connectWebSerial } from "@zmkfirmware/zmk-studio-ts-client/transport/serial";
 import { LockState } from "@zmkfirmware/zmk-studio-ts-client/core";
 import { BehaviorBinding, Keymap, SetLayerBindingResponse } from "@zmkfirmware/zmk-studio-ts-client/keymap";
+
+export type StudioConnectionKind = "usb" | "bluetooth";
 
 export type WebStudioKeymap = {
   deviceName: string;
@@ -16,39 +18,111 @@ export type WebStudioKeymap = {
 };
 
 export type WebStudioSession = {
+  kind: StudioConnectionKind;
   label: string;
   keymap: WebStudioKeymap;
+};
+
+export type DirectTrackballSettings = {
+  cpi: number;
+  cursorNumerator: number;
+  cursorDenominator: number;
+  scrollNumerator: number;
+  scrollDenominator: number;
+};
+
+type WebStudioNavigator = Navigator & {
+  serial?: unknown;
+  bluetooth?: {
+    requestDevice?: unknown;
+  };
+};
+
+type WebBluetoothDevice = EventTarget & {
+  gatt?: {
+    connected: boolean;
+    connect: () => Promise<void>;
+    disconnect: () => void;
+    getPrimaryService: (service: string) => Promise<WebBluetoothService>;
+  };
+  name?: string;
+};
+
+type WebBluetoothService = {
+  getCharacteristic: (characteristic: string) => Promise<WebBluetoothCharacteristic>;
+};
+
+type WebBluetoothCharacteristic = EventTarget & {
+  value?: DataView;
+  getCharacteristic?: never;
+  startNotifications: () => Promise<WebBluetoothCharacteristic>;
+  stopNotifications: () => Promise<WebBluetoothCharacteristic>;
+  writeValueWithoutResponse: (value: BufferSource) => Promise<void>;
 };
 
 let activeConnection: RpcConnection | null = null;
 let activeBehaviorCatalog: Map<number, string> = new Map();
 let behaviorIdByRole: Map<string, number> = new Map();
 
-const ENABLE_WEB_SERIAL_DIRECT = false;
-
-export function supportsWebSerial(): boolean {
-  return ENABLE_WEB_SERIAL_DIRECT && typeof navigator !== "undefined" && "serial" in navigator;
+export class WebTrackballRpcUnavailableError extends Error {
+  constructor() {
+    super("Trackball Direct RPC is available in the desktop app. The current Web client package does not expose the pointing RPC encoder yet.");
+    this.name = "WebTrackballRpcUnavailableError";
+  }
 }
 
-export async function connectWebStudioDevice(): Promise<WebStudioSession> {
-  const transport = await connect();
-  activeConnection = create_rpc_connection(transport, { signal: transport.abortController.signal });
-  activeBehaviorCatalog = await loadBehaviorCatalog(activeConnection);
-  behaviorIdByRole = invertBehaviorCatalog(activeBehaviorCatalog);
-  return {
-    label: activeConnection.label,
-    keymap: await readWebStudioKeymap(),
-  };
+export function supportsWebStudioConnection(kind: StudioConnectionKind): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const webNavigator = navigator as WebStudioNavigator;
+  switch (kind) {
+    case "usb":
+      return "serial" in webNavigator;
+    case "bluetooth":
+      return typeof webNavigator.bluetooth?.requestDevice === "function";
+  }
+}
+
+export function supportsWebSerial(): boolean {
+  return supportsWebStudioConnection("usb");
+}
+
+export function supportsWebBluetooth(): boolean {
+  return supportsWebStudioConnection("bluetooth");
+}
+
+export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb"): Promise<WebStudioSession> {
+  const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
+  const connection = create_rpc_connection(transport, { signal: transport.abortController.signal });
+  try {
+    await call_rpc(connection, { core: { getDeviceInfo: true } });
+    const catalog = await loadBehaviorCatalog(connection).catch((error) => {
+      throw new Error(
+        `Connected, but the device did not allow reading behaviors. Press the Studio Unlock key on the keyboard, then reconnect. (${formatWebError(error)})`,
+      );
+    });
+    activeConnection = connection;
+    activeBehaviorCatalog = catalog;
+    behaviorIdByRole = invertBehaviorCatalog(catalog);
+    return {
+      kind,
+      label: connection.label,
+      keymap: await readWebStudioKeymap(),
+    };
+  } catch (error) {
+    resetWebStudioState();
+    transport.abortController.abort();
+    throw error;
+  }
 }
 
 export async function readWebStudioKeymap(): Promise<WebStudioKeymap> {
   const conn = requireConnection();
-  const [deviceInfo, lockResponse, keymapResponse, unsavedResponse] = await Promise.all([
-    call_rpc(conn, { core: { getDeviceInfo: true } }),
-    call_rpc(conn, { core: { getLockState: true } }),
-    call_rpc(conn, { keymap: { getKeymap: true } }),
-    call_rpc(conn, { keymap: { checkUnsavedChanges: true } }),
-  ]);
+  const deviceInfo = await call_rpc(conn, { core: { getDeviceInfo: true } });
+  const lockResponse = await call_rpc(conn, { core: { getLockState: true } });
+  const keymapResponse = await call_rpc(conn, { keymap: { getKeymap: true } });
+  const unsavedResponse = await call_rpc(conn, { keymap: { checkUnsavedChanges: true } });
   const keymap = keymapResponse.keymap?.getKeymap;
   if (!keymap) {
     throw new Error("Device did not return a keymap");
@@ -61,6 +135,124 @@ export async function readWebStudioKeymap(): Promise<WebStudioKeymap> {
     hasUnsavedChanges: Boolean(unsavedResponse.keymap?.checkUnsavedChanges),
     keymap,
   });
+}
+
+async function connectWebGattWithFallback() {
+  const serviceUuid = "00000000-0196-6107-c967-c5cfb1c2482a";
+  const rpcCharacteristicUuid = "00000001-0196-6107-c967-c5cfb1c2482a";
+  const bluetooth = (navigator as WebStudioNavigator).bluetooth;
+  if (typeof bluetooth?.requestDevice !== "function") {
+    throw new Error("Web Bluetooth API is not supported in this browser. Please use Chrome or Edge.");
+  }
+
+  const requestDevice = bluetooth.requestDevice as (options: Record<string, unknown>) => Promise<WebBluetoothDevice>;
+  const device = await requestDevice({
+    filters: [
+      { services: [serviceUuid] },
+      { namePrefix: "KobitoKey" },
+      { namePrefix: "Conductor" },
+      { namePrefix: "ZMK" },
+    ],
+    optionalServices: [serviceUuid],
+  }).catch((error) => {
+    if (error instanceof DOMException && error.name === "NotFoundError") {
+      throw new Error("Bluetooth device was not selected. Put the keyboard in pairing/advertising mode and try again.");
+    }
+    throw error;
+  });
+
+  if (!device.gatt) {
+    throw new Error("Selected Bluetooth device does not expose GATT.");
+  }
+
+  if (!device.gatt.connected) {
+    await device.gatt.connect();
+  }
+  const service = await device.gatt.getPrimaryService(serviceUuid);
+  const characteristic = await service.getCharacteristic(rpcCharacteristicUuid);
+  const abortController = new AbortController();
+  let cleanupNotifications: (() => void) | undefined;
+
+  const cleanup = () => {
+    cleanupNotifications?.();
+    cleanupNotifications = undefined;
+  };
+
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        await characteristic.stopNotifications();
+      } catch {
+        // Some browsers reject if notifications were not active.
+      }
+      await characteristic.startNotifications();
+      const onValueChanged = (event: Event) => {
+        const value = (event.target as WebBluetoothCharacteristic | null)?.value;
+        if (value) {
+          controller.enqueue(new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)));
+        }
+      };
+      const onDisconnected = () => {
+        cleanup();
+        try {
+          controller.close();
+        } catch {
+          // The stream may already be closed by local cancellation.
+        }
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+        }
+      };
+      cleanupNotifications = () => {
+        characteristic.removeEventListener("characteristicvaluechanged", onValueChanged);
+        device.removeEventListener("gattserverdisconnected", onDisconnected);
+      };
+      characteristic.addEventListener("characteristicvaluechanged", onValueChanged);
+      device.addEventListener("gattserverdisconnected", onDisconnected);
+    },
+    cancel() {
+      cleanup();
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    },
+  });
+  const writable = new WritableStream<Uint8Array>({
+    async write(chunk) {
+      const maxChunk = 20;
+      const bytes = new Uint8Array(chunk);
+      for (let offset = 0; offset < bytes.byteLength; offset += maxChunk) {
+        await characteristic.writeValueWithoutResponse(bytes.subarray(offset, offset + maxChunk));
+      }
+    },
+    close() {
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    },
+    abort() {
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    },
+  });
+
+  abortController.signal.addEventListener(
+    "abort",
+    () => {
+      cleanup();
+      device.gatt?.disconnect();
+    },
+    { once: true },
+  );
+  return { label: device.name || "Bluetooth ZMK device", abortController, readable, writable };
+}
+
+function formatWebError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 export async function writeWebStudioKey(layerId: number, keyPosition: number, binding: string): Promise<WebStudioKeymap> {
@@ -88,9 +280,23 @@ export async function writeWebStudioKey(layerId: number, keyPosition: number, bi
   return readWebStudioKeymap();
 }
 
+export async function readWebTrackballSettings(): Promise<DirectTrackballSettings> {
+  throw new WebTrackballRpcUnavailableError();
+}
+
+export async function writeWebTrackballSettings(settings: DirectTrackballSettings): Promise<DirectTrackballSettings> {
+  return Promise.reject(new WebTrackballRpcUnavailableError());
+}
+
+function resetWebStudioState() {
+  activeConnection = null;
+  activeBehaviorCatalog = new Map();
+  behaviorIdByRole = new Map();
+}
+
 function requireConnection(): RpcConnection {
   if (!activeConnection) {
-    throw new Error("No Web Serial Studio device is connected");
+    throw new Error("No Web Studio device is connected");
   }
   return activeConnection;
 }
@@ -149,10 +355,16 @@ function formatWebBehaviorBinding(binding: BehaviorBinding): string {
   switch (roleFromDisplayName(role ?? "")) {
     case "key":
       return `&kp ${formatHidUsage(binding.param1)}`;
+    case "key-toggle":
+      return `&kt ${formatHidUsage(binding.param1)}`;
     case "layer-tap":
       return `&lt ${binding.param1} ${formatHidUsage(binding.param2)}`;
     case "mod-tap":
       return `&mt ${formatHidUsage(binding.param1)} ${formatHidUsage(binding.param2)}`;
+    case "sticky-key":
+      return `&sk ${formatHidUsage(binding.param1)}`;
+    case "sticky-layer":
+      return `&sl ${binding.param1}`;
     case "momentary":
       return `&mo ${binding.param1}`;
     case "to-layer":
@@ -163,6 +375,24 @@ function formatWebBehaviorBinding(binding: BehaviorBinding): string {
       return `&bt ${binding.param1} ${binding.param2}`;
     case "mouse-key":
       return `&mkp ${binding.param1}`;
+    case "mouse-move":
+      return `&mmv ${binding.param1}`;
+    case "mouse-scroll":
+      return `&msc ${binding.param1}`;
+    case "caps-word":
+      return "&caps_word";
+    case "key-repeat":
+      return "&key_repeat";
+    case "reset":
+      return "&sys_reset";
+    case "bootloader":
+      return "&bootloader";
+    case "soft-off":
+      return "&soft_off";
+    case "studio-unlock":
+      return "&studio_unlock";
+    case "grave-escape":
+      return "&gresc";
     case "transparent":
       return "&trans";
     case "none":
@@ -179,10 +409,16 @@ function parseWebBinding(binding: string): BehaviorBinding {
   switch (behavior) {
     case "&kp":
       return behaviorBinding("key", parseHidUsage(requiredPart(parts, 1, "key")));
+    case "&kt":
+      return behaviorBinding("key-toggle", parseHidUsage(requiredPart(parts, 1, "key")));
     case "&lt":
       return behaviorBinding("layer-tap", parseInteger(requiredPart(parts, 1, "layer")), parseHidUsage(requiredPart(parts, 2, "tap key")));
     case "&mt":
       return behaviorBinding("mod-tap", parseHidUsage(requiredPart(parts, 1, "hold key")), parseHidUsage(requiredPart(parts, 2, "tap key")));
+    case "&sk":
+      return behaviorBinding("sticky-key", parseHidUsage(requiredPart(parts, 1, "key")));
+    case "&sl":
+      return behaviorBinding("sticky-layer", parseInteger(requiredPart(parts, 1, "layer")));
     case "&mo":
       return behaviorBinding("momentary", parseInteger(requiredPart(parts, 1, "layer")));
     case "&to":
@@ -193,6 +429,10 @@ function parseWebBinding(binding: string): BehaviorBinding {
       return behaviorBinding("bluetooth", parseBtCommand(requiredPart(parts, 1, "command")), parseInteger(requiredPart(parts, 2, "value")));
     case "&mkp":
       return behaviorBinding("mouse-key", parseInteger(requiredPart(parts, 1, "value")));
+    case "&mmv":
+      return behaviorBinding("mouse-move", parseInteger(requiredPart(parts, 1, "value")));
+    case "&msc":
+      return behaviorBinding("mouse-scroll", parseInteger(requiredPart(parts, 1, "value")));
     case "&trans":
       return behaviorBinding("transparent");
     case "&none":
@@ -214,10 +454,16 @@ function roleFromDisplayName(displayName: string): string | undefined {
   switch (displayName.trim().toLowerCase()) {
     case "key press":
       return "key";
+    case "key toggle":
+      return "key-toggle";
     case "layer-tap":
       return "layer-tap";
     case "mod-tap":
       return "mod-tap";
+    case "sticky key":
+      return "sticky-key";
+    case "sticky layer":
+      return "sticky-layer";
     case "momentary layer":
       return "momentary";
     case "to layer":
@@ -228,6 +474,27 @@ function roleFromDisplayName(displayName: string): string | undefined {
       return "bluetooth";
     case "mouse key press":
       return "mouse-key";
+    case "mouse move":
+    case "mouse_move":
+      return "mouse-move";
+    case "mouse scroll":
+    case "mouse_scroll":
+      return "mouse-scroll";
+    case "caps word":
+      return "caps-word";
+    case "key repeat":
+      return "key-repeat";
+    case "reset":
+      return "reset";
+    case "bootloader":
+      return "bootloader";
+    case "soft off":
+    case "z_so_off":
+      return "soft-off";
+    case "studio unlock":
+      return "studio-unlock";
+    case "grave/escape":
+      return "grave-escape";
     case "transparent":
       return "transparent";
     case "none":
@@ -282,6 +549,7 @@ const HID_USAGE_BY_NAME: Record<string, number> = {
   TAB: 0x0007002b,
   SPACE: 0x0007002c,
   SPC: 0x0007002c,
+  CAPS: 0x00070039,
   MINUS: 0x0007002d,
   EQUAL: 0x0007002e,
   LBKT: 0x0007002f,
@@ -307,11 +575,31 @@ const HID_USAGE_BY_NAME: Record<string, number> = {
   F10: 0x00070043,
   F11: 0x00070044,
   F12: 0x00070045,
+  PSCRN: 0x00070046,
+  SCROLLLOCK: 0x00070047,
+  PAUSE_BREAK: 0x00070048,
+  INS: 0x00070049,
+  HOME: 0x0007004a,
+  PG_UP: 0x0007004b,
   DEL: 0x0007004c,
+  END: 0x0007004d,
+  PG_DN: 0x0007004e,
   RIGHT: 0x0007004f,
   LEFT: 0x00070050,
   DOWN: 0x00070051,
   UP: 0x00070052,
+  F13: 0x00070068,
+  F14: 0x00070069,
+  F15: 0x0007006a,
+  F16: 0x0007006b,
+  F17: 0x0007006c,
+  F18: 0x0007006d,
+  F19: 0x0007006e,
+  F20: 0x0007006f,
+  F21: 0x00070070,
+  F22: 0x00070071,
+  F23: 0x00070072,
+  F24: 0x00070073,
   LANG1: 0x00070090,
   LANG2: 0x00070091,
   LCTRL: 0x000700e0,
@@ -328,6 +616,12 @@ const HID_USAGE_BY_NAME: Record<string, number> = {
   RALT: 0x000700e6,
   RCMD: 0x000700e7,
   RGUI: 0x000700e7,
+  C_PLAY_PAUSE: 0x000c00cd,
+  C_NEXT: 0x000c00b5,
+  C_PREV: 0x000c00b6,
+  C_MUTE: 0x000c00e2,
+  C_VOL_UP: 0x000c00e9,
+  C_VOL_DN: 0x000c00ea,
 };
 
 const NAME_BY_HID_USAGE = Object.fromEntries(Object.entries(HID_USAGE_BY_NAME).map(([name, value]) => [value, name]));
@@ -338,13 +632,24 @@ function parseHidUsage(value: string): number {
     return direct;
   }
   if (/^0x[0-9a-f]+$/i.test(value)) {
-    return Number.parseInt(value, 16);
+    return normalizeHidUsage(Number.parseInt(value, 16));
   }
   throw new Error(`Unknown keycode: ${value}`);
 }
 
 function formatHidUsage(value: number): string {
-  return NAME_BY_HID_USAGE[value] ?? `0x${value.toString(16).padStart(8, "0")}`;
+  const normalized = normalizeHidUsage(value);
+  return NAME_BY_HID_USAGE[normalized] ?? `0x${normalized.toString(16).padStart(8, "0")}`;
+}
+
+function normalizeHidUsage(value: number): number {
+  const page = value & 0x00ff0000;
+  if (page !== 0) {
+    return value;
+  }
+  const modifiers = value & 0xff000000;
+  const usage = value & 0x0000ffff;
+  return modifiers | 0x00070000 | usage;
 }
 
 function requiredPart(parts: string[], index: number, label: string): string {

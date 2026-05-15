@@ -2,7 +2,18 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Download, FolderOpen, RefreshCw, Save, UploadCloud, Usb } from "lucide-react";
+import {
+  Bluetooth,
+  Clock,
+  Download,
+  FolderOpen,
+  MousePointer,
+  RefreshCw,
+  Save,
+  SlidersHorizontal,
+  UploadCloud,
+  Usb,
+} from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
@@ -20,6 +31,7 @@ import {
 import {
   KeymapCombo,
   KeymapLayer,
+  ParsedKeymap,
   addCombo,
   deleteCombo,
   parseKeymap,
@@ -44,9 +56,12 @@ import {
 } from "./lib/trackballParser";
 import {
   connectWebStudioDevice,
-  readWebStudioKeymap,
-  supportsWebSerial,
+  DirectTrackballSettings,
+  readWebTrackballSettings,
+  StudioConnectionKind,
+  supportsWebStudioConnection,
   writeWebStudioKey,
+  writeWebTrackballSettings,
 } from "./lib/zmkStudioWeb";
 import "./styles.css";
 
@@ -87,7 +102,45 @@ type StudioLayer = {
   bindings: string[];
 };
 
+type DirectCombo = KeymapCombo & {
+  index: number;
+  requirePriorIdleMs: number;
+  layerMask: number;
+  slowRelease: boolean;
+};
+
+type DirectComboSource = "none" | "device" | "firmware";
+
+type StudioComboSet = {
+  combos: Array<{
+    id: string;
+    index: number;
+    binding: string;
+    keyPositions: number[];
+    timeoutMs: number;
+    requirePriorIdleMs: number;
+    layerMask: number;
+    slowRelease: boolean;
+  }>;
+  maxCombos: number;
+};
+
 type EditorMode = "firmware" | "direct";
+type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
+type StudioConnectionSession = {
+  kind: StudioConnectionKind;
+  label: string;
+  deviceName: string;
+  serialNumber: string;
+  lockState: string;
+  keymap: StudioKeymap;
+};
+type DesktopStudioConnection = {
+  kind: StudioConnectionKind;
+  transport: string;
+  portPath?: string;
+  keymap: StudioKeymap;
+};
 
 declare global {
   interface Window {
@@ -102,7 +155,14 @@ function App() {
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
   const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
   const [selectedStudioPort, setSelectedStudioPort] = React.useState("");
+  const [studioConnectionKind, setStudioConnectionKind] = React.useState<StudioConnectionKind>("usb");
+  const [studioConnectionState, setStudioConnectionState] = React.useState<StudioConnectionState>("disconnected");
+  const [studioConnectionError, setStudioConnectionError] = React.useState("");
   const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
+  const [directTrackball, setDirectTrackball] = React.useState<DirectTrackballSettings | null>(null);
+  const [directCombos, setDirectCombos] = React.useState<DirectCombo[]>([]);
+  const [directComboSource, setDirectComboSource] = React.useState<DirectComboSource>("none");
+  const [directMaxCombos, setDirectMaxCombos] = React.useState(0);
   const [bindingDraft, setBindingDraft] = React.useState("");
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
@@ -118,7 +178,8 @@ function App() {
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
   const isDesktopRuntime = isTauriRuntime();
-  const canUseWebSerial = supportsWebSerial();
+  const canUseWebUsb = supportsWebStudioConnection("usb");
+  const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
 
   React.useEffect(() => {
     loadFixture();
@@ -126,22 +187,30 @@ function App() {
 
   const isDirectMode = editorMode === "direct";
   const activeKeymapSource = React.useMemo(
-    () => (isDirectMode && directKeymap ? studioKeymapToKeymapSource(directKeymap) : files?.keymap ?? ""),
-    [directKeymap, files?.keymap, isDirectMode],
+    () => files?.keymap ?? "",
+    [files?.keymap],
   );
-  const parsedKeymap = React.useMemo(() => parseKeymap(activeKeymapSource), [activeKeymapSource]);
+  const firmwareParsedKeymap = React.useMemo(() => parseKeymap(activeKeymapSource), [activeKeymapSource]);
+  const directParsedKeymap = React.useMemo(
+    () => (directKeymap ? studioKeymapToParsedKeymap(directKeymap, directCombos) : firmwareParsedKeymap),
+    [directCombos, directKeymap, firmwareParsedKeymap],
+  );
+  const parsedKeymap = isDirectMode ? directParsedKeymap : firmwareParsedKeymap;
   const layers = parsedKeymap.layers;
   const combos = parsedKeymap.combos;
+  const activeCombos = combos;
+  const displayedDirectComboSource: DirectComboSource = directKeymap ? directComboSource : "firmware";
+  const displayedDirectMaxCombos = directKeymap ? directMaxCombos : activeCombos.length;
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
   const showDirectEmptyState = isDirectMode && !directKeymap;
   const selectedCombos = React.useMemo(
-    () => combos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
-    [combos, selectedKeyIndex],
+    () => activeCombos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
+    [activeCombos, selectedKeyIndex],
   );
   const selectedCombo = React.useMemo(
-    () => combos.find((combo) => combo.id === selectedComboId) ?? selectedCombos[0] ?? combos[0],
-    [combos, selectedComboId, selectedCombos],
+    () => activeCombos.find((combo) => combo.id === selectedComboId) ?? selectedCombos[0] ?? activeCombos[0],
+    [activeCombos, selectedComboId, selectedCombos],
   );
   const trackball = React.useMemo(
     () => parseTrackballSettings(files?.leftOverlay ?? "", files?.rightOverlay ?? ""),
@@ -256,7 +325,7 @@ function App() {
 
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      setStatus("Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。");
+      setStatus("ブラウザ版では事前のdevice一覧検出はできません。Connect via USB / Bluetooth でブラウザの接続ダイアログを開いてください。");
       return;
     }
 
@@ -268,65 +337,126 @@ function App() {
     }
   }
 
-  async function readStudioDevice() {
+  function applyStudioConnection(session: StudioConnectionSession) {
+    setDirectKeymap(session.keymap);
+    setDirectTrackball(null);
+    setDirectCombos([]);
+    setDirectComboSource("none");
+    setDirectMaxCombos(0);
+    setSelectedStudioPort(session.label);
+    setStudioConnectionKind(session.kind);
+    setStudioConnectionState("connected");
+    setStudioConnectionError("");
+    setEditorMode("direct");
+    setActiveLayerIndex(0);
+    setSelectedKeyIndex(0);
+    setSelectedComboId(null);
+    setStatus(`${session.deviceName || "ZMK device"} に ${session.kind.toUpperCase()} で接続しました`);
+  }
+
+  async function connectStudioDevice(kind: StudioConnectionKind) {
+    setStudioConnectionKind(kind);
+    setStudioConnectionState("connecting");
+    setStudioConnectionError("");
+
+    if (isDesktopRuntime && kind === "bluetooth") {
+      const message =
+        "macOS native Bluetooth Direct は現在クラッシュ回避のため無効化しています。USB Direct、またはChrome/EdgeのWeb Bluetoothを使ってください。";
+      setStudioConnectionState("error");
+      setStudioConnectionError(message);
+      setStatus(message);
+      return;
+    }
+
     if (!isDesktopRuntime) {
-      if (!canUseWebSerial) {
-        setStatus("このブラウザは Web Serial に対応していません。Direct Mode は Tauri アプリ内で利用してください。");
+      if (!supportsWebStudioConnection(kind)) {
+        const message = kind === "usb"
+          ? "このブラウザは Web Serial に対応していません。Chrome または Edge で開いてください。"
+          : "このブラウザは Web Bluetooth に対応していません。Chrome または Edge で開いてください。";
+        setStudioConnectionState("error");
+        setStudioConnectionError(message);
+        setStatus(message);
         return;
       }
 
       try {
-        const session = await connectWebStudioDevice();
-        setSelectedStudioPort(session.label);
-        setDirectKeymap(session.keymap);
-        setActiveLayerIndex(0);
-        setSelectedKeyIndex(0);
-        setSelectedComboId(null);
-        setStatus(`${session.keymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+        const session = await connectWebStudioDevice(kind);
+        applyStudioConnection({
+          kind: session.kind,
+          label: session.label,
+          deviceName: session.keymap.deviceName,
+          serialNumber: session.keymap.serialNumber,
+          lockState: session.keymap.lockState,
+          keymap: session.keymap,
+        });
       } catch (error) {
-        setStatus(`Web Serial 読み込み失敗: ${String(error)}`);
+        const message = `${kind === "usb" ? "Web Serial" : "Web Bluetooth"} 接続失敗: ${String(error)}`;
+        setStudioConnectionState("error");
+        setStudioConnectionError(message);
+        setStatus(message);
       }
       return;
     }
 
     let portPath = selectedStudioPort;
-    if (!portPath) {
+    if (kind === "usb") {
       try {
         const ports = await detectStudioPorts();
-        portPath = ports[0]?.path || "";
+        const selectedUsbPort = ports.find((port) => port.path === selectedStudioPort && port.portKind === "usb");
+        portPath = selectedUsbPort?.path || ports.find((port) => port.portKind === "usb")?.path || ports[0]?.path || "";
+        setSelectedStudioPort(portPath);
       } catch (error) {
-        setStatus(`Studio device 検出失敗: ${String(error)}`);
+        const message = `Studio device 検出失敗: ${formatError(error)}`;
+        setStudioConnectionState("error");
+        setStudioConnectionError(message);
+        setStatus(message);
         return;
       }
     }
 
-    if (!portPath) {
-      setStatus("Studio device が見つかりません。USB で接続し、ZMK Studio を有効にした firmware を書き込んでください。");
+    if (kind === "usb" && !portPath) {
+      const message = "Studio device が見つかりません。USB で接続し、ZMK Studio を有効にした firmware を書き込んでください。";
+      setStudioConnectionState("error");
+      setStudioConnectionError(message);
+      setStatus(message);
       return;
     }
 
     try {
-      const nextKeymap = await invoke<StudioKeymap>("read_studio_keymap", { portPath });
-      setDirectKeymap(nextKeymap);
-      setSelectedStudioPort(portPath);
-      setEditorMode("direct");
-      setActiveLayerIndex(0);
-      setSelectedKeyIndex(0);
-      setSelectedComboId(null);
-      setStatus(`${nextKeymap.deviceName || "ZMK device"} から keymap を読み込みました`);
+      const session = await invoke<DesktopStudioConnection>("connect_studio_device", {
+        kind,
+        portPath: kind === "usb" ? portPath : null,
+      });
+      applyStudioConnection({
+        kind: session.kind,
+        label: session.portPath || session.transport,
+        deviceName: session.keymap.deviceName,
+        serialNumber: session.keymap.serialNumber,
+        lockState: session.keymap.lockState,
+        keymap: session.keymap,
+      });
+      await refreshDirectCombos(kind, session.portPath || "", { silent: true });
+      await refreshDirectTrackballSettings(kind, session.portPath || "", { silent: true });
     } catch (error) {
-      setStatus(`Direct 読み込み失敗: ${String(error)}`);
+      const message = `Direct ${kind.toUpperCase()} 接続失敗: ${formatError(error)}`;
+      setStudioConnectionState("error");
+      setStudioConnectionError(message);
+      setStatus(message);
     }
+  }
+
+  async function readStudioDevice(kind: StudioConnectionKind = studioConnectionKind) {
+    await connectStudioDevice(kind);
   }
 
   async function writeDirectBinding(nextBinding: string) {
     if (!isDesktopRuntime) {
-      if (!canUseWebSerial) {
-        setStatus("このブラウザは Web Serial に対応していません。");
+      if (!supportsWebStudioConnection(studioConnectionKind)) {
+        setStatus("このブラウザは現在の Direct 接続方式に対応していません。");
         return;
       }
       if (!directKeymap) {
-        setStatus("Web Serial で device を読み込んでから書き込んでください");
+        setStatus("Direct Mode で device を読み込んでから書き込んでください");
         return;
       }
       const directLayer = directKeymap.layers[activeLayerIndex];
@@ -340,7 +470,7 @@ function App() {
         setBindingDraft(nextBinding);
         setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
       } catch (error) {
-        setStatus(`Web Serial 書き込み失敗: ${String(error)}`);
+        setStatus(`Web Direct 書き込み失敗: ${String(error)}`);
       }
       return;
     }
@@ -358,6 +488,7 @@ function App() {
 
     try {
       const nextKeymap = await invoke<StudioKeymap>("write_studio_key", {
+        kind: studioConnectionKind,
         portPath: selectedStudioPort,
         layerId: directLayer.id,
         keyPosition: selectedKeyIndex,
@@ -369,6 +500,203 @@ function App() {
     } catch (error) {
       setStatus(`Direct 書き込み失敗: ${String(error)}`);
     }
+  }
+
+  async function refreshDirectTrackballSettings(
+    kind: StudioConnectionKind = studioConnectionKind,
+    portPath: string = selectedStudioPort,
+    options: { silent?: boolean } = {},
+  ) {
+    if (!directKeymap && !portPath && isDesktopRuntime) {
+      if (!options.silent) {
+        setStatus("Direct Mode で接続中の device がありません");
+      }
+      return;
+    }
+
+    try {
+      const settings = isDesktopRuntime
+        ? await invoke<DirectTrackballSettings>("read_studio_trackball_settings", {
+            kind,
+            portPath: portPath || null,
+          })
+        : await readWebTrackballSettings();
+      setDirectTrackball(settings);
+      if (!options.silent) {
+        setStatus(`Trackball 設定を ${kind.toUpperCase()} から読み込みました`);
+      }
+    } catch (error) {
+      if (!options.silent) {
+        setStatus(`Trackball 読み込み失敗: ${formatError(error)}`);
+      }
+    }
+  }
+
+  async function saveDirectTrackballSettings(settings: DirectTrackballSettings) {
+    if (!directKeymap && isDesktopRuntime) {
+      setStatus("Direct Mode で接続中の device がありません");
+      return;
+    }
+
+    try {
+      const nextSettings = isDesktopRuntime
+        ? await invoke<DirectTrackballSettings>("write_studio_trackball_settings", {
+            kind: studioConnectionKind,
+            portPath: selectedStudioPort || null,
+            settings,
+          })
+        : await writeWebTrackballSettings(settings);
+      setDirectTrackball(nextSettings);
+      setStatus("Trackball 設定を実機へ保存し、再読み込みしました");
+    } catch (error) {
+      setStatus(`Trackball 保存失敗: ${formatError(error)}`);
+    }
+  }
+
+  async function refreshDirectCombos(
+    kind: StudioConnectionKind = studioConnectionKind,
+    portPath: string = selectedStudioPort,
+    options: { silent?: boolean } = {},
+  ) {
+    if (!portPath && isDesktopRuntime) {
+      if (!options.silent) {
+        setStatus("Direct Mode で接続中の device がありません");
+      }
+      return;
+    }
+
+    if (!isDesktopRuntime) {
+      if (!options.silent) {
+        setStatus("Direct Combo は現在 Tauri デスクトップアプリで利用してください。");
+      }
+      return;
+    }
+
+    try {
+      const comboSet = await invoke<StudioComboSet>("read_studio_combos", {
+        kind,
+        portPath: portPath || null,
+      });
+      applyDirectComboSet(comboSet, "device");
+      if (!options.silent) {
+        setStatus(`Combo ${comboSet.combos.length} 件を実機から読み込みました`);
+      }
+    } catch (error) {
+      const fallbackApplied = applyFirmwareComboFallback();
+      if (!options.silent) {
+        setStatus(
+          fallbackApplied
+            ? `Direct Combo 読み込み失敗: ${formatError(error)}。Firmware keymap の Combo を表示しています。`
+            : `Combo 読み込み失敗: ${formatError(error)}`,
+        );
+      }
+    }
+  }
+
+  async function createDirectCombo() {
+    const keyPositions = selectedKeyIndex >= 39 ? [38, 39] : [selectedKeyIndex, selectedKeyIndex + 1];
+    await writeDirectComboCommand("add_studio_combo", {
+      combo: {
+        binding: "&kp ESC",
+        keyPositions,
+        timeoutMs: 50,
+        requirePriorIdleMs: 0,
+        layerMask: 0xffffffff,
+        slowRelease: false,
+      },
+    });
+  }
+
+  async function saveDirectCombo(combo: KeymapCombo, input: ComboFormValue) {
+    const keyPositions = parseDisplayKeyPositions(input.keyPositions);
+    if (keyPositions.length < 2) {
+      setStatus("combo には2つ以上のキーが必要です");
+      return;
+    }
+
+    const directCombo = directCombos.find((candidate) => candidate.id === combo.id);
+    if (!directCombo) {
+      setStatus("Direct Combo の対象が見つかりません");
+      return;
+    }
+
+    await writeDirectComboCommand("set_studio_combo", {
+      index: directCombo.index,
+      combo: {
+        binding: input.binding,
+        keyPositions,
+        timeoutMs: input.timeoutMs,
+        requirePriorIdleMs: directCombo.requirePriorIdleMs,
+        layerMask: directCombo.layerMask,
+        slowRelease: directCombo.slowRelease,
+      },
+    });
+  }
+
+  async function removeDirectCombo(combo: KeymapCombo) {
+    const directCombo = directCombos.find((candidate) => candidate.id === combo.id);
+    if (!directCombo) {
+      setStatus("Direct Combo の対象が見つかりません");
+      return;
+    }
+
+    await writeDirectComboCommand("remove_studio_combo", {
+      index: directCombo.index,
+    });
+  }
+
+  async function writeDirectComboCommand(command: string, payload: Record<string, unknown>) {
+    if (!directKeymap || !selectedStudioPort) {
+      setStatus("Direct Mode で接続中の device がありません");
+      return;
+    }
+    if (!isDesktopRuntime) {
+      setStatus("Direct Combo は現在 Tauri デスクトップアプリで利用してください。");
+      return;
+    }
+    if (directComboSource === "firmware") {
+      setStatus("Firmware keymap 参照中のため、Direct Combo 書き込みはできません。");
+      return;
+    }
+
+    try {
+      const comboSet = await invoke<StudioComboSet>(command, {
+        kind: studioConnectionKind,
+        portPath: selectedStudioPort || null,
+        ...payload,
+      });
+      applyDirectComboSet(comboSet, "device");
+      setStatus("Combo を実機へ保存し、再読み込みしました");
+    } catch (error) {
+      setStatus(`Direct Combo 書き込み失敗: ${formatError(error)}`);
+    }
+  }
+
+  function applyDirectComboSet(comboSet: StudioComboSet, source: DirectComboSource) {
+    const nextCombos = comboSet.combos.map((combo) => ({
+      id: combo.id,
+      index: combo.index,
+      binding: combo.binding,
+      keyPositions: combo.keyPositions,
+      timeoutMs: combo.timeoutMs,
+      requirePriorIdleMs: combo.requirePriorIdleMs,
+      layerMask: combo.layerMask,
+      slowRelease: combo.slowRelease,
+      blockStart: combo.index,
+      blockEnd: combo.index,
+    }));
+    setDirectCombos(nextCombos);
+    setDirectComboSource(source);
+    setDirectMaxCombos(comboSet.maxCombos);
+    setSelectedComboId((current) => current && nextCombos.some((combo) => combo.id === current) ? current : nextCombos[0]?.id ?? null);
+  }
+
+  function applyFirmwareComboFallback(): boolean {
+    if (firmwareParsedKeymap.combos.length === 0) {
+      return false;
+    }
+    applyDirectComboSet(firmwareCombosToStudioSet(firmwareParsedKeymap.combos), "firmware");
+    return true;
   }
 
   function saveCombo(combo: KeymapCombo, input: ComboFormValue) {
@@ -605,18 +933,18 @@ function App() {
                 <RefreshCw size={17} />
                 検出
               </button>
-              <button type="button" onClick={readStudioDevice}>
+              <button type="button" onClick={() => readStudioDevice()}>
                 <Usb size={17} />
                 読み込み
               </button>
             </div>
           ) : (
             <div className="topbar-hint">
-              <Usb size={16} />
+              {canUseWebBluetooth ? <Bluetooth size={17} /> : <Usb size={17} />}
               <span>
-                {canUseWebSerial
-                  ? "中央カードから device を読み込み"
-                  : "実機操作は Tauri アプリで利用"}
+                {canUseWebUsb || canUseWebBluetooth
+                  ? "左ペイン下部から USB または Bluetooth で KobitoKey に接続します"
+                  : "Web Serial / Web Bluetooth がこのページから見えていません。Chrome/Edge と localhost/HTTPS を確認してください"}
               </span>
             </div>
           )}
@@ -625,42 +953,65 @@ function App() {
 
       {showDirectEmptyState ? (
         <DirectWelcome
-          canUseWebSerial={canUseWebSerial}
+          canUseWebBluetooth={canUseWebBluetooth}
+          canUseWebUsb={canUseWebUsb}
+          connectionError={studioConnectionError}
+          connectionKind={studioConnectionKind}
+          connectionState={studioConnectionState}
           isDesktopRuntime={isDesktopRuntime}
           ports={studioPorts}
           selectedPort={selectedStudioPort}
+          onConnect={connectStudioDevice}
           onPortChange={setSelectedStudioPort}
           onRefresh={refreshStudioPorts}
-          onRead={readStudioDevice}
         />
       ) : (
       <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
-          {layers.map((layer, index) => (
-            <button
-              type="button"
-              key={layer.id}
-              className={index === activeLayerIndex ? "active" : ""}
-              onClick={() => {
-                setActiveLayerIndex(index);
-                setSelectedKeyIndex(0);
-              }}
-            >
-              <span>{index}</span>
-              {layer.label}
-            </button>
-          ))}
+          <div className="layer-list">
+            {layers.map((layer, index) => (
+              <button
+                type="button"
+                key={layer.id}
+                className={index === activeLayerIndex ? "active" : ""}
+                onClick={() => {
+                  setActiveLayerIndex(index);
+                  setSelectedKeyIndex(0);
+                }}
+              >
+                <span>{index}</span>
+                {layer.label}
+              </button>
+            ))}
+          </div>
+          {isDirectMode ? (
+            <SidebarConnectionPanel
+              canUseWebBluetooth={canUseWebBluetooth}
+              canUseWebUsb={canUseWebUsb}
+              connectionKind={studioConnectionKind}
+              connectionState={studioConnectionState}
+              isDesktopRuntime={isDesktopRuntime}
+              onConnect={connectStudioDevice}
+            />
+          ) : null}
         </nav>
 
         <section className="keyboard-panel">
-          {isDirectMode ? <DirectConnectionBar keymap={directKeymap} portPath={selectedStudioPort} /> : null}
+          {isDirectMode ? (
+            <DirectConnectionBar
+              connectionKind={studioConnectionKind}
+              connectionState={studioConnectionState}
+              keymap={directKeymap}
+              portPath={selectedStudioPort}
+            />
+          ) : null}
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Layer {activeLayerIndex}</p>
               <h2>{activeLayer?.label ?? "No layer"}</h2>
             </div>
             {isDirectMode ? (
-              <button type="button" className="primary" onClick={readStudioDevice}>
+              <button type="button" className="primary" onClick={() => readStudioDevice()}>
                 <RefreshCw size={17} />
                 再読み込み
               </button>
@@ -673,7 +1024,7 @@ function App() {
           </div>
 
           <KeyboardGrid
-            combos={combos}
+            combos={activeCombos}
             layer={activeLayer}
             selectedComboId={selectedComboId}
             selectedKeyIndex={selectedKeyIndex}
@@ -682,7 +1033,7 @@ function App() {
           />
 
           {isDirectMode ? (
-            <DirectSummaryPanel keymap={directKeymap} portPath={selectedStudioPort} />
+            <DirectSummaryPanel connectionKind={studioConnectionKind} keymap={directKeymap} portPath={selectedStudioPort} />
           ) : (
             <WorkbenchTabs
               activeTab={workbenchTab}
@@ -726,19 +1077,57 @@ function App() {
         </section>
 
         <aside className="inspector">
-          <section className={isDirectMode ? "direct-key-editor" : "key-editor"}>
-            <p className="eyebrow">Key {selectedKeyIndex + 1}</p>
-            <h2>{selectedBinding}</h2>
-            <BindingEditor
-              actionLabel={isDirectMode ? "実機へ書き込み" : "Binding に反映"}
-              binding={bindingDraft}
-              onApply={applyBinding}
-            />
-          </section>
-
           {isDirectMode ? (
-            <DirectModeNote onFirmwareMode={() => setEditorMode("firmware")} />
-          ) : null}
+            <DirectInspectorTabs
+              binding={bindingDraft}
+              combos={activeCombos}
+              comboSource={displayedDirectComboSource}
+              connectionState={studioConnectionState}
+              maxCombos={displayedDirectMaxCombos}
+              keyIndex={selectedKeyIndex}
+              onApply={applyBinding}
+              onCreateCombo={createDirectCombo}
+              onDeleteCombo={removeDirectCombo}
+              onFirmwareMode={() => setEditorMode("firmware")}
+              onRefreshCombos={() => refreshDirectCombos()}
+              onRefreshTrackball={() => refreshDirectTrackballSettings()}
+              onSaveCombo={saveDirectCombo}
+              onSaveTrackball={saveDirectTrackballSettings}
+              onSelectCombo={setSelectedComboId}
+              selectedCombo={selectedCombo}
+              selectedCombos={selectedCombos}
+              selectedBinding={selectedBinding}
+              trackball={directTrackball}
+            />
+          ) : (
+            <FirmwareInspectorTabs
+              binding={bindingDraft}
+              buildStatus={buildStatus}
+              bootloaderVolumes={bootloaderVolumes}
+              combo={selectedCombo}
+              combos={combos}
+              keyIndex={selectedKeyIndex}
+              onApplyBinding={applyBinding}
+              onCopyUf2={copySelectedUf2}
+              onCreateCombo={createCombo}
+              onDeleteCombo={removeCombo}
+              onDownloadArtifacts={downloadArtifacts}
+              onRefreshBuildStatus={refreshBuildStatus}
+              onRefreshFlashTargets={refreshFlashTargets}
+              onSaveCombo={saveCombo}
+              onSaveTrackball={applyTrackballSettings}
+              onSelectCombo={setSelectedComboId}
+              onSelectedUf2Change={setSelectedUf2}
+              onSelectedVolumeChange={setSelectedVolume}
+              onTriggerBuild={triggerBuild}
+              selectedBinding={selectedBinding}
+              selectedCombos={selectedCombos}
+              selectedUf2={selectedUf2}
+              selectedVolume={selectedVolume}
+              trackball={trackball}
+              uf2Files={uf2Files}
+            />
+          )}
         </aside>
       </section>
       )}
@@ -770,6 +1159,53 @@ type RequiredTrackballSettings = Required<Pick<
   | "tabThreshold"
   | "desktopThreshold"
 >>;
+
+function defaultDirectTrackballSettings(): DirectTrackballSettings {
+  return {
+    cpi: 800,
+    cursorNumerator: 1,
+    cursorDenominator: 1,
+    scrollNumerator: 1,
+    scrollDenominator: 1,
+  };
+}
+
+function scaleToNumber(numerator: number, denominator: number): number {
+  return denominator > 0 ? numerator / denominator : 1;
+}
+
+function numberToScale(value: number): { numerator: number; denominator: number } {
+  const denominator = 100;
+  const numerator = Math.max(1, Math.round(value * denominator));
+  const divisor = gcd(numerator, denominator);
+  return {
+    numerator: numerator / divisor,
+    denominator: denominator / divisor,
+  };
+}
+
+function gcd(a: number, b: number): number {
+  let left = Math.abs(a);
+  let right = Math.abs(b);
+  while (right > 0) {
+    const next = left % right;
+    left = right;
+    right = next;
+  }
+  return left || 1;
+}
+
+function formatError(error: unknown): string {
+  if (typeof error === "object" && error && "message" in error) {
+    const message = String((error as { message: unknown }).message);
+    if ("name" in error) {
+      const name = String((error as { name: unknown }).name);
+      return name && name !== "Error" ? `${name}: ${message}` : message;
+    }
+    return message;
+  }
+  return String(error);
+}
 
 const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
   { value: "key", label: "Key" },
@@ -1036,7 +1472,76 @@ function truncateComboLabel(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
-function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+function SidebarConnectionPanel({
+  canUseWebBluetooth,
+  canUseWebUsb,
+  connectionKind,
+  connectionState,
+  isDesktopRuntime,
+  onConnect,
+}: {
+  canUseWebBluetooth: boolean;
+  canUseWebUsb: boolean;
+  connectionKind: StudioConnectionKind;
+  connectionState: StudioConnectionState;
+  isDesktopRuntime: boolean;
+  onConnect: (kind: StudioConnectionKind) => void;
+}) {
+  const isConnecting = connectionState === "connecting";
+  const isConnected = connectionState === "connected";
+  const connectionLabel = isConnected
+    ? `${connectionKind.toUpperCase()} connected`
+    : connectionState === "connecting"
+      ? `${connectionKind.toUpperCase()} connecting`
+      : connectionState === "error"
+        ? "Connection error"
+        : "Disconnected";
+
+  return (
+    <section className="sidebar-connection">
+      <div className="sidebar-connection-head">
+        <span>
+          <Usb size={13} />
+          USB
+        </span>
+        <a href="https://zmk.dev/docs/features/studio" target="_blank" rel="noreferrer">
+          FW Guide
+        </a>
+      </div>
+      <p>{connectionLabel}</p>
+      <button
+        type="button"
+        className="sidebar-connect-primary"
+        disabled={isConnecting || (!isDesktopRuntime && !canUseWebUsb)}
+        onClick={() => onConnect("usb")}
+      >
+        <Usb size={13} />
+        Connect via USB
+      </button>
+      <button
+        type="button"
+        disabled={isConnecting || (!isDesktopRuntime && !canUseWebBluetooth)}
+        onClick={() => onConnect("bluetooth")}
+      >
+        <Bluetooth size={13} />
+        Connect via Bluetooth
+      </button>
+      <span>
+        USBケーブルまたはBluetoothで接続してください。Bluetooth接続時はペアリング候補からKobitoKeyを選びます。
+      </span>
+    </section>
+  );
+}
+
+function DirectSummaryPanel({
+  connectionKind,
+  keymap,
+  portPath,
+}: {
+  connectionKind: StudioConnectionKind;
+  keymap: StudioKeymap | null;
+  portPath: string;
+}) {
   return (
     <section className="direct-summary">
       <div className="panel-heading compact">
@@ -1050,7 +1555,7 @@ function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null;
             <dd>{keymap.deviceName || "Unknown ZMK device"}</dd>
           </div>
           <div>
-            <dt>Port</dt>
+            <dt>{connectionKind === "usb" ? "Port" : "Link"}</dt>
             <dd>{portPath || "-"}</dd>
           </div>
           <div>
@@ -1069,37 +1574,60 @@ function DirectSummaryPanel({ keymap, portPath }: { keymap: StudioKeymap | null;
   );
 }
 
-function DirectConnectionBar({ keymap, portPath }: { keymap: StudioKeymap | null; portPath: string }) {
+function DirectConnectionBar({
+  connectionKind,
+  connectionState,
+  keymap,
+  portPath,
+}: {
+  connectionKind: StudioConnectionKind;
+  connectionState: StudioConnectionState;
+  keymap: StudioKeymap | null;
+  portPath: string;
+}) {
   return (
     <div className="direct-connection-bar">
       <div>
         <p className="eyebrow">Connected Keyboard</p>
         <strong>{keymap?.deviceName || "ZMK Studio device"}</strong>
       </div>
-      <span>{portPath || "port 未選択"}</span>
+      <span>{connectionKind.toUpperCase()}</span>
+      <span>{portPath || "device 未選択"}</span>
       <span>{keymap ? `${keymap.layers.length} layers` : "未読み込み"}</span>
-      <span>{keymap?.lockState ?? "unknown"}</span>
+      <span>{connectionState === "connected" ? keymap?.lockState ?? "unknown" : "未接続"}</span>
     </div>
   );
 }
 
 function DirectWelcome({
-  canUseWebSerial,
+  canUseWebBluetooth,
+  canUseWebUsb,
+  connectionError,
+  connectionKind,
+  connectionState,
   isDesktopRuntime,
+  onConnect,
   onPortChange,
-  onRead,
   onRefresh,
   ports,
   selectedPort,
 }: {
-  canUseWebSerial: boolean;
+  canUseWebBluetooth: boolean;
+  canUseWebUsb: boolean;
+  connectionError: string;
+  connectionKind: StudioConnectionKind;
+  connectionState: StudioConnectionState;
   isDesktopRuntime: boolean;
+  onConnect: (kind: StudioConnectionKind) => void;
   onPortChange: (port: string) => void;
-  onRead: () => void;
   onRefresh: () => void;
   ports: StudioPort[];
   selectedPort: string;
 }) {
+  const canUseAnyWebConnection = canUseWebUsb || canUseWebBluetooth;
+  const isConnecting = connectionState === "connecting";
+  const webDiagnostics = getWebRuntimeDiagnostics(isDesktopRuntime);
+
   return (
     <section className="direct-welcome">
       <div className="direct-welcome-card">
@@ -1107,52 +1635,620 @@ function DirectWelcome({
           <p className="eyebrow">Direct Mode</p>
           <h2>キーボードを接続</h2>
           <p>
-            USB で KobitoKey を接続して、実機の keymap を読み込みます。読み込んだ後は、キーを選んでその場で
-            binding を書き込めます。
+            USB または Bluetooth で KobitoKey を接続して、実機の keymap を読み込みます。読み込んだ後は、
+            キーを選んでその場で binding を書き込めます。
           </p>
         </div>
         <div className="direct-connect-controls">
-          {!isDesktopRuntime && !canUseWebSerial ? (
+          {!isDesktopRuntime && !canUseAnyWebConnection ? (
             <div className="runtime-warning">
-              <strong>このブラウザでは device 検出できません</strong>
-              <span>Direct Mode の実機読み書きは Tauri デスクトップアプリで利用してください。</span>
+              <strong>Web device API が見えていません</strong>
+              <span>Chrome/Edgeで、localhost または HTTPS から開いてください。ブラウザ版では事前一覧検出ではなく、Connectボタンで接続ダイアログを開きます。</span>
             </div>
           ) : null}
-          {!isDesktopRuntime && canUseWebSerial ? (
+          {!isDesktopRuntime && canUseAnyWebConnection ? (
             <div className="runtime-notice">
-              <strong>Web Serial で接続します</strong>
-              <span>読み込みを押すと、ブラウザの device 選択ダイアログが開きます。</span>
+              <strong>ブラウザの接続ダイアログを使います</strong>
+              <span>USB はWeb Serial、BluetoothはWeb Bluetoothで接続します。ブラウザ版では事前のdevice一覧検出はできないため、Connectボタンでpermission pickerを開きます。</span>
             </div>
           ) : null}
-          <label>
-            Device
-            <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
-              <option value="">Studio device 未選択</option>
-              {ports.map((port) => (
-                <option key={port.path} value={port.path}>
-                  {port.label} ({port.path})
-                </option>
-              ))}
-            </select>
-          </label>
+          {!isDesktopRuntime ? (
+            <div className="runtime-diagnostics" aria-label="Web runtime diagnostics">
+              <span>secure: {webDiagnostics.secure ? "yes" : "no"}</span>
+              <span>serial: {webDiagnostics.serial ? "yes" : "no"}</span>
+              <span>bluetooth: {webDiagnostics.bluetooth ? "yes" : "no"}</span>
+              <span>url: {webDiagnostics.url}</span>
+            </div>
+          ) : null}
+          {connectionState === "error" && connectionError ? (
+            <div className="runtime-warning">
+              <strong>{connectionKind.toUpperCase()} 接続に失敗しました</strong>
+              <span>{connectionError}</span>
+            </div>
+          ) : null}
+          {isDesktopRuntime ? (
+            <label>
+              Desktop USB Device
+              <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+                <option value="">Studio device 未選択</option>
+                {ports.map((port) => (
+                  <option key={port.path} value={port.path}>
+                    {port.label} ({port.path})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="direct-connect-actions">
             <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
               <RefreshCw size={17} />
               検出
             </button>
-            <button type="button" className="primary" disabled={!isDesktopRuntime && !canUseWebSerial} onClick={onRead}>
+            <button
+              type="button"
+              className="primary"
+              disabled={isConnecting || (!isDesktopRuntime && !canUseWebUsb)}
+              onClick={() => onConnect("usb")}
+            >
               <Usb size={17} />
-              読み込み
+              {isConnecting && connectionKind === "usb" ? "USB 接続中" : "Connect via USB"}
+            </button>
+            <button
+              type="button"
+              className="primary bluetooth-action"
+              disabled={isConnecting || (!isDesktopRuntime && !canUseWebBluetooth)}
+              onClick={() => onConnect("bluetooth")}
+            >
+              <Bluetooth size={17} />
+              {isConnecting && connectionKind === "bluetooth" ? "Bluetooth 接続中" : "Connect via Bluetooth"}
             </button>
           </div>
         </div>
         <div className="direct-capability-strip">
           <span>Keymap: 直接編集</span>
-          <span>Combo: Firmware Mode</span>
-          <span>Trackball: Firmware Mode</span>
+          <span>Combo: 直接編集</span>
+          <span>Trackball: 直接編集</span>
         </div>
       </div>
     </section>
+  );
+}
+
+function FirmwareInspectorTabs({
+  binding,
+  bootloaderVolumes,
+  buildStatus,
+  combo,
+  combos,
+  keyIndex,
+  onApplyBinding,
+  onCopyUf2,
+  onCreateCombo,
+  onDeleteCombo,
+  onDownloadArtifacts,
+  onRefreshBuildStatus,
+  onRefreshFlashTargets,
+  onSaveCombo,
+  onSaveTrackball,
+  onSelectCombo,
+  onSelectedUf2Change,
+  onSelectedVolumeChange,
+  onTriggerBuild,
+  selectedBinding,
+  selectedCombos,
+  selectedUf2,
+  selectedVolume,
+  trackball,
+  uf2Files,
+}: {
+  binding: string;
+  bootloaderVolumes: string[];
+  buildStatus: string;
+  combo?: KeymapCombo;
+  combos: KeymapCombo[];
+  keyIndex: number;
+  onApplyBinding: (binding: string) => void;
+  onCopyUf2: () => void;
+  onCreateCombo: () => void;
+  onDeleteCombo: (combo: KeymapCombo) => void;
+  onDownloadArtifacts: () => void;
+  onRefreshBuildStatus: () => void;
+  onRefreshFlashTargets: () => void;
+  onSaveCombo: (combo: KeymapCombo, input: ComboFormValue) => void;
+  onSaveTrackball: (settings: RequiredTrackballSettings) => void;
+  onSelectCombo: (comboId: string) => void;
+  onSelectedUf2Change: (value: string) => void;
+  onSelectedVolumeChange: (value: string) => void;
+  onTriggerBuild: () => void;
+  selectedBinding: string;
+  selectedCombos: KeymapCombo[];
+  selectedUf2: string;
+  selectedVolume: string;
+  trackball: TrackballSettings;
+  uf2Files: string[];
+}) {
+  const [activeTab, setActiveTab] = React.useState<"key" | "combo" | "trackball" | "build">("key");
+  const tabLabels: Array<{ id: "key" | "combo" | "trackball" | "build"; icon: React.ReactNode; label: string }> = [
+    { id: "key", icon: <SlidersHorizontal size={13} />, label: "Key Config" },
+    { id: "combo", icon: <UploadCloud size={13} />, label: "Combos" },
+    { id: "trackball", icon: <MousePointer size={13} />, label: "Trackball" },
+    { id: "build", icon: <Download size={13} />, label: "Build" },
+  ];
+
+  return (
+    <section className="firmware-inspector">
+      <div className="direct-inspector-tabs" role="tablist" aria-label="Firmware settings">
+        {tabLabels.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            className={activeTab === tab.id ? "active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {activeTab === "key" ? (
+        <section>
+          <p className="eyebrow">Key {keyIndex + 1}</p>
+          <h2>{selectedBinding}</h2>
+          <BindingEditor actionLabel="Binding に反映" binding={binding} onApply={onApplyBinding} />
+        </section>
+      ) : activeTab === "combo" ? (
+        <div className="firmware-tab-stack">
+          <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelectCombo} />
+          <ComboEditor
+            combo={combo}
+            onCreate={onCreateCombo}
+            onDelete={onDeleteCombo}
+            onSave={onSaveCombo}
+            onSelect={onSelectCombo}
+          />
+        </div>
+      ) : activeTab === "trackball" ? (
+        <div className="firmware-tab-stack">
+          <TrackballPanel settings={trackball} />
+          <TrackballEditor settings={trackball} onApply={onSaveTrackball} />
+        </div>
+      ) : (
+        <BuildPanel
+          bootloaderVolumes={bootloaderVolumes}
+          buildStatus={buildStatus}
+          onCopyUf2={onCopyUf2}
+          onDownloadArtifacts={onDownloadArtifacts}
+          onRefreshBuildStatus={onRefreshBuildStatus}
+          onRefreshFlashTargets={onRefreshFlashTargets}
+          onSelectedUf2Change={onSelectedUf2Change}
+          onSelectedVolumeChange={onSelectedVolumeChange}
+          onTriggerBuild={onTriggerBuild}
+          selectedUf2={selectedUf2}
+          selectedVolume={selectedVolume}
+          uf2Files={uf2Files}
+        />
+      )}
+    </section>
+  );
+}
+
+function BuildPanel({
+  bootloaderVolumes,
+  buildStatus,
+  onCopyUf2,
+  onDownloadArtifacts,
+  onRefreshBuildStatus,
+  onRefreshFlashTargets,
+  onSelectedUf2Change,
+  onSelectedVolumeChange,
+  onTriggerBuild,
+  selectedUf2,
+  selectedVolume,
+  uf2Files,
+}: {
+  bootloaderVolumes: string[];
+  buildStatus: string;
+  onCopyUf2: () => void;
+  onDownloadArtifacts: () => void;
+  onRefreshBuildStatus: () => void;
+  onRefreshFlashTargets: () => void;
+  onSelectedUf2Change: (value: string) => void;
+  onSelectedVolumeChange: (value: string) => void;
+  onTriggerBuild: () => void;
+  selectedUf2: string;
+  selectedVolume: string;
+  uf2Files: string[];
+}) {
+  return (
+    <section className="build-panel">
+      <div>
+        <p className="eyebrow">Build / Flash</p>
+        <h2>アップロード支援</h2>
+      </div>
+      <ol>
+        <li>Git diff を確認して保存</li>
+        <li>GitHub Actions の build を起動</li>
+        <li>artifact から左右 UF2 を取得</li>
+        <li>左右を順番に bootloader へ書き込み</li>
+      </ol>
+      <p className="build-status">{buildStatus}</p>
+      <button type="button" onClick={onTriggerBuild}>
+        <UploadCloud size={17} />
+        Build 起動
+      </button>
+      <button type="button" onClick={onRefreshBuildStatus}>
+        最新 run 確認
+      </button>
+      <button type="button" onClick={onDownloadArtifacts}>
+        Artifact 取得
+      </button>
+      <div className="flash-wizard">
+        <button type="button" onClick={onRefreshFlashTargets}>
+          UF2 / Volume 更新
+        </button>
+        <label>
+          UF2
+          <select value={selectedUf2} onChange={(event) => onSelectedUf2Change(event.target.value)}>
+            <option value="">未選択</option>
+            {uf2Files.map((file) => (
+              <option key={file} value={file}>
+                {file.split("/").pop()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Bootloader
+          <select value={selectedVolume} onChange={(event) => onSelectedVolumeChange(event.target.value)}>
+            <option value="">未選択</option>
+            {bootloaderVolumes.map((volume) => (
+              <option key={volume} value={volume}>
+                {volume.split("/").pop()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onCopyUf2}>
+          UF2 をコピー
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DirectInspectorTabs({
+  binding,
+  combos,
+  comboSource,
+  connectionState,
+  keyIndex,
+  maxCombos,
+  onApply,
+  onCreateCombo,
+  onDeleteCombo,
+  onFirmwareMode,
+  onRefreshCombos,
+  onRefreshTrackball,
+  onSaveCombo,
+  onSaveTrackball,
+  onSelectCombo,
+  selectedCombo,
+  selectedCombos,
+  selectedBinding,
+  trackball,
+}: {
+  binding: string;
+  combos: KeymapCombo[];
+  comboSource: DirectComboSource;
+  connectionState: StudioConnectionState;
+  keyIndex: number;
+  maxCombos: number;
+  onApply: (binding: string) => void;
+  onCreateCombo: () => void;
+  onDeleteCombo: (combo: KeymapCombo) => void;
+  onFirmwareMode: () => void;
+  onRefreshCombos: () => void;
+  onRefreshTrackball: () => void;
+  onSaveCombo: (combo: KeymapCombo, input: ComboFormValue) => void;
+  onSaveTrackball: (settings: DirectTrackballSettings) => void;
+  onSelectCombo: (comboId: string) => void;
+  selectedCombo?: KeymapCombo;
+  selectedCombos: KeymapCombo[];
+  selectedBinding: string;
+  trackball: DirectTrackballSettings | null;
+}) {
+  const [activeTab, setActiveTab] = React.useState<"key" | "combo" | "trackball" | "timing">("key");
+  const tabLabels: Array<{ id: "key" | "combo" | "trackball" | "timing"; icon: React.ReactNode; label: string }> = [
+    { id: "key", icon: <SlidersHorizontal size={13} />, label: "Key Config" },
+    { id: "combo", icon: <UploadCloud size={13} />, label: "Combos" },
+    { id: "trackball", icon: <MousePointer size={13} />, label: "Trackball" },
+    { id: "timing", icon: <Clock size={13} />, label: "Timing" },
+  ];
+
+  return (
+    <section className="direct-inspector">
+      <div className="direct-inspector-tabs" role="tablist" aria-label="Direct settings">
+        {tabLabels.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            className={activeTab === tab.id ? "active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {activeTab === "key" ? (
+        <div className="direct-key-editor">
+          <p className="eyebrow">Key {keyIndex + 1}</p>
+          <h2>{selectedBinding}</h2>
+          <BindingEditor actionLabel="実機へ書き込み" binding={binding} onApply={onApply} />
+        </div>
+      ) : activeTab === "combo" ? (
+        <DirectComboPanel
+          combos={combos}
+          connectionState={connectionState}
+          comboSource={comboSource}
+          maxCombos={maxCombos}
+          onCreate={onCreateCombo}
+          onDelete={onDeleteCombo}
+          onRefresh={onRefreshCombos}
+          onSave={onSaveCombo}
+          onSelect={onSelectCombo}
+          selectedCombo={selectedCombo}
+          selectedCombos={selectedCombos}
+        />
+      ) : activeTab === "trackball" ? (
+        <DirectTrackballPanel
+          connectionState={connectionState}
+          onFirmwareMode={onFirmwareMode}
+          onRefresh={onRefreshTrackball}
+          onSave={onSaveTrackball}
+          settings={trackball}
+        />
+      ) : (
+        <DirectTimingPanel />
+      )}
+    </section>
+  );
+}
+
+function DirectTrackballPanel({
+  connectionState,
+  onFirmwareMode,
+  onRefresh,
+  onSave,
+  settings,
+}: {
+  connectionState: StudioConnectionState;
+  onFirmwareMode: () => void;
+  onRefresh: () => void;
+  onSave: (settings: DirectTrackballSettings) => void;
+  settings: DirectTrackballSettings | null;
+}) {
+  const [form, setForm] = React.useState<DirectTrackballSettings>(() => settings ?? defaultDirectTrackballSettings());
+  const connected = connectionState === "connected";
+
+  React.useEffect(() => {
+    if (settings) {
+      setForm(settings);
+    }
+  }, [settings]);
+
+  function updateScale(kind: "cursor" | "scroll", value: number) {
+    const scale = numberToScale(value);
+    setForm((current) => ({
+      ...current,
+      [`${kind}Numerator`]: scale.numerator,
+      [`${kind}Denominator`]: scale.denominator,
+    }));
+  }
+
+  return (
+    <div className="direct-settings-panel direct-trackball-panel">
+      <div className="direct-settings-heading">
+        <div>
+          <strong>Trackball Direct Write</strong>
+          <p>CPI と cursor / scroll 感度を USB または Bluetooth 経由で実機へ保存します。</p>
+        </div>
+        <button type="button" onClick={onRefresh} disabled={!connected}>
+          <RefreshCw size={15} />
+          読み込み
+        </button>
+      </div>
+
+      <label className="direct-number-field">
+        <span>CPI</span>
+        <input
+          type="number"
+          min={100}
+          max={3200}
+          step={50}
+          value={form.cpi}
+          onChange={(event) => setForm({ ...form, cpi: Number(event.target.value) })}
+        />
+      </label>
+
+      <ScaleSlider
+        label="Cursor sensitivity"
+        value={scaleToNumber(form.cursorNumerator, form.cursorDenominator)}
+        onChange={(value) => updateScale("cursor", value)}
+      />
+      <ScaleSlider
+        label="Scroll sensitivity"
+        value={scaleToNumber(form.scrollNumerator, form.scrollDenominator)}
+        onChange={(value) => updateScale("scroll", value)}
+      />
+
+      <div className="timing-actions">
+        <button type="button" disabled={!connected} onClick={() => onSave(form)}>
+          デバイスに保存
+        </button>
+        <button type="button" onClick={() => setForm(settings ?? defaultDirectTrackballSettings())}>
+          リセット
+        </button>
+      </div>
+      {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると保存できます。</p> : null}
+      <button type="button" className="wide-action" onClick={onFirmwareMode}>
+        Firmware Mode の詳細設定を開く
+      </button>
+    </div>
+  );
+}
+
+function DirectComboPanel({
+  combos,
+  connectionState,
+  comboSource,
+  maxCombos,
+  onCreate,
+  onDelete,
+  onRefresh,
+  onSave,
+  onSelect,
+  selectedCombo,
+  selectedCombos,
+}: {
+  combos: KeymapCombo[];
+  connectionState: StudioConnectionState;
+  comboSource: DirectComboSource;
+  maxCombos: number;
+  onCreate: () => void;
+  onDelete: (combo: KeymapCombo) => void;
+  onRefresh: () => void;
+  onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
+  onSelect: (comboId: string) => void;
+  selectedCombo?: KeymapCombo;
+  selectedCombos: KeymapCombo[];
+}) {
+  const connected = connectionState === "connected";
+  const firmwareFallback = comboSource === "firmware";
+  return (
+    <div className="direct-combo-panel">
+      <div className="direct-settings-panel">
+        <div className="direct-settings-heading">
+          <div>
+            <strong>Combo Direct Write</strong>
+            <p>
+              実機の Combo を読み込み、追加・更新・削除します。保存後は device から再読み込みして画面と同期します。
+            </p>
+          </div>
+          <button type="button" onClick={onRefresh} disabled={!connected}>
+            <RefreshCw size={15} />
+            読み込み
+          </button>
+        </div>
+        <div className="direct-combo-meter">
+          <span>{combos.length} combos</span>
+          <span>{firmwareFallback ? "Firmware keymap" : maxCombos > 0 ? `max ${maxCombos}` : "max unknown"}</span>
+        </div>
+        {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると編集できます。</p> : null}
+        {firmwareFallback ? <p className="empty-note">Direct Combo RPC が読めないため、Firmware keymap の Combo を表示しています。</p> : null}
+      </div>
+      <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
+      <ComboEditor
+        combo={selectedCombo}
+        readOnly={firmwareFallback}
+        onCreate={onCreate}
+        onDelete={onDelete}
+        onSave={onSave}
+        onSelect={onSelect}
+      />
+    </div>
+  );
+}
+
+function ScaleSlider({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  const presets = [0.5, 0.75, 1, 1.5, 2];
+  return (
+    <div className="timing-field">
+      <div>
+        <span>{label}</span>
+        <strong>{value.toFixed(2)}x</strong>
+      </div>
+      <input
+        type="range"
+        min={0.25}
+        max={3}
+        step={0.05}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <div className="timing-presets compact-presets">
+        <div>
+          {presets.map((preset) => (
+            <button
+              type="button"
+              key={preset}
+              className={Math.abs(value - preset) < 0.01 ? "active" : ""}
+              onClick={() => onChange(preset)}
+            >
+              {preset}x
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DirectTimingPanel() {
+  const tappingTerm = 200;
+  const presets = [150, 175, 200, 250, 300];
+
+  return (
+    <div className="direct-settings-panel timing-panel">
+      <div className="direct-settings-heading">
+        <div>
+          <strong>長押し判定時間</strong>
+          <p>
+            キーを押してからホールド（レイヤー切替・修飾キー）と判定するまでの時間を設定します。短いほど反応が速く、
+            長いほどタップが安定します。
+          </p>
+        </div>
+        <span className="coming-soon-badge">Coming soon</span>
+      </div>
+      <p className="empty-note">Timing Direct RPC は次の実装対象です。現在は保存せず、予定している操作UIだけを表示しています。</p>
+      <div className="timing-field">
+        <div>
+          <span>Tapping Term</span>
+          <strong>{tappingTerm}ms</strong>
+        </div>
+        <input type="range" min={100} max={400} step={10} value={tappingTerm} disabled readOnly />
+        <div className="timing-range-labels">
+          <span>100ms（速い）</span>
+          <span>400ms（遅い）</span>
+        </div>
+      </div>
+      <div className="timing-presets">
+        <span>プリセット</span>
+        <div>
+          {presets.map((preset) => (
+            <button type="button" key={preset} className={preset === tappingTerm ? "active" : ""} disabled>
+              {preset}ms
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="timing-actions">
+        <button type="button" disabled>
+          デバイスに保存
+        </button>
+        <button type="button" disabled>
+          リセット
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1483,12 +2579,14 @@ function ComboEditor({
   onDelete,
   onSave,
   onSelect,
+  readOnly = false,
 }: {
   combo?: KeymapCombo;
   onCreate: () => void;
   onDelete: (combo: KeymapCombo) => void;
   onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
   onSelect: (comboId: string) => void;
+  readOnly?: boolean;
 }) {
   const [form, setForm] = React.useState<ComboFormValue>({
     binding: "",
@@ -1515,7 +2613,7 @@ function ComboEditor({
           <p className="eyebrow">Combo Edit</p>
           <h2>{combo?.id ?? "新規 combo"}</h2>
         </div>
-        <button type="button" className="primary" onClick={onCreate}>
+        <button type="button" className="primary" onClick={onCreate} disabled={readOnly}>
           追加
         </button>
       </div>
@@ -1545,10 +2643,10 @@ function ComboEditor({
             />
           </label>
           <div className="combo-editor-actions">
-            <button type="button" className="primary" onClick={() => onSave(combo, form)}>
+            <button type="button" className="primary" onClick={() => onSave(combo, form)} disabled={readOnly}>
               更新
             </button>
-            <button type="button" className="danger" onClick={() => onDelete(combo)}>
+            <button type="button" className="danger" onClick={() => onDelete(combo)} disabled={readOnly}>
               削除
             </button>
           </div>
@@ -1901,6 +2999,22 @@ function toggleDisplayKeyPosition(currentPositions: number[], position: number):
     .join(" ");
 }
 
+function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet {
+  return {
+    combos: combos.map((combo, index) => ({
+      id: combo.id,
+      index,
+      binding: combo.binding,
+      keyPositions: combo.keyPositions,
+      timeoutMs: combo.timeoutMs || 50,
+      requirePriorIdleMs: 0,
+      layerMask: 0xffffffff,
+      slowRelease: false,
+    })),
+    maxCombos: combos.length,
+  };
+}
+
 function nextComboId(combos: KeymapCombo[]): string {
   const existing = new Set(combos.map((combo) => combo.id));
   let index = combos.length + 1;
@@ -2077,8 +3191,21 @@ function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
   return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
 }
 
+function studioKeymapToParsedKeymap(keymap: StudioKeymap, combos: KeymapCombo[]): ParsedKeymap {
+  return {
+    layers: keymap.layers.map((layer, index) => ({
+      id: `direct_layer_${layer.id}`,
+      label: layer.name || `Layer ${index}`,
+      bindings: completeStudioBindings(layer.bindings),
+      blockStart: index,
+      blockEnd: index,
+    })),
+    combos,
+  };
+}
+
 function formatStudioBindings(bindings: string[]): string {
-  const completeBindings = Array.from({ length: 40 }, (_, index) => bindings[index] ?? "&none");
+  const completeBindings = completeStudioBindings(bindings);
   const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
 
   return Array.from({ length: 4 }, (_, row) =>
@@ -2088,6 +3215,55 @@ function formatStudioBindings(bindings: string[]): string {
       .join("  ")
       .trimEnd(),
   ).join("\n");
+}
+
+function completeStudioBindings(bindings: string[]): string[] {
+  return Array.from({ length: 40 }, (_, index) => normalizeDirectBindingForDisplay(bindings[index] ?? "&none"));
+}
+
+function normalizeDirectBindingForDisplay(binding: string): string {
+  const parts = binding.trim().split(/\s+/);
+  if (parts[0] === "&bt") {
+    return `&bt ${formatBtCommand(parts[1])} ${parts[2] ?? "0"}`;
+  }
+  if (parts[0] === "&mkp") {
+    return `&mkp ${formatMouseButton(parts[1])}`;
+  }
+  return binding;
+}
+
+function formatBtCommand(value?: string): string {
+  switch (value) {
+    case "0":
+      return "BT_CLR";
+    case "1":
+      return "BT_SEL";
+    case "2":
+      return "BT_NXT";
+    case "3":
+      return "BT_PRV";
+    case "4":
+      return "BT_CLR_ALL";
+    default:
+      return value ?? "BT_SEL";
+  }
+}
+
+function formatMouseButton(value?: string): string {
+  switch (value) {
+    case "1":
+      return "MB1";
+    case "2":
+      return "MB2";
+    case "4":
+      return "MB3";
+    case "8":
+      return "MB4";
+    case "16":
+      return "MB5";
+    default:
+      return value ?? "MB1";
+  }
 }
 
 function sanitizeLayerId(name: string, index: number): string {
@@ -2105,6 +3281,24 @@ function escapeDtsString(value: string): string {
 
 function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
+}
+
+function getWebRuntimeDiagnostics(isDesktopRuntime: boolean): {
+  bluetooth: boolean;
+  secure: boolean;
+  serial: boolean;
+  url: string;
+} {
+  if (typeof window === "undefined" || typeof navigator === "undefined" || isDesktopRuntime) {
+    return { bluetooth: false, secure: false, serial: false, url: "" };
+  }
+
+  return {
+    bluetooth: "bluetooth" in navigator,
+    secure: window.isSecureContext,
+    serial: "serial" in navigator,
+    url: window.location.href,
+  };
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

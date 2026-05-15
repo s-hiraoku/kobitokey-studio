@@ -30,7 +30,7 @@ export type KeymapComboInput = {
 const KEY_COUNT = 40;
 const LAYER_PATTERN =
   /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
-const COMBO_PATTERN = /(?<id>combo_[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?)\};/g;
+const COMBO_PATTERN = /(?<id>[A-Za-z_][A-Za-z0-9_-]*)\s*\{(?<body>[\s\S]*?)\};/g;
 
 export function parseKeymap(source: string): ParsedKeymap {
   const keymapBlock = extractKeymapBody(source);

@@ -1,7 +1,13 @@
+use std::collections::HashMap;
 use std::fs;
+use std::io::{Read, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use zmk_studio_api::transport::{serial::SerialTransport, BleDeviceInfo, PlatformBleTransport};
 use zmk_studio_api::{Behavior, HidUsage, Keycode, StudioClient};
+
+const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = false;
 
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
@@ -26,7 +32,8 @@ fn read_kobitokey_project(root: String) -> Result<KobitoKeyProject, String> {
         left_overlay_path: display_path(&left_overlay_path),
         left_overlay: fs::read_to_string(&left_overlay_path).map_err(|error| error.to_string())?,
         right_overlay_path: display_path(&right_overlay_path),
-        right_overlay: fs::read_to_string(&right_overlay_path).map_err(|error| error.to_string())?,
+        right_overlay: fs::read_to_string(&right_overlay_path)
+            .map_err(|error| error.to_string())?,
     })
 }
 
@@ -117,7 +124,7 @@ fn list_studio_ports() -> Result<Vec<StudioPort>, String> {
 
     Ok(ports
         .into_iter()
-        .filter(|port| is_likely_studio_port(port))
+        .filter(is_likely_studio_port)
         .map(|port| {
             let (manufacturer, product, serial_number, port_kind) = match port.port_type {
                 serialport::SerialPortType::UsbPort(info) => (
@@ -126,10 +133,18 @@ fn list_studio_ports() -> Result<Vec<StudioPort>, String> {
                     info.serial_number,
                     "usb".to_string(),
                 ),
-                serialport::SerialPortType::BluetoothPort => {
-                    (None, Some("Bluetooth serial".to_string()), None, "bluetooth".to_string())
-                }
-                serialport::SerialPortType::PciPort => (None, Some("PCI serial".to_string()), None, "pci".to_string()),
+                serialport::SerialPortType::BluetoothPort => (
+                    None,
+                    Some("Bluetooth serial".to_string()),
+                    None,
+                    "bluetooth".to_string(),
+                ),
+                serialport::SerialPortType::PciPort => (
+                    None,
+                    Some("PCI serial".to_string()),
+                    None,
+                    "pci".to_string(),
+                ),
                 serialport::SerialPortType::Unknown => (None, None, None, "serial".to_string()),
             };
             let label = product
@@ -150,9 +165,94 @@ fn list_studio_ports() -> Result<Vec<StudioPort>, String> {
 }
 
 #[tauri::command]
+fn list_studio_bluetooth_devices() -> Result<Vec<StudioBluetoothDevice>, String> {
+    ensure_desktop_bluetooth_direct_enabled().map_err(|error| error.message)?;
+    list_ble_devices_safe().map(|devices| {
+        devices
+            .into_iter()
+            .map(StudioBluetoothDevice::from)
+            .collect()
+    })
+}
+
+#[tauri::command]
 fn read_studio_keymap(port_path: String) -> Result<StudioKeymap, String> {
     let mut client = open_studio_client(&port_path)?;
-    let info = client.get_device_info().map_err(|error| error.to_string())?;
+    read_studio_keymap_from_client(&mut client)
+}
+
+#[tauri::command]
+fn connect_studio_device(
+    kind: String,
+    port_path: Option<String>,
+) -> Result<StudioConnection, StudioConnectionError> {
+    match kind.as_str() {
+        "usb" => {
+            let port_path = port_path
+                .filter(|path| !path.trim().is_empty())
+                .ok_or_else(|| {
+                    StudioConnectionError::new(
+                        "missing_port",
+                        "USB Direct Mode requires a serial port path.",
+                    )
+                })?;
+            let mut client = open_studio_client(&port_path).map_err(|message| {
+                StudioConnectionError::new(
+                    "connection_failed",
+                    format!("Failed to open USB Studio connection: {message}"),
+                )
+            })?;
+            let keymap = read_studio_keymap_from_client(&mut client).map_err(|message| {
+                StudioConnectionError::new(
+                    "read_failed",
+                    format!("Failed to read Studio keymap: {message}"),
+                )
+            })?;
+
+            Ok(StudioConnection {
+                kind,
+                transport: "serial".to_string(),
+                port_path: Some(port_path),
+                keymap,
+            })
+        }
+        "bluetooth" => {
+            ensure_desktop_bluetooth_direct_enabled()?;
+            let device = resolve_ble_device(port_path)
+                .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+            let mut client = open_ble_client_safe(&device.device_id).map_err(|message| {
+                StudioConnectionError::new(
+                    "connection_failed",
+                    format!("Failed to open Bluetooth Studio connection: {message}"),
+                )
+            })?;
+            let keymap = read_studio_keymap_from_client(&mut client).map_err(|message| {
+                StudioConnectionError::new(
+                    "read_failed",
+                    format!("Failed to read Studio keymap: {message}"),
+                )
+            })?;
+
+            Ok(StudioConnection {
+                kind,
+                transport: "bluetooth".to_string(),
+                port_path: Some(device.device_id),
+                keymap,
+            })
+        }
+        _ => Err(StudioConnectionError::new(
+            "unsupported_kind",
+            format!("Unsupported Direct Mode connection kind: {kind}"),
+        )),
+    }
+}
+
+fn read_studio_keymap_from_client<T: Read + Write>(
+    client: &mut StudioClient<T>,
+) -> Result<StudioKeymap, String> {
+    let info = client
+        .get_device_info()
+        .map_err(|error| error.to_string())?;
     let lock_state = client
         .get_lock_state()
         .map(|state| format!("{state:?}"))
@@ -190,20 +290,912 @@ fn read_studio_keymap(port_path: String) -> Result<StudioKeymap, String> {
 
 #[tauri::command]
 fn write_studio_key(
+    kind: Option<String>,
     port_path: String,
     layer_id: u32,
     key_position: i32,
     binding: String,
 ) -> Result<StudioKeymap, String> {
     let behavior = parse_direct_behavior(&binding)?;
-    let mut client = open_studio_client(&port_path)?;
+    match kind.as_deref().unwrap_or("usb") {
+        "usb" => {
+            let mut client = open_studio_client(&port_path)?;
+            write_studio_key_with_client(&mut client, layer_id, key_position, behavior)?;
+            read_studio_keymap_from_client(&mut client)
+        }
+        "bluetooth" => {
+            ensure_desktop_bluetooth_direct_enabled().map_err(|error| error.message)?;
+            let device = resolve_ble_device(Some(port_path))?;
+            let mut client = open_ble_client_safe(&device.device_id)?;
+            write_studio_key_with_client(&mut client, layer_id, key_position, behavior)?;
+            read_studio_keymap_from_client(&mut client)
+        }
+        other => Err(format!("Unsupported Direct Mode connection kind: {other}")),
+    }
+}
+
+fn write_studio_key_with_client<T: Read + Write>(
+    client: &mut StudioClient<T>,
+    layer_id: u32,
+    key_position: i32,
+    behavior: Behavior,
+) -> Result<(), String> {
     client
         .set_key_at(layer_id, key_position, behavior)
         .map_err(|error| error.to_string())?;
     client.save_changes().map_err(|error| error.to_string())?;
-    drop(client);
+    Ok(())
+}
 
-    read_studio_keymap(port_path)
+#[tauri::command]
+fn read_studio_trackball_settings(
+    kind: String,
+    port_path: Option<String>,
+) -> Result<StudioTrackballSettings, StudioConnectionError> {
+    match kind.as_str() {
+        "usb" => {
+            let port_path = port_path
+                .filter(|path| !path.trim().is_empty())
+                .ok_or_else(|| {
+                    StudioConnectionError::new(
+                        "missing_port",
+                        "USB Trackball Direct requires a serial port path.",
+                    )
+                })?;
+            let mut transport = SerialTransport::open(&port_path).map_err(|error| {
+                StudioConnectionError::new(
+                    "connection_failed",
+                    format!("Failed to open USB Studio connection: {error}"),
+                )
+            })?;
+            read_trackball_settings_from_transport(&mut transport)
+                .map_err(|message| StudioConnectionError::new("trackball_read_failed", message))
+        }
+        "bluetooth" => {
+            ensure_desktop_bluetooth_direct_enabled()?;
+            let device = resolve_ble_device(port_path)
+                .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+            let mut transport =
+                connect_ble_transport_safe(&device.device_id).map_err(|message| {
+                    StudioConnectionError::new(
+                        "connection_failed",
+                        format!("Failed to open Bluetooth Studio connection: {message}"),
+                    )
+                })?;
+            read_trackball_settings_from_transport(&mut transport)
+                .map_err(|message| StudioConnectionError::new("trackball_read_failed", message))
+        }
+        _ => Err(StudioConnectionError::new(
+            "unsupported_kind",
+            format!("Unsupported Direct Mode connection kind: {kind}"),
+        )),
+    }
+}
+
+#[tauri::command]
+fn write_studio_trackball_settings(
+    kind: String,
+    port_path: Option<String>,
+    settings: StudioTrackballSettings,
+) -> Result<StudioTrackballSettings, StudioConnectionError> {
+    match kind.as_str() {
+        "usb" => {
+            let port_path = port_path
+                .filter(|path| !path.trim().is_empty())
+                .ok_or_else(|| {
+                    StudioConnectionError::new(
+                        "missing_port",
+                        "USB Trackball Direct requires a serial port path.",
+                    )
+                })?;
+            let mut transport = SerialTransport::open(&port_path).map_err(|error| {
+                StudioConnectionError::new(
+                    "connection_failed",
+                    format!("Failed to open USB Studio connection: {error}"),
+                )
+            })?;
+            write_trackball_settings_to_transport(&mut transport, &settings)
+                .map_err(|message| StudioConnectionError::new("trackball_write_failed", message))?;
+            read_trackball_settings_from_transport(&mut transport)
+                .map_err(|message| StudioConnectionError::new("trackball_read_failed", message))
+        }
+        "bluetooth" => {
+            ensure_desktop_bluetooth_direct_enabled()?;
+            let device = resolve_ble_device(port_path)
+                .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+            let mut transport =
+                connect_ble_transport_safe(&device.device_id).map_err(|message| {
+                    StudioConnectionError::new(
+                        "connection_failed",
+                        format!("Failed to open Bluetooth Studio connection: {message}"),
+                    )
+                })?;
+            write_trackball_settings_to_transport(&mut transport, &settings)
+                .map_err(|message| StudioConnectionError::new("trackball_write_failed", message))?;
+            read_trackball_settings_from_transport(&mut transport)
+                .map_err(|message| StudioConnectionError::new("trackball_read_failed", message))
+        }
+        _ => Err(StudioConnectionError::new(
+            "unsupported_kind",
+            format!("Unsupported Direct Mode connection kind: {kind}"),
+        )),
+    }
+}
+
+#[tauri::command]
+fn read_studio_combos(
+    kind: String,
+    port_path: Option<String>,
+) -> Result<StudioComboSet, StudioConnectionError> {
+    if kind == "bluetooth" {
+        ensure_desktop_bluetooth_direct_enabled()?;
+    }
+    let target = resolve_studio_target(&kind, port_path)
+        .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+    with_studio_transport(&target, |transport| read_studio_combos_from_transport(transport))
+        .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
+}
+
+#[tauri::command]
+fn add_studio_combo(
+    kind: String,
+    port_path: Option<String>,
+    combo: StudioComboInput,
+) -> Result<StudioComboSet, StudioConnectionError> {
+    if kind == "bluetooth" {
+        ensure_desktop_bluetooth_direct_enabled()?;
+    }
+    let target = resolve_studio_target(&kind, port_path)
+        .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+    with_studio_transport(&target, |transport| {
+        let catalog = load_behavior_catalog_from_transport(transport)?;
+        let config = encode_combo_config(&combo, &catalog)?;
+        call_subsystem_rpc(transport, 7, encode_add_combo_request(&config))
+            .and_then(|response| decode_add_combo_response(&response))?;
+        save_studio_changes_from_transport(transport)?;
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_add_failed", message))
+}
+
+#[tauri::command]
+fn set_studio_combo(
+    kind: String,
+    port_path: Option<String>,
+    index: u32,
+    combo: StudioComboInput,
+) -> Result<StudioComboSet, StudioConnectionError> {
+    if kind == "bluetooth" {
+        ensure_desktop_bluetooth_direct_enabled()?;
+    }
+    let target = resolve_studio_target(&kind, port_path)
+        .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+    with_studio_transport(&target, |transport| {
+        let catalog = load_behavior_catalog_from_transport(transport)?;
+        let config = encode_combo_config(&combo, &catalog)?;
+        call_subsystem_rpc(transport, 7, encode_set_combo_request(index, &config))
+            .and_then(|response| decode_set_combo_response(&response))?;
+        save_studio_changes_from_transport(transport)?;
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_set_failed", message))
+}
+
+#[tauri::command]
+fn remove_studio_combo(
+    kind: String,
+    port_path: Option<String>,
+    index: u32,
+) -> Result<StudioComboSet, StudioConnectionError> {
+    if kind == "bluetooth" {
+        ensure_desktop_bluetooth_direct_enabled()?;
+    }
+    let target = resolve_studio_target(&kind, port_path)
+        .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
+    with_studio_transport(&target, |transport| {
+        call_subsystem_rpc(transport, 7, encode_remove_combo_request(index))
+            .and_then(|response| decode_remove_combo_response(&response))?;
+        save_studio_changes_from_transport(transport)?;
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_remove_failed", message))
+}
+
+fn read_trackball_settings_from_transport<T: Read + Write>(
+    transport: &mut T,
+) -> Result<StudioTrackballSettings, String> {
+    let response = call_pointing_rpc(transport, encode_get_sensitivity_request())?;
+    decode_get_sensitivity_response(&response)
+}
+
+fn write_trackball_settings_to_transport<T: Read + Write>(
+    transport: &mut T,
+    settings: &StudioTrackballSettings,
+) -> Result<(), String> {
+    let response = call_pointing_rpc(transport, encode_set_sensitivity_request(settings))?;
+    decode_set_sensitivity_response(&response)
+}
+
+fn call_pointing_rpc<T: Read + Write>(
+    transport: &mut T,
+    pointing_request: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    let request_id = 1;
+    let mut request = Vec::new();
+    push_varint_field(&mut request, 1, request_id);
+    push_len_field(&mut request, 6, &pointing_request);
+    let frame = encode_studio_frame(&request);
+
+    transport
+        .write_all(&frame)
+        .map_err(|error| error.to_string())?;
+    transport.flush().map_err(|error| error.to_string())?;
+
+    let mut decoder = StudioFrameDecoder::default();
+    let mut read_buffer = [0_u8; 256];
+    loop {
+        let read = transport
+            .read(&mut read_buffer)
+            .map_err(|error| error.to_string())?;
+        if read == 0 {
+            return Err("Device closed the Studio connection".to_string());
+        }
+        for frame in decoder.push(&read_buffer[..read])? {
+            if let Some(response) = decode_pointing_response_frame(&frame, u64::from(request_id))? {
+                return Ok(response);
+            }
+        }
+    }
+}
+
+fn encode_get_sensitivity_request() -> Vec<u8> {
+    let mut request = Vec::new();
+    push_len_field(&mut request, 2, &[]);
+    request
+}
+
+fn encode_set_sensitivity_request(settings: &StudioTrackballSettings) -> Vec<u8> {
+    let mut set_request = Vec::new();
+    push_len_field(
+        &mut set_request,
+        1,
+        &encode_sensitivity_scale(settings.cursor_numerator, settings.cursor_denominator),
+    );
+    push_len_field(
+        &mut set_request,
+        2,
+        &encode_sensitivity_scale(settings.scroll_numerator, settings.scroll_denominator),
+    );
+    push_varint_field(&mut set_request, 3, settings.cpi);
+
+    let mut request = Vec::new();
+    push_len_field(&mut request, 1, &set_request);
+    request
+}
+
+fn encode_sensitivity_scale(numerator: u32, denominator: u32) -> Vec<u8> {
+    let mut scale = Vec::new();
+    push_varint_field(&mut scale, 1, numerator);
+    push_varint_field(&mut scale, 2, denominator.max(1));
+    scale
+}
+
+fn decode_get_sensitivity_response(
+    pointing_response: &[u8],
+) -> Result<StudioTrackballSettings, String> {
+    let get_response = find_len_field(pointing_response, 2)
+        .ok_or_else(|| "Device did not return trackball sensitivity".to_string())?;
+    let cursor = find_len_field(get_response, 1)
+        .map(decode_sensitivity_scale)
+        .transpose()?
+        .unwrap_or((1, 1));
+    let scroll = find_len_field(get_response, 2)
+        .map(decode_sensitivity_scale)
+        .transpose()?
+        .unwrap_or((1, 1));
+    let cpi = find_varint_field(get_response, 3).unwrap_or(800) as u32;
+
+    Ok(StudioTrackballSettings {
+        cpi,
+        cursor_numerator: cursor.0,
+        cursor_denominator: cursor.1,
+        scroll_numerator: scroll.0,
+        scroll_denominator: scroll.1,
+    })
+}
+
+fn decode_set_sensitivity_response(pointing_response: &[u8]) -> Result<(), String> {
+    let set_response = find_len_field(pointing_response, 1)
+        .ok_or_else(|| "Device did not return setSensitivity result".to_string())?;
+    if find_varint_field(set_response, 1).unwrap_or(0) != 0 {
+        return Ok(());
+    }
+
+    match find_varint_field(set_response, 2).unwrap_or(0) {
+        0 => Ok(()),
+        1 => Err("Trackball sensitivity RPC is unsupported by this firmware".to_string()),
+        2 => Err("Trackball sensitivity value is invalid".to_string()),
+        3 => Err("Trackball sensitivity could not be saved to device storage".to_string()),
+        code => Err(format!(
+            "Trackball sensitivity write failed with error code {code}"
+        )),
+    }
+}
+
+fn decode_sensitivity_scale(bytes: &[u8]) -> Result<(u32, u32), String> {
+    let numerator = find_varint_field(bytes, 1).unwrap_or(1) as u32;
+    let denominator = (find_varint_field(bytes, 2).unwrap_or(1) as u32).max(1);
+    Ok((numerator, denominator))
+}
+
+fn decode_pointing_response_frame(
+    frame: &[u8],
+    request_id: u64,
+) -> Result<Option<Vec<u8>>, String> {
+    let request_response = match find_len_field(frame, 1) {
+        Some(value) => value,
+        None => return Ok(None),
+    };
+    if find_varint_field(request_response, 1) != Some(request_id) {
+        return Ok(None);
+    }
+    if let Some(meta) = find_len_field(request_response, 2) {
+        return Err(decode_meta_error(meta));
+    }
+    find_len_field(request_response, 6)
+        .map(|value| Some(value.to_vec()))
+        .ok_or_else(|| "Device response did not include the pointing subsystem".to_string())
+}
+
+fn decode_meta_error(meta: &[u8]) -> String {
+    if find_varint_field(meta, 1).unwrap_or(0) != 0 {
+        return "Device returned no response for the trackball RPC".to_string();
+    }
+    match find_varint_field(meta, 2).unwrap_or(0) {
+        1 => "Device is locked. Unlock ZMK Studio on the keyboard first.".to_string(),
+        2 => "Trackball RPC was not found. Update firmware with pointing Studio RPC support."
+            .to_string(),
+        3 => "Device could not decode the trackball RPC request.".to_string(),
+        4 => "Device could not encode the trackball RPC response.".to_string(),
+        code => format!("Device returned Studio RPC error code {code}"),
+    }
+}
+
+fn read_studio_combos_from_transport<T: Read + Write + ?Sized>(
+    transport: &mut T,
+) -> Result<StudioComboSet, String> {
+    let catalog = load_behavior_catalog_from_transport(transport)?;
+    call_subsystem_rpc(transport, 7, encode_get_combos_request())
+        .and_then(|response| decode_get_combos_response(&response, &catalog))
+}
+
+fn with_studio_transport<R>(
+    target: &StudioTarget,
+    operation: impl FnOnce(&mut dyn StudioIo) -> Result<R, String>,
+) -> Result<R, String> {
+    match target {
+        StudioTarget::Usb { port_path } => {
+            let mut transport =
+                SerialTransport::open(port_path).map_err(|error| error.to_string())?;
+            operation(&mut transport)
+        }
+        StudioTarget::Bluetooth { device_id } => {
+            let mut transport = connect_ble_transport_safe(device_id)?;
+            operation(&mut transport)
+        }
+    }
+}
+
+trait StudioIo: Read + Write {}
+
+impl<T: Read + Write> StudioIo for T {}
+
+fn call_subsystem_rpc<T: Read + Write + ?Sized>(
+    transport: &mut T,
+    subsystem_field: u32,
+    subsystem_request: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    let request_id = 1;
+    let mut request = Vec::new();
+    push_varint_field(&mut request, 1, request_id);
+    push_len_field(&mut request, subsystem_field, &subsystem_request);
+    let frame = encode_studio_frame(&request);
+
+    transport
+        .write_all(&frame)
+        .map_err(|error| error.to_string())?;
+    transport.flush().map_err(|error| error.to_string())?;
+
+    let mut decoder = StudioFrameDecoder::default();
+    let mut read_buffer = [0_u8; 256];
+    loop {
+        let read = transport
+            .read(&mut read_buffer)
+            .map_err(|error| error.to_string())?;
+        if read == 0 {
+            return Err("Device closed the Studio connection".to_string());
+        }
+        for frame in decoder.push(&read_buffer[..read])? {
+            if let Some(response) =
+                decode_subsystem_response_frame(&frame, u64::from(request_id), subsystem_field)?
+            {
+                return Ok(response);
+            }
+        }
+    }
+}
+
+fn encode_get_combos_request() -> Vec<u8> {
+    let mut request = Vec::new();
+    push_len_field(&mut request, 1, &[]);
+    request
+}
+
+fn encode_set_combo_request(index: u32, combo_config: &[u8]) -> Vec<u8> {
+    let mut set_request = Vec::new();
+    push_varint_field(&mut set_request, 1, index);
+    push_len_field(&mut set_request, 2, combo_config);
+
+    let mut request = Vec::new();
+    push_len_field(&mut request, 2, &set_request);
+    request
+}
+
+fn encode_add_combo_request(combo_config: &[u8]) -> Vec<u8> {
+    let mut add_request = Vec::new();
+    push_len_field(&mut add_request, 1, combo_config);
+
+    let mut request = Vec::new();
+    push_len_field(&mut request, 3, &add_request);
+    request
+}
+
+fn encode_remove_combo_request(index: u32) -> Vec<u8> {
+    let mut remove_request = Vec::new();
+    push_varint_field(&mut remove_request, 1, index);
+
+    let mut request = Vec::new();
+    push_len_field(&mut request, 4, &remove_request);
+    request
+}
+
+fn encode_combo_config(
+    combo: &StudioComboInput,
+    catalog: &BehaviorCatalog,
+) -> Result<Vec<u8>, String> {
+    let binding = parse_direct_behavior(&combo.binding)?;
+    let raw_binding = encode_behavior_binding(binding, catalog)?;
+
+    let mut config = Vec::new();
+    for position in &combo.key_positions {
+        push_varint_field(&mut config, 1, *position);
+    }
+    push_len_field(&mut config, 2, &raw_binding);
+    push_varint_field(&mut config, 3, combo.timeout_ms);
+    push_varint_field(&mut config, 4, combo.require_prior_idle_ms.unwrap_or(0));
+    push_varint_field(&mut config, 5, combo.layer_mask.unwrap_or(u32::MAX));
+    push_varint_field(
+        &mut config,
+        6,
+        u32::from(combo.slow_release.unwrap_or(false)),
+    );
+    Ok(config)
+}
+
+fn encode_behavior_binding(
+    behavior: Behavior,
+    catalog: &BehaviorCatalog,
+) -> Result<Vec<u8>, String> {
+    let (behavior_id, param1, param2) = raw_behavior_parts(behavior, catalog)?;
+    let mut binding = Vec::new();
+    push_varint_field(&mut binding, 1, behavior_id as u32);
+    push_varint_field(&mut binding, 2, param1);
+    push_varint_field(&mut binding, 3, param2);
+    Ok(binding)
+}
+
+fn raw_behavior_parts(
+    behavior: Behavior,
+    catalog: &BehaviorCatalog,
+) -> Result<(i32, u32, u32), String> {
+    match behavior {
+        Behavior::KeyPress(key) => Ok((catalog.id_for("key")?, key.to_hid_usage(), 0)),
+        Behavior::KeyToggle(key) => Ok((catalog.id_for("key-toggle")?, key.to_hid_usage(), 0)),
+        Behavior::LayerTap { layer_id, tap } => {
+            Ok((catalog.id_for("layer-tap")?, layer_id, tap.to_hid_usage()))
+        }
+        Behavior::ModTap { hold, tap } => Ok((
+            catalog.id_for("mod-tap")?,
+            hold.to_hid_usage(),
+            tap.to_hid_usage(),
+        )),
+        Behavior::StickyKey(key) => Ok((catalog.id_for("sticky-key")?, key.to_hid_usage(), 0)),
+        Behavior::StickyLayer { layer_id } => Ok((catalog.id_for("sticky-layer")?, layer_id, 0)),
+        Behavior::MomentaryLayer { layer_id } => Ok((catalog.id_for("momentary")?, layer_id, 0)),
+        Behavior::ToggleLayer { layer_id } => Ok((catalog.id_for("toggle-layer")?, layer_id, 0)),
+        Behavior::ToLayer { layer_id } => Ok((catalog.id_for("to-layer")?, layer_id, 0)),
+        Behavior::Bluetooth { command, value } => {
+            Ok((catalog.id_for("bluetooth")?, command, value))
+        }
+        Behavior::MouseKeyPress { value } => Ok((catalog.id_for("mouse-key")?, value, 0)),
+        Behavior::MouseMove { value } => Ok((catalog.id_for("mouse-move")?, value, 0)),
+        Behavior::MouseScroll { value } => Ok((catalog.id_for("mouse-scroll")?, value, 0)),
+        Behavior::CapsWord => Ok((catalog.id_for("caps-word")?, 0, 0)),
+        Behavior::KeyRepeat => Ok((catalog.id_for("key-repeat")?, 0, 0)),
+        Behavior::Reset => Ok((catalog.id_for("reset")?, 0, 0)),
+        Behavior::Bootloader => Ok((catalog.id_for("bootloader")?, 0, 0)),
+        Behavior::SoftOff => Ok((catalog.id_for("soft-off")?, 0, 0)),
+        Behavior::StudioUnlock => Ok((catalog.id_for("studio-unlock")?, 0, 0)),
+        Behavior::GraveEscape => Ok((catalog.id_for("grave-escape")?, 0, 0)),
+        Behavior::Transparent => Ok((catalog.id_for("transparent")?, 0, 0)),
+        Behavior::None => Ok((catalog.id_for("none")?, 0, 0)),
+        Behavior::Unknown {
+            behavior_id,
+            param1,
+            param2,
+        } => Ok((behavior_id, param1, param2)),
+        other => Err(format!("{other:?} is not supported by Direct Combo yet")),
+    }
+}
+
+fn decode_get_combos_response(
+    combo_response: &[u8],
+    catalog: &BehaviorCatalog,
+) -> Result<StudioComboSet, String> {
+    let combos_response = find_len_field(combo_response, 1)
+        .ok_or_else(|| "Device did not return combos".to_string())?;
+    let combos = find_len_fields(combos_response, 1)
+        .into_iter()
+        .enumerate()
+        .map(|(index, bytes)| decode_combo_config(index as u32, bytes, catalog))
+        .collect::<Result<Vec<_>, _>>()?;
+    let max_combos = find_varint_field(combos_response, 2).unwrap_or(combos.len() as u64) as u32;
+    Ok(StudioComboSet { combos, max_combos })
+}
+
+fn decode_combo_config(
+    index: u32,
+    bytes: &[u8],
+    catalog: &BehaviorCatalog,
+) -> Result<StudioCombo, String> {
+    let key_positions = find_varint_fields(bytes, 1)
+        .into_iter()
+        .map(|value| value as u32)
+        .collect::<Vec<_>>();
+    let binding = find_len_field(bytes, 2)
+        .map(|binding| decode_behavior_binding(binding, catalog))
+        .transpose()?
+        .unwrap_or_else(|| "&none".to_string());
+    let timeout_ms = find_varint_field(bytes, 3).unwrap_or(50) as u32;
+    let require_prior_idle_ms = find_varint_field(bytes, 4).unwrap_or(0) as u32;
+    let layer_mask = find_varint_field(bytes, 5).unwrap_or(u64::from(u32::MAX)) as u32;
+    let slow_release = find_varint_field(bytes, 6).unwrap_or(0) != 0;
+
+    Ok(StudioCombo {
+        id: format!("direct_combo_{}", index + 1),
+        index,
+        binding,
+        key_positions,
+        timeout_ms,
+        require_prior_idle_ms,
+        layer_mask,
+        slow_release,
+    })
+}
+
+fn decode_behavior_binding(bytes: &[u8], catalog: &BehaviorCatalog) -> Result<String, String> {
+    let behavior_id = find_varint_field(bytes, 1).unwrap_or(0) as i32;
+    let param1 = find_varint_field(bytes, 2).unwrap_or(0) as u32;
+    let param2 = find_varint_field(bytes, 3).unwrap_or(0) as u32;
+    Ok(
+        match catalog.role_by_id.get(&behavior_id).map(String::as_str) {
+            Some("key") => format!("&kp {}", HidUsage::from_encoded(param1)),
+            Some("key-toggle") => format!("&kt {}", HidUsage::from_encoded(param1)),
+            Some("layer-tap") => format!("&lt {param1} {}", HidUsage::from_encoded(param2)),
+            Some("mod-tap") => format!(
+                "&mt {} {}",
+                HidUsage::from_encoded(param1),
+                HidUsage::from_encoded(param2)
+            ),
+            Some("sticky-key") => format!("&sk {}", HidUsage::from_encoded(param1)),
+            Some("sticky-layer") => format!("&sl {param1}"),
+            Some("momentary") => format!("&mo {param1}"),
+            Some("toggle-layer") => format!("&tog {param1}"),
+            Some("to-layer") => format!("&to {param1}"),
+            Some("bluetooth") => format!("&bt {param1} {param2}"),
+            Some("mouse-key") => format!("&mkp {param1}"),
+            Some("mouse-move") => format!("&mmv {param1}"),
+            Some("mouse-scroll") => format!("&msc {param1}"),
+            Some("caps-word") => "&caps_word".to_string(),
+            Some("key-repeat") => "&key_repeat".to_string(),
+            Some("reset") => "&sys_reset".to_string(),
+            Some("bootloader") => "&bootloader".to_string(),
+            Some("soft-off") => "&soft_off".to_string(),
+            Some("studio-unlock") => "&studio_unlock".to_string(),
+            Some("grave-escape") => "&gresc".to_string(),
+            Some("transparent") => "&trans".to_string(),
+            Some("none") => "&none".to_string(),
+            _ => format!("&unknown {behavior_id} {param1} {param2}"),
+        },
+    )
+}
+
+fn decode_set_combo_response(combo_response: &[u8]) -> Result<(), String> {
+    let set_response = find_len_field(combo_response, 2)
+        .ok_or_else(|| "Device did not return setCombo result".to_string())?;
+    match find_varint_field(set_response, 2).unwrap_or(0) {
+        0 => Ok(()),
+        2 => Err("Combo index is invalid".to_string()),
+        3 => Err("Combo parameters are invalid".to_string()),
+        code => Err(format!("Set combo failed with error code {code}")),
+    }
+}
+
+fn decode_add_combo_response(combo_response: &[u8]) -> Result<(), String> {
+    let add_response = find_len_field(combo_response, 3)
+        .ok_or_else(|| "Device did not return addCombo result".to_string())?;
+    if find_varint_field(add_response, 1).is_some() {
+        return Ok(());
+    }
+    match find_varint_field(add_response, 2).unwrap_or(0) {
+        0 => Ok(()),
+        2 => Err("No combo slots are available on the device".to_string()),
+        3 => Err("Combo parameters are invalid".to_string()),
+        code => Err(format!("Add combo failed with error code {code}")),
+    }
+}
+
+fn decode_remove_combo_response(combo_response: &[u8]) -> Result<(), String> {
+    let remove_response = find_len_field(combo_response, 4)
+        .ok_or_else(|| "Device did not return removeCombo result".to_string())?;
+    match find_varint_field(remove_response, 2).unwrap_or(0) {
+        0 => Ok(()),
+        2 => Err("Combo index is invalid".to_string()),
+        code => Err(format!("Remove combo failed with error code {code}")),
+    }
+}
+
+fn decode_subsystem_response_frame(
+    frame: &[u8],
+    request_id: u64,
+    subsystem_field: u32,
+) -> Result<Option<Vec<u8>>, String> {
+    let request_response = match find_len_field(frame, 1) {
+        Some(value) => value,
+        None => return Ok(None),
+    };
+    if find_varint_field(request_response, 1) != Some(request_id) {
+        return Ok(None);
+    }
+    if let Some(meta) = find_len_field(request_response, 2) {
+        return Err(decode_meta_error(meta));
+    }
+    find_len_field(request_response, subsystem_field)
+        .map(|value| Some(value.to_vec()))
+        .ok_or_else(|| "Device response did not include the requested subsystem".to_string())
+}
+
+const STUDIO_FRAME_SOF: u8 = 0xAB;
+const STUDIO_FRAME_ESC: u8 = 0xAC;
+const STUDIO_FRAME_EOF: u8 = 0xAD;
+
+#[derive(Default)]
+struct StudioFrameDecoder {
+    state: DecodeState,
+    data: Vec<u8>,
+}
+
+#[derive(Default)]
+enum DecodeState {
+    #[default]
+    Idle,
+    AwaitingData,
+    Escaped,
+}
+
+impl StudioFrameDecoder {
+    fn push(&mut self, chunk: &[u8]) -> Result<Vec<Vec<u8>>, String> {
+        let mut frames = Vec::new();
+        for &byte in chunk {
+            match self.state {
+                DecodeState::Idle => {
+                    if byte == STUDIO_FRAME_SOF {
+                        self.state = DecodeState::AwaitingData;
+                    }
+                }
+                DecodeState::AwaitingData => match byte {
+                    STUDIO_FRAME_SOF => {
+                        self.data.clear();
+                        return Err("Unexpected Studio frame start".to_string());
+                    }
+                    STUDIO_FRAME_ESC => {
+                        self.state = DecodeState::Escaped;
+                    }
+                    STUDIO_FRAME_EOF => {
+                        frames.push(std::mem::take(&mut self.data));
+                        self.state = DecodeState::Idle;
+                    }
+                    _ => self.data.push(byte),
+                },
+                DecodeState::Escaped => {
+                    self.data.push(byte);
+                    self.state = DecodeState::AwaitingData;
+                }
+            }
+        }
+        Ok(frames)
+    }
+}
+
+fn encode_studio_frame(payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(payload.len() + 2);
+    out.push(STUDIO_FRAME_SOF);
+    for &byte in payload {
+        if matches!(byte, STUDIO_FRAME_SOF | STUDIO_FRAME_ESC | STUDIO_FRAME_EOF) {
+            out.push(STUDIO_FRAME_ESC);
+        }
+        out.push(byte);
+    }
+    out.push(STUDIO_FRAME_EOF);
+    out
+}
+
+fn push_varint_field(out: &mut Vec<u8>, field_number: u32, value: u32) {
+    push_varint(out, u64::from(field_number << 3));
+    push_varint(out, u64::from(value));
+}
+
+fn push_len_field(out: &mut Vec<u8>, field_number: u32, bytes: &[u8]) {
+    push_varint(out, u64::from((field_number << 3) | 2));
+    push_varint(out, bytes.len() as u64);
+    out.extend_from_slice(bytes);
+}
+
+fn push_varint(out: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        out.push((value as u8) | 0x80);
+        value >>= 7;
+    }
+    out.push(value as u8);
+}
+
+fn find_varint_field(bytes: &[u8], field_number: u32) -> Option<u64> {
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let tag = read_varint(bytes, &mut cursor)?;
+        let field = (tag >> 3) as u32;
+        let wire = tag & 0x07;
+        match wire {
+            0 => {
+                let value = read_varint(bytes, &mut cursor)?;
+                if field == field_number {
+                    return Some(value);
+                }
+            }
+            2 => {
+                let length = read_varint(bytes, &mut cursor)? as usize;
+                cursor = cursor.checked_add(length)?;
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn find_varint_fields(bytes: &[u8], field_number: u32) -> Vec<u64> {
+    let mut values = Vec::new();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let Some(tag) = read_varint(bytes, &mut cursor) else {
+            break;
+        };
+        let field = (tag >> 3) as u32;
+        let wire = tag & 0x07;
+        match wire {
+            0 => {
+                let Some(value) = read_varint(bytes, &mut cursor) else {
+                    break;
+                };
+                if field == field_number {
+                    values.push(value);
+                }
+            }
+            2 => {
+                let Some(length) = read_varint(bytes, &mut cursor).map(|value| value as usize)
+                else {
+                    break;
+                };
+                let Some(end) = cursor.checked_add(length) else {
+                    break;
+                };
+                if end > bytes.len() {
+                    break;
+                }
+                cursor = end;
+            }
+            _ => break,
+        }
+    }
+    values
+}
+
+fn find_len_field(bytes: &[u8], field_number: u32) -> Option<&[u8]> {
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let tag = read_varint(bytes, &mut cursor)?;
+        let field = (tag >> 3) as u32;
+        let wire = tag & 0x07;
+        match wire {
+            0 => {
+                let _ = read_varint(bytes, &mut cursor)?;
+            }
+            2 => {
+                let length = read_varint(bytes, &mut cursor)? as usize;
+                let end = cursor.checked_add(length)?;
+                if end > bytes.len() {
+                    return None;
+                }
+                if field == field_number {
+                    return Some(&bytes[cursor..end]);
+                }
+                cursor = end;
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn find_len_fields(bytes: &[u8], field_number: u32) -> Vec<&[u8]> {
+    let mut values = Vec::new();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let Some(tag) = read_varint(bytes, &mut cursor) else {
+            break;
+        };
+        let field = (tag >> 3) as u32;
+        let wire = tag & 0x07;
+        match wire {
+            0 => {
+                if read_varint(bytes, &mut cursor).is_none() {
+                    break;
+                }
+            }
+            2 => {
+                let Some(length) = read_varint(bytes, &mut cursor).map(|value| value as usize)
+                else {
+                    break;
+                };
+                let Some(end) = cursor.checked_add(length) else {
+                    break;
+                };
+                if end > bytes.len() {
+                    break;
+                }
+                if field == field_number {
+                    values.push(&bytes[cursor..end]);
+                }
+                cursor = end;
+            }
+            _ => break,
+        }
+    }
+    values
+}
+
+fn read_varint(bytes: &[u8], cursor: &mut usize) -> Option<u64> {
+    let mut value = 0_u64;
+    let mut shift = 0;
+    while *cursor < bytes.len() && shift < 64 {
+        let byte = bytes[*cursor];
+        *cursor += 1;
+        value |= u64::from(byte & 0x7F) << shift;
+        if byte & 0x80 == 0 {
+            return Some(value);
+        }
+        shift += 7;
+    }
+    None
 }
 
 fn collect_uf2_files(dir: &Path, files: &mut Vec<String>) -> Result<(), String> {
@@ -224,11 +1216,185 @@ fn collect_uf2_files(dir: &Path, files: &mut Vec<String>) -> Result<(), String> 
     Ok(())
 }
 
-fn open_studio_client(port_path: &str) -> Result<
-    StudioClient<zmk_studio_api::transport::serial::SerialTransport>,
-    String,
-> {
+fn open_studio_client(port_path: &str) -> Result<StudioClient<SerialTransport>, String> {
     StudioClient::open_serial(port_path).map_err(|error| error.to_string())
+}
+
+fn ensure_desktop_bluetooth_direct_enabled() -> Result<(), StudioConnectionError> {
+    if DESKTOP_BLUETOOTH_DIRECT_ENABLED {
+        return Ok(());
+    }
+
+    Err(StudioConnectionError::new(
+        "bluetooth_disabled",
+        "Desktop Bluetooth Direct is disabled because the native macOS BLE backend can terminate the app on this machine. Use USB Direct for now, or use Chrome/Edge Web Bluetooth from the browser build.",
+    ))
+}
+
+fn list_ble_devices_safe() -> Result<Vec<BleDeviceInfo>, String> {
+    run_ble_operation(StudioClient::<PlatformBleTransport>::list_ble_devices)
+}
+
+fn open_ble_client_safe(device_id: &str) -> Result<StudioClient<PlatformBleTransport>, String> {
+    run_ble_operation(|| StudioClient::<PlatformBleTransport>::open_ble(device_id))
+}
+
+fn connect_ble_transport_safe(device_id: &str) -> Result<PlatformBleTransport, String> {
+    run_ble_operation(|| PlatformBleTransport::connect_device(device_id))
+}
+
+fn run_ble_operation<T, E, F>(operation: F) -> Result<T, String>
+where
+    E: std::fmt::Display,
+    F: FnOnce() -> Result<T, E>,
+{
+    match catch_unwind(AssertUnwindSafe(operation)) {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(error)) => Err(error.to_string()),
+        Err(payload) => Err(format!(
+            "Bluetooth backend crashed before returning an error: {}",
+            panic_payload_message(payload)
+        )),
+    }
+}
+
+fn panic_payload_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "unknown panic".to_string()
+}
+
+fn resolve_ble_device(device_id: Option<String>) -> Result<BleDeviceInfo, String> {
+    let requested = device_id
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let devices = list_ble_devices_safe()
+        .map_err(|error| format!("Bluetooth device discovery failed: {error}"))?;
+
+    if let Some(requested) = requested {
+        return devices
+            .into_iter()
+            .find(|device| device.device_id == requested || device.local_name.as_deref() == Some(&requested))
+            .ok_or_else(|| {
+                "Bluetooth Studio device was not found. Pair or connect it in macOS Bluetooth settings first."
+                    .to_string()
+            });
+    }
+
+    devices.into_iter().next().ok_or_else(|| {
+        "Bluetooth Studio device was not found. Pair or connect it in macOS Bluetooth settings first."
+            .to_string()
+    })
+}
+
+enum StudioTarget {
+    Usb { port_path: String },
+    Bluetooth { device_id: String },
+}
+
+fn resolve_studio_target(kind: &str, port_path: Option<String>) -> Result<StudioTarget, String> {
+    match kind {
+        "usb" => {
+            let port_path = port_path
+                .filter(|path| !path.trim().is_empty())
+                .ok_or_else(|| "USB Direct Mode requires a serial port path.".to_string())?;
+            Ok(StudioTarget::Usb { port_path })
+        }
+        "bluetooth" => {
+            let device = resolve_ble_device(port_path)?;
+            Ok(StudioTarget::Bluetooth {
+                device_id: device.device_id,
+            })
+        }
+        _ => Err(format!("Unsupported Direct Mode connection kind: {kind}")),
+    }
+}
+
+struct BehaviorCatalog {
+    role_by_id: HashMap<i32, String>,
+    id_by_role: HashMap<String, i32>,
+}
+
+impl BehaviorCatalog {
+    fn id_for(&self, role: &str) -> Result<i32, String> {
+        self.id_by_role
+            .get(role)
+            .copied()
+            .ok_or_else(|| format!("Device firmware does not expose behavior: {role}"))
+    }
+}
+
+fn load_behavior_catalog_from_transport<T: Read + Write + ?Sized>(
+    transport: &mut T,
+) -> Result<BehaviorCatalog, String> {
+    let mut client = StudioClient::new(transport);
+    load_behavior_catalog_from_client(&mut client)
+}
+
+fn load_behavior_catalog_from_client<T: Read + Write>(
+    client: &mut StudioClient<T>,
+) -> Result<BehaviorCatalog, String> {
+    let behavior_ids = client
+        .list_all_behaviors()
+        .map_err(|error| error.to_string())?;
+    let mut role_by_id = HashMap::new();
+    let mut id_by_role = HashMap::new();
+
+    for behavior_id in behavior_ids {
+        let details = client
+            .get_behavior_details(behavior_id)
+            .map_err(|error| error.to_string())?;
+        if let Some(role) = role_from_behavior_display_name(&details.display_name) {
+            role_by_id.insert(behavior_id as i32, role.to_string());
+            id_by_role
+                .entry(role.to_string())
+                .or_insert(behavior_id as i32);
+        }
+    }
+
+    Ok(BehaviorCatalog {
+        role_by_id,
+        id_by_role,
+    })
+}
+
+fn save_studio_changes_from_transport<T: Read + Write + ?Sized>(
+    transport: &mut T,
+) -> Result<(), String> {
+    let mut client = StudioClient::new(transport);
+    client.save_changes().map_err(|error| error.to_string())
+}
+
+fn role_from_behavior_display_name(display_name: &str) -> Option<&'static str> {
+    match display_name.trim().to_ascii_lowercase().as_str() {
+        "key press" => Some("key"),
+        "key toggle" => Some("key-toggle"),
+        "layer-tap" => Some("layer-tap"),
+        "mod-tap" => Some("mod-tap"),
+        "sticky key" => Some("sticky-key"),
+        "sticky layer" => Some("sticky-layer"),
+        "momentary layer" => Some("momentary"),
+        "toggle layer" => Some("toggle-layer"),
+        "to layer" => Some("to-layer"),
+        "bluetooth" => Some("bluetooth"),
+        "mouse key press" => Some("mouse-key"),
+        "mouse move" | "mouse_move" => Some("mouse-move"),
+        "mouse scroll" | "mouse_scroll" => Some("mouse-scroll"),
+        "caps word" => Some("caps-word"),
+        "key repeat" => Some("key-repeat"),
+        "reset" => Some("reset"),
+        "bootloader" => Some("bootloader"),
+        "soft off" | "z_so_off" => Some("soft-off"),
+        "studio unlock" => Some("studio-unlock"),
+        "grave/escape" => Some("grave-escape"),
+        "transparent" => Some("transparent"),
+        "none" => Some("none"),
+        _ => None,
+    }
 }
 
 fn is_likely_studio_port(port: &serialport::SerialPortInfo) -> bool {
@@ -295,8 +1461,12 @@ fn parse_direct_behavior(binding: &str) -> Result<Behavior, String> {
         .trim();
 
     match behavior {
-        "&kp" => Ok(Behavior::KeyPress(parse_hid_usage(required_token(&tokens, 1, "key")?)?)),
-        "&kt" => Ok(Behavior::KeyToggle(parse_hid_usage(required_token(&tokens, 1, "key")?)?)),
+        "&kp" => Ok(Behavior::KeyPress(parse_hid_usage(required_token(
+            &tokens, 1, "key",
+        )?)?)),
+        "&kt" => Ok(Behavior::KeyToggle(parse_hid_usage(required_token(
+            &tokens, 1, "key",
+        )?)?)),
         "&lt" => Ok(Behavior::LayerTap {
             layer_id: parse_u32(required_token(&tokens, 1, "layer")?)?,
             tap: parse_hid_usage(required_token(&tokens, 2, "tap key")?)?,
@@ -305,7 +1475,9 @@ fn parse_direct_behavior(binding: &str) -> Result<Behavior, String> {
             hold: parse_hid_usage(required_token(&tokens, 1, "hold key")?)?,
             tap: parse_hid_usage(required_token(&tokens, 2, "tap key")?)?,
         }),
-        "&sk" => Ok(Behavior::StickyKey(parse_hid_usage(required_token(&tokens, 1, "key")?)?)),
+        "&sk" => Ok(Behavior::StickyKey(parse_hid_usage(required_token(
+            &tokens, 1, "key",
+        )?)?)),
         "&sl" => Ok(Behavior::StickyLayer {
             layer_id: parse_u32(required_token(&tokens, 1, "layer")?)?,
         }),
@@ -428,12 +1600,95 @@ struct StudioPort {
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioBluetoothDevice {
+    device_id: String,
+    local_name: Option<String>,
+    label: String,
+}
+
+impl From<BleDeviceInfo> for StudioBluetoothDevice {
+    fn from(device: BleDeviceInfo) -> Self {
+        let label = device.display_name();
+        Self {
+            device_id: device.device_id,
+            local_name: device.local_name,
+            label,
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
 struct StudioKeymap {
     device_name: String,
     serial_number: String,
     lock_state: String,
     has_unsaved_changes: bool,
     layers: Vec<StudioLayer>,
+}
+
+#[derive(serde::Serialize)]
+struct StudioConnection {
+    kind: String,
+    transport: String,
+    port_path: Option<String>,
+    keymap: StudioKeymap,
+}
+
+#[derive(serde::Serialize)]
+struct StudioConnectionError {
+    code: String,
+    message: String,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioTrackballSettings {
+    cpi: u32,
+    cursor_numerator: u32,
+    cursor_denominator: u32,
+    scroll_numerator: u32,
+    scroll_denominator: u32,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioComboSet {
+    combos: Vec<StudioCombo>,
+    max_combos: u32,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioCombo {
+    id: String,
+    index: u32,
+    binding: String,
+    key_positions: Vec<u32>,
+    timeout_ms: u32,
+    require_prior_idle_ms: u32,
+    layer_mask: u32,
+    slow_release: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioComboInput {
+    binding: String,
+    key_positions: Vec<u32>,
+    timeout_ms: u32,
+    require_prior_idle_ms: Option<u32>,
+    layer_mask: Option<u32>,
+    slow_release: Option<bool>,
+}
+
+impl StudioConnectionError {
+    fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -457,9 +1712,52 @@ pub fn run() {
             list_bootloader_volumes,
             copy_uf2_to_volume,
             list_studio_ports,
+            list_studio_bluetooth_devices,
             read_studio_keymap,
-            write_studio_key
+            connect_studio_device,
+            write_studio_key,
+            read_studio_trackball_settings,
+            write_studio_trackball_settings,
+            read_studio_combos,
+            add_studio_combo,
+            set_studio_combo,
+            remove_studio_combo
         ])
         .run(tauri::generate_context!())
         .expect("error while running KobitoKey Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_combo_decoder_reads_nested_error() {
+        let mut set_response = Vec::new();
+        push_varint_field(&mut set_response, 2, 2);
+        let mut wrapper = Vec::new();
+        push_len_field(&mut wrapper, 2, &set_response);
+
+        let error = decode_set_combo_response(&wrapper).expect_err("invalid index must fail");
+        assert_eq!(error, "Combo index is invalid");
+    }
+
+    #[test]
+    fn remove_combo_decoder_reads_nested_error() {
+        let mut remove_response = Vec::new();
+        push_varint_field(&mut remove_response, 2, 2);
+        let mut wrapper = Vec::new();
+        push_len_field(&mut wrapper, 4, &remove_response);
+
+        let error = decode_remove_combo_response(&wrapper).expect_err("invalid index must fail");
+        assert_eq!(error, "Combo index is invalid");
+    }
+
+    #[test]
+    fn get_combos_request_uses_length_delimited_oneof() {
+        let request = encode_get_combos_request();
+
+        assert!(find_len_field(&request, 1).is_some());
+        assert_eq!(find_varint_field(&request, 1), None);
+    }
 }
