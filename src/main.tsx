@@ -389,6 +389,8 @@ function App() {
           lockState: session.keymap.lockState,
           keymap: session.keymap,
         });
+        await refreshDirectCombos(kind, "", { silent: true });
+        await refreshDirectTrackballSettings(kind, "", { silent: true });
       } catch (error) {
         const message = `${kind === "usb" ? "Web Serial" : "Web Bluetooth"} 接続失敗: ${String(error)}`;
         setStudioConnectionState("error");
@@ -470,7 +472,7 @@ function App() {
         setBindingDraft(nextBinding);
         setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
       } catch (error) {
-        setStatus(`Web Direct 書き込み失敗: ${String(error)}`);
+        setStatus(`Web Direct 書き込み失敗: ${formatError(error)}`);
       }
       return;
     }
@@ -566,8 +568,13 @@ function App() {
     }
 
     if (!isDesktopRuntime) {
+      const fallbackApplied = applyFirmwareComboFallback();
       if (!options.silent) {
-        setStatus("Direct Combo は現在 Tauri デスクトップアプリで利用してください。");
+        setStatus(
+          fallbackApplied
+            ? "Web Direct では Combo RPC が未公開のため、Firmware keymap の Combo を読み取り専用で表示しています。"
+            : "Web Direct では Combo RPC が未公開です。Combo 編集は Tauri デスクトップアプリで利用してください。",
+        );
       }
       return;
     }
@@ -1098,6 +1105,8 @@ function App() {
               selectedCombos={selectedCombos}
               selectedBinding={selectedBinding}
               trackball={directTrackball}
+              canWriteCombos={isDesktopRuntime}
+              canWriteTrackball={isDesktopRuntime}
             />
           ) : (
             <FirmwareInspectorTabs
@@ -1918,6 +1927,8 @@ function BuildPanel({
 
 function DirectInspectorTabs({
   binding,
+  canWriteCombos,
+  canWriteTrackball,
   combos,
   comboSource,
   connectionState,
@@ -1938,6 +1949,8 @@ function DirectInspectorTabs({
   trackball,
 }: {
   binding: string;
+  canWriteCombos: boolean;
+  canWriteTrackball: boolean;
   combos: KeymapCombo[];
   comboSource: DirectComboSource;
   connectionState: StudioConnectionState;
@@ -1988,6 +2001,7 @@ function DirectInspectorTabs({
         </div>
       ) : activeTab === "combo" ? (
         <DirectComboPanel
+          canWrite={canWriteCombos}
           combos={combos}
           connectionState={connectionState}
           comboSource={comboSource}
@@ -2002,6 +2016,7 @@ function DirectInspectorTabs({
         />
       ) : activeTab === "trackball" ? (
         <DirectTrackballPanel
+          canWrite={canWriteTrackball}
           connectionState={connectionState}
           onFirmwareMode={onFirmwareMode}
           onRefresh={onRefreshTrackball}
@@ -2016,12 +2031,14 @@ function DirectInspectorTabs({
 }
 
 function DirectTrackballPanel({
+  canWrite,
   connectionState,
   onFirmwareMode,
   onRefresh,
   onSave,
   settings,
 }: {
+  canWrite: boolean;
   connectionState: StudioConnectionState;
   onFirmwareMode: () => void;
   onRefresh: () => void;
@@ -2030,6 +2047,7 @@ function DirectTrackballPanel({
 }) {
   const [form, setForm] = React.useState<DirectTrackballSettings>(() => settings ?? defaultDirectTrackballSettings());
   const connected = connectionState === "connected";
+  const canSave = connected && canWrite && settings !== null;
 
   React.useEffect(() => {
     if (settings) {
@@ -2053,7 +2071,7 @@ function DirectTrackballPanel({
           <strong>Trackball Direct Write</strong>
           <p>CPI と cursor / scroll 感度を USB または Bluetooth 経由で実機へ保存します。</p>
         </div>
-        <button type="button" onClick={onRefresh} disabled={!connected}>
+        <button type="button" onClick={onRefresh} disabled={!connected || !canWrite}>
           <RefreshCw size={15} />
           読み込み
         </button>
@@ -2062,6 +2080,7 @@ function DirectTrackballPanel({
       <label className="direct-number-field">
         <span>CPI</span>
         <input
+          disabled={!canWrite || settings === null}
           type="number"
           min={100}
           max={3200}
@@ -2072,18 +2091,20 @@ function DirectTrackballPanel({
       </label>
 
       <ScaleSlider
+        disabled={!canWrite || settings === null}
         label="Cursor sensitivity"
         value={scaleToNumber(form.cursorNumerator, form.cursorDenominator)}
         onChange={(value) => updateScale("cursor", value)}
       />
       <ScaleSlider
+        disabled={!canWrite || settings === null}
         label="Scroll sensitivity"
         value={scaleToNumber(form.scrollNumerator, form.scrollDenominator)}
         onChange={(value) => updateScale("scroll", value)}
       />
 
       <div className="timing-actions">
-        <button type="button" disabled={!connected} onClick={() => onSave(form)}>
+        <button type="button" disabled={!canSave} onClick={() => onSave(form)}>
           デバイスに保存
         </button>
         <button type="button" onClick={() => setForm(settings ?? defaultDirectTrackballSettings())}>
@@ -2091,6 +2112,8 @@ function DirectTrackballPanel({
         </button>
       </div>
       {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると保存できます。</p> : null}
+      {connected && !canWrite ? <p className="empty-note">Web Direct では Trackball RPC が未公開です。Tauri デスクトップアプリでは実機へ保存できます。</p> : null}
+      {connected && canWrite && settings === null ? <p className="empty-note">まず読み込みを実行してください。RPC が firmware にない場合は Firmware Mode で編集します。</p> : null}
       <button type="button" className="wide-action" onClick={onFirmwareMode}>
         Firmware Mode の詳細設定を開く
       </button>
@@ -2099,6 +2122,7 @@ function DirectTrackballPanel({
 }
 
 function DirectComboPanel({
+  canWrite,
   combos,
   connectionState,
   comboSource,
@@ -2111,6 +2135,7 @@ function DirectComboPanel({
   selectedCombo,
   selectedCombos,
 }: {
+  canWrite: boolean;
   combos: KeymapCombo[];
   connectionState: StudioConnectionState;
   comboSource: DirectComboSource;
@@ -2125,6 +2150,7 @@ function DirectComboPanel({
 }) {
   const connected = connectionState === "connected";
   const firmwareFallback = comboSource === "firmware";
+  const comboWritable = connected && canWrite && comboSource === "device";
   return (
     <div className="direct-combo-panel">
       <div className="direct-settings-panel">
@@ -2145,12 +2171,14 @@ function DirectComboPanel({
           <span>{firmwareFallback ? "Firmware keymap" : maxCombos > 0 ? `max ${maxCombos}` : "max unknown"}</span>
         </div>
         {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると編集できます。</p> : null}
+        {connected && !canWrite ? <p className="empty-note">Web Direct では Combo RPC が未公開です。Firmware keymap の内容を読み取り専用で確認できます。</p> : null}
         {firmwareFallback ? <p className="empty-note">Direct Combo RPC が読めないため、Firmware keymap の Combo を表示しています。</p> : null}
+        {connected && canWrite && comboSource === "none" ? <p className="empty-note">Combo RPC の読み込みに成功していません。読み込みを実行してください。</p> : null}
       </div>
       <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
       <ComboEditor
         combo={selectedCombo}
-        readOnly={firmwareFallback}
+        readOnly={!comboWritable}
         onCreate={onCreate}
         onDelete={onDelete}
         onSave={onSave}
@@ -2161,10 +2189,12 @@ function DirectComboPanel({
 }
 
 function ScaleSlider({
+  disabled = false,
   label,
   onChange,
   value,
 }: {
+  disabled?: boolean;
   label: string;
   onChange: (value: number) => void;
   value: number;
@@ -2182,6 +2212,7 @@ function ScaleSlider({
         max={3}
         step={0.05}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <div className="timing-presets compact-presets">
@@ -2191,6 +2222,7 @@ function ScaleSlider({
               type="button"
               key={preset}
               className={Math.abs(value - preset) < 0.01 ? "active" : ""}
+              disabled={disabled}
               onClick={() => onChange(preset)}
             >
               {preset}x

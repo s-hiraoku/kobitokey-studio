@@ -1492,7 +1492,11 @@ fn parse_direct_behavior(binding: &str) -> Result<Behavior, String> {
         }),
         "&bt" => Ok(Behavior::Bluetooth {
             command: parse_command(required_token(&tokens, 1, "command")?)?,
-            value: parse_u32(required_token(&tokens, 2, "value")?)?,
+            value: tokens
+                .get(2)
+                .map(|value| parse_u32(value))
+                .transpose()?
+                .unwrap_or(0),
         }),
         "&mkp" => Ok(Behavior::MouseKeyPress {
             value: parse_u32(required_token(&tokens, 1, "value")?)?,
@@ -1537,6 +1541,7 @@ fn parse_command(value: &str) -> Result<u32, String> {
         "BT_SEL" => Ok(1),
         "BT_NXT" => Ok(2),
         "BT_PRV" => Ok(3),
+        "BT_CLR_ALL" => Ok(4),
         _ => parse_u32(value),
     }
 }
@@ -1731,6 +1736,21 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    fn test_behavior_catalog() -> BehaviorCatalog {
+        BehaviorCatalog {
+            role_by_id: std::collections::HashMap::from([
+                (1, "key".to_string()),
+                (2, "bluetooth".to_string()),
+                (3, "momentary".to_string()),
+            ]),
+            id_by_role: std::collections::HashMap::from([
+                ("key".to_string(), 1),
+                ("bluetooth".to_string(), 2),
+                ("momentary".to_string(), 3),
+            ]),
+        }
+    }
+
     #[test]
     fn set_combo_decoder_reads_nested_error() {
         let mut set_response = Vec::new();
@@ -1759,5 +1779,67 @@ mod tests {
 
         assert!(find_len_field(&request, 1).is_some());
         assert_eq!(find_varint_field(&request, 1), None);
+    }
+
+    #[test]
+    fn parse_direct_behavior_accepts_all_bluetooth_commands() {
+        let behavior = parse_direct_behavior("&bt BT_CLR_ALL").expect("BT_CLR_ALL should parse without a value");
+
+        assert!(matches!(
+            behavior,
+            Behavior::Bluetooth {
+                command: 4,
+                value: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn combo_config_round_trips_common_fields() {
+        let catalog = test_behavior_catalog();
+        let combo = StudioComboInput {
+            binding: "&kp A".to_string(),
+            key_positions: vec![0, 3],
+            timeout_ms: 75,
+            require_prior_idle_ms: Some(20),
+            layer_mask: Some(0b101),
+            slow_release: Some(true),
+        };
+
+        let config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
+        let decoded = decode_combo_config(0, &config, &catalog).expect("combo config should decode");
+
+        assert_eq!(decoded.binding, "&kp A");
+        assert_eq!(decoded.key_positions, vec![0, 3]);
+        assert_eq!(decoded.timeout_ms, 75);
+        assert_eq!(decoded.require_prior_idle_ms, 20);
+        assert_eq!(decoded.layer_mask, 0b101);
+        assert!(decoded.slow_release);
+    }
+
+    #[test]
+    fn get_combos_response_decodes_combos_and_capacity() {
+        let catalog = test_behavior_catalog();
+        let combo = StudioComboInput {
+            binding: "&mo 2".to_string(),
+            key_positions: vec![4, 5],
+            timeout_ms: 60,
+            require_prior_idle_ms: None,
+            layer_mask: None,
+            slow_release: None,
+        };
+        let combo_config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
+        let mut combos_payload = Vec::new();
+        push_len_field(&mut combos_payload, 1, &combo_config);
+        push_varint_field(&mut combos_payload, 2, 12);
+        let mut response = Vec::new();
+        push_len_field(&mut response, 1, &combos_payload);
+
+        let decoded = decode_get_combos_response(&response, &catalog).expect("combo response should decode");
+
+        assert_eq!(decoded.max_combos, 12);
+        assert_eq!(decoded.combos.len(), 1);
+        assert_eq!(decoded.combos[0].binding, "&mo 2");
+        assert_eq!(decoded.combos[0].key_positions, vec![4, 5]);
     }
 }

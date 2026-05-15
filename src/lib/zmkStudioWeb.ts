@@ -426,7 +426,7 @@ function parseWebBinding(binding: string): BehaviorBinding {
     case "&tog":
       return behaviorBinding("toggle-layer", parseInteger(requiredPart(parts, 1, "layer")));
     case "&bt":
-      return behaviorBinding("bluetooth", parseBtCommand(requiredPart(parts, 1, "command")), parseInteger(requiredPart(parts, 2, "value")));
+      return behaviorBinding("bluetooth", parseBtCommand(requiredPart(parts, 1, "command")), parseInteger(parts[2] ?? "0"));
     case "&mkp":
       return behaviorBinding("mouse-key", parseInteger(requiredPart(parts, 1, "value")));
     case "&mmv":
@@ -678,6 +678,8 @@ function parseBtCommand(value: string): number {
       return 2;
     case "BT_PRV":
       return 3;
+    case "BT_CLR_ALL":
+      return 4;
     default:
       return parseInteger(value);
   }
