@@ -1153,16 +1153,6 @@ function App() {
               </button>
             ))}
           </div>
-          {isDirectMode ? (
-            <SidebarConnectionPanel
-              canUseWebBluetooth={canUseWebBluetooth}
-              canUseWebUsb={canUseWebUsb}
-              connectionKind={studioConnectionKind}
-              connectionState={studioConnectionState}
-              isDesktopRuntime={isDesktopRuntime}
-              onConnect={connectStudioDevice}
-            />
-          ) : null}
         </nav>
 
         <section className="keyboard-panel">
@@ -1647,67 +1637,6 @@ function truncateComboLabel(value: string, maxLength: number): string {
     return value;
   }
   return `${value.slice(0, maxLength - 3)}...`;
-}
-
-function SidebarConnectionPanel({
-  canUseWebBluetooth,
-  canUseWebUsb,
-  connectionKind,
-  connectionState,
-  isDesktopRuntime,
-  onConnect,
-}: {
-  canUseWebBluetooth: boolean;
-  canUseWebUsb: boolean;
-  connectionKind: StudioConnectionKind;
-  connectionState: StudioConnectionState;
-  isDesktopRuntime: boolean;
-  onConnect: (kind: StudioConnectionKind) => void;
-}) {
-  const isConnecting = connectionState === "connecting";
-  const isConnected = connectionState === "connected";
-  const connectionLabel = isConnected
-    ? `${connectionKind.toUpperCase()} 接続済み`
-    : connectionState === "connecting"
-      ? `${connectionKind.toUpperCase()} 接続中`
-      : connectionState === "error"
-        ? "接続エラー"
-        : "未接続";
-
-  return (
-    <section className="sidebar-connection">
-      <div className="sidebar-connection-head">
-        <span>
-          <Usb size={13} />
-          USB
-        </span>
-        <a href="https://zmk.dev/docs/features/studio" target="_blank" rel="noreferrer">
-          FW Guide
-        </a>
-      </div>
-      <p>{connectionLabel}</p>
-      <button
-        type="button"
-        className="sidebar-connect-primary"
-        disabled={isConnecting || (!isDesktopRuntime && !canUseWebUsb)}
-        onClick={() => onConnect("usb")}
-      >
-        <Usb size={13} />
-        Connect via USB
-      </button>
-      <button
-        type="button"
-        disabled={isConnecting || (!isDesktopRuntime && !canUseWebBluetooth)}
-        onClick={() => onConnect("bluetooth")}
-      >
-        <Bluetooth size={13} />
-        Connect via Bluetooth
-      </button>
-      <span>
-        USBケーブルまたはBluetoothで接続してください。Bluetooth接続時はペアリング候補からKobitoKeyを選びます。
-      </span>
-    </section>
-  );
 }
 
 function DirectSummaryPanel({
