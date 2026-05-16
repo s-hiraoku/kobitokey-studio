@@ -43,29 +43,55 @@ export function updateBlockNumberSetting(
   propertyName: string,
   value: number,
 ): string {
-  const blockStart = source.indexOf(blockName);
-  if (blockStart < 0) {
+  const range = findBlockRange(source, blockName);
+  if (!range) {
     return source;
   }
 
-  const blockEnd = source.indexOf("};", blockStart);
-  if (blockEnd < 0) {
-    return source;
-  }
-
-  const block = source.slice(blockStart, blockEnd);
+  const block = source.slice(range.start, range.end);
   const updatedBlock = updateNumberSetting(block, propertyName, value);
-  return source.slice(0, blockStart) + updatedBlock + source.slice(blockEnd);
+  return source.slice(0, range.start) + updatedBlock + source.slice(range.end);
 }
 
 function readBlockNumber(source: string, blockName: string, propertyName: string): number | undefined {
-  const blockStart = source.indexOf(blockName);
-  if (blockStart < 0) {
+  const range = findBlockRange(source, blockName);
+  if (!range) {
     return undefined;
   }
 
-  const block = source.slice(blockStart, source.indexOf("};", blockStart) + 2);
+  const block = source.slice(range.start, range.end);
   return readFirstNumber(block, new RegExp(`${escapeRegExp(propertyName)}\\s*=\\s*<(\\d+)>`));
+}
+
+function findBlockRange(source: string, blockName: string): { start: number; end: number } | undefined {
+  const escapedName = escapeRegExp(blockName);
+  const blockPattern = new RegExp(
+    `(?:^|[\\s{};])(?:&${escapedName}(?![A-Za-z0-9_-])\\s*\\{|${escapedName}(?![A-Za-z0-9_-])\\s*:|${escapedName}(?![A-Za-z0-9_-])\\s*\\{)`,
+  );
+  const match = source.match(blockPattern);
+  if (!match || match.index === undefined) {
+    return undefined;
+  }
+
+  const openBrace = source.indexOf("{", match.index);
+  if (openBrace < 0) {
+    return undefined;
+  }
+
+  let depth = 0;
+  for (let index = openBrace; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return { start: match.index, end: index + 1 };
+      }
+    }
+  }
+
+  return { start: match.index, end: source.length };
 }
 
 function readFirstNumber(source: string, pattern: RegExp): number | undefined {

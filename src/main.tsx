@@ -622,7 +622,7 @@ function App() {
   }
 
   async function createDirectCombo() {
-    const keyPositions = selectedKeyIndex >= 39 ? [38, 39] : [selectedKeyIndex, selectedKeyIndex + 1];
+    const keyPositions = defaultComboKeyPositions(selectedKeyIndex);
     await writeDirectComboCommand("add_studio_combo", {
       combo: {
         binding: "&kp ESC",
@@ -757,7 +757,7 @@ function App() {
     }
 
     const id = nextComboId(combos);
-    const keyPositions = [selectedKeyIndex, Math.min(selectedKeyIndex + 1, 39)];
+    const keyPositions = defaultComboKeyPositions(selectedKeyIndex);
     setFiles({
       ...files,
       keymap: addCombo(files.keymap, {
@@ -3106,11 +3106,12 @@ function mouseValue(value: string, fallback: string): string {
 }
 
 function parseDisplayKeyPositions(value: string): number[] {
-  return value
+  const positions = value
     .split(/[\s,]+/)
     .map((item) => Number(item.trim()))
     .filter((number) => Number.isFinite(number) && number >= 1 && number <= 40)
     .map((number) => number - 1);
+  return [...new Set(positions)];
 }
 
 function toggleDisplayKeyPosition(currentPositions: number[], position: number): string {
@@ -3121,6 +3122,10 @@ function toggleDisplayKeyPosition(currentPositions: number[], position: number):
     .sort((left, right) => left - right)
     .map((currentPosition) => currentPosition + 1)
     .join(" ");
+}
+
+function defaultComboKeyPositions(selectedKeyIndex: number): number[] {
+  return selectedKeyIndex >= 39 ? [38, 39] : [selectedKeyIndex, selectedKeyIndex + 1];
 }
 
 function nextComboId(combos: KeymapCombo[]): string {

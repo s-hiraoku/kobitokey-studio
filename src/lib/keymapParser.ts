@@ -108,12 +108,14 @@ function extractKeymapBody(source: string): { body: string; bodyStart: number } 
 }
 
 function extractNamedBody(source: string, name: string): { body: string; bodyStart: number } | undefined {
-  const nodeStart = source.indexOf(`${name} {`);
-  if (nodeStart < 0) {
+  const escapedName = escapeRegExp(name);
+  const nodePattern = new RegExp(`(?:^|[\\s;{}])(?:[A-Za-z_][A-Za-z0-9_-]*\\s*:\\s*)?${escapedName}\\s*\\{`);
+  const match = source.match(nodePattern);
+  if (!match || match.index === undefined) {
     return undefined;
   }
 
-  const openBrace = source.indexOf("{", nodeStart);
+  const openBrace = source.indexOf("{", match.index);
   if (openBrace < 0) {
     return undefined;
   }
@@ -178,11 +180,28 @@ export function deleteCombo(source: string, combo: KeymapCombo): string {
 export function addCombo(source: string, input: KeymapComboInput): string {
   const combosBlock = extractNamedBody(source, "combos");
   if (!combosBlock) {
-    return source;
+    return addComboBlock(source, input);
   }
 
   const insertAt = combosBlock.bodyStart + combosBlock.body.length;
   return `${source.slice(0, insertAt)}\n\n${indent(formatComboBlock(input), 8)}${source.slice(insertAt)}`;
+}
+
+function addComboBlock(source: string, input: KeymapComboInput): string {
+  const comboBlock = [
+    "    combos {",
+    "        compatible = \"zmk,combos\";",
+    "",
+    indent(formatComboBlock(input), 8),
+    "    };",
+  ].join("\n");
+  const rootEnd = source.lastIndexOf("};");
+
+  if (rootEnd < 0) {
+    return `${source.trimEnd()}\n\n${comboBlock}\n`;
+  }
+
+  return `${source.slice(0, rootEnd).trimEnd()}\n\n${comboBlock}\n${source.slice(rootEnd)}`;
 }
 
 function formatComboBlock(input: KeymapComboInput): string {
@@ -256,4 +275,8 @@ function defaultLayerLabel(id: string, index: number): string {
 function normalizeBinding(binding: string): string {
   const normalized = binding.trim().replace(/\s+/g, " ");
   return normalized.startsWith("&") ? normalized : `&kp ${normalized}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
