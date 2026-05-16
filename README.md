@@ -6,6 +6,16 @@ KobitoKey Studio is a dedicated desktop editor for
 The app is intentionally KobitoKey-specific at this stage. It is not trying to
 be a general ZMK editor yet.
 
+## 使い方ガイド
+
+GitHub Pages で日本語の詳細ガイドを公開します。
+
+- [KobitoKey Studio 使い方ガイド](https://s-hiraoku.github.io/kobitokey-studio/usage-guide/)
+
+Firmware Mode、Direct Mode、Tauri デスクトップ版とブラウザ版の違い、
+Combo / Trackball 設定、GitHub Actions build、artifact download、UF2
+書き込みまで順番に確認できます。
+
 ## Current Scope
 
 - Load `config/KobitoKey.keymap`
