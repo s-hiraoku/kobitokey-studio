@@ -280,14 +280,24 @@ function App() {
   }
 
   async function saveProjectFiles() {
-    if (!files?.keymapPath) {
-      downloadText("KobitoKey.keymap", files?.keymap ?? "");
-      downloadText("KobitoKey_left.overlay", files?.leftOverlay ?? "");
-      downloadText("KobitoKey_right.overlay", files?.rightOverlay ?? "");
-      setSavedKeymap(files?.keymap ?? "");
-      setSavedLeftOverlay(files?.leftOverlay ?? "");
-      setSavedRightOverlay(files?.rightOverlay ?? "");
+    if (!files) {
+      setStatus("保存対象のファイルがありません");
+      return;
+    }
+
+    if (!files.keymapPath) {
+      downloadText("KobitoKey.keymap", files.keymap);
+      downloadText("KobitoKey_left.overlay", files.leftOverlay);
+      downloadText("KobitoKey_right.overlay", files.rightOverlay);
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
       setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
+      return;
+    }
+
+    if (!files.leftOverlayPath || !files.rightOverlayPath) {
+      setStatus("overlay の保存先パスが不足しています");
       return;
     }
 
@@ -300,7 +310,7 @@ function App() {
       setSavedRightOverlay(files.rightOverlay);
       setStatus("変更ファイルを保存しました");
     } catch (error) {
-      setStatus(`保存失敗: ${String(error)}`);
+      setStatus(`保存失敗: ${formatError(error)}`);
     }
   }
 
