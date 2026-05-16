@@ -76,6 +76,16 @@ describe("parseKeymap", () => {
 
     expect(parsed.layers).toEqual([]);
   });
+
+  it("parses labelled keymap and combos nodes", () => {
+    const source = sampleKeymap()
+      .replace("keymap {", "my_keymap: keymap {")
+      .replace("combos {", "my_combos: combos {");
+    const parsed = parseKeymap(source);
+
+    expect(parsed.layers).toHaveLength(2);
+    expect(parsed.combos.map((combo) => combo.id)).toEqual(["combo_tab"]);
+  });
 });
 
 describe("keymap updates", () => {
@@ -117,6 +127,26 @@ describe("keymap updates", () => {
 
     const deleted = deleteCombo(added, parseKeymap(added).combos[0]);
     expect(parseKeymap(deleted).combos.map((item) => item.id)).toEqual(["combo_enter"]);
+  });
+
+  it("creates a combos node when adding the first combo", () => {
+    const source = sampleKeymap().replace(/\n\n    combos \{[\s\S]*?\n    \};/, "");
+    const added = addCombo(source, {
+      id: "combo_first",
+      binding: "&kp ESC",
+      keyPositions: [38, 39],
+      timeoutMs: 50,
+    });
+
+    expect(added).toContain('compatible = "zmk,combos";');
+    expect(parseKeymap(added).combos).toEqual([
+      expect.objectContaining({
+        id: "combo_first",
+        binding: "&kp ESC",
+        keyPositions: [38, 39],
+        timeoutMs: 50,
+      }),
+    ]);
   });
 });
 

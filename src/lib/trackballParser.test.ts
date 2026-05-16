@@ -64,4 +64,18 @@ describe("trackball parser", () => {
     expect(parseTrackballSettings(updated, rightOverlay).pointerMinFactor).toBe(800);
     expect(parseTrackballSettings(updated, rightOverlay).rightPointerMinFactor).toBe(900);
   });
+
+  it("does not treat pointer_accel_right as the left pointer_accel block", () => {
+    const rightOnlyOverlay = `
+pointer_accel_right {
+    min-factor = <620>;
+};
+`;
+
+    expect(parseTrackballSettings(rightOnlyOverlay, rightOverlay).pointerMinFactor).toBeUndefined();
+    expect(parseTrackballSettings(rightOnlyOverlay, rightOverlay).rightPointerMinFactor).toBe(620);
+
+    const updated = updateBlockNumberSetting(rightOnlyOverlay, "pointer_accel", "min-factor", 900);
+    expect(updated).toBe(rightOnlyOverlay);
+  });
 });
