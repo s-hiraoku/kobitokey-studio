@@ -7,7 +7,7 @@ use std::process::Command;
 use zmk_studio_api::transport::{serial::SerialTransport, BleDeviceInfo, PlatformBleTransport};
 use zmk_studio_api::{Behavior, HidUsage, Keycode, StudioClient};
 
-const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = false;
+const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = true;
 
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {

@@ -93,6 +93,13 @@ export function supportsWebBluetooth(): boolean {
 }
 
 export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb"): Promise<WebStudioSession> {
+  if (!supportsWebStudioConnection(kind)) {
+    throw new Error(
+      kind === "usb"
+        ? "Web Serial is not available. Use Chrome or Edge from localhost/HTTPS, and make sure the page has device permissions."
+        : "Web Bluetooth is not available. Use Chrome or Edge from localhost/HTTPS, and make sure Bluetooth is enabled.",
+    );
+  }
   const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
   const connection = create_rpc_connection(transport, { signal: transport.abortController.signal });
   try {

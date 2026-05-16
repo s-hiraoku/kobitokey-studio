@@ -282,7 +282,12 @@ function App() {
   async function saveProjectFiles() {
     if (!files?.keymapPath) {
       downloadText("KobitoKey.keymap", files?.keymap ?? "");
-      setStatus("ブラウザ表示のため keymap をダウンロードしました");
+      downloadText("KobitoKey_left.overlay", files?.leftOverlay ?? "");
+      downloadText("KobitoKey_right.overlay", files?.rightOverlay ?? "");
+      setSavedKeymap(files?.keymap ?? "");
+      setSavedLeftOverlay(files?.leftOverlay ?? "");
+      setSavedRightOverlay(files?.rightOverlay ?? "");
+      setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
       return;
     }
 
@@ -360,26 +365,7 @@ function App() {
     setStudioConnectionState("connecting");
     setStudioConnectionError("");
 
-    if (isDesktopRuntime && kind === "bluetooth") {
-      const message =
-        "macOS native Bluetooth Direct は現在クラッシュ回避のため無効化しています。USB Direct、またはChrome/EdgeのWeb Bluetoothを使ってください。";
-      setStudioConnectionState("error");
-      setStudioConnectionError(message);
-      setStatus(message);
-      return;
-    }
-
     if (!isDesktopRuntime) {
-      if (!supportsWebStudioConnection(kind)) {
-        const message = kind === "usb"
-          ? "このブラウザは Web Serial に対応していません。Chrome または Edge で開いてください。"
-          : "このブラウザは Web Bluetooth に対応していません。Chrome または Edge で開いてください。";
-        setStudioConnectionState("error");
-        setStudioConnectionError(message);
-        setStatus(message);
-        return;
-      }
-
       try {
         const session = await connectWebStudioDevice(kind);
         applyStudioConnection({
@@ -501,7 +487,7 @@ function App() {
       setBindingDraft(nextBinding);
       setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
     } catch (error) {
-      setStatus(`Direct 書き込み失敗: ${String(error)}`);
+      setStatus(`Direct 書き込み失敗: ${formatError(error)}`);
     }
   }
 
