@@ -68,6 +68,7 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | --- | --- | --- |
 | `選択` | Firmware Mode 上部 | `KobitoKey_QWERTY` フォルダを picker で選ぶ |
 | `読み込み` | Firmware Mode 上部 | 指定した project から keymap と overlay を読む |
+| Firmware repository URL | Firmware Mode 上部 | GitHub Actions を実行する firmware repository を指定する |
 | `保存` | Firmware Mode 中央上部 | 編集した keymap / overlay をローカルファイルへ保存する |
 | `書き出し` | ブラウザ版 Firmware Mode | ブラウザで編集したファイルを download する |
 | `検出` | Direct Mode 上部 | Tauri 版で Studio device candidate を探す |
@@ -214,8 +215,9 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 
 1. 上部のモード切り替えで `Firmware` を選びます。
 2. `KobitoKey_QWERTY` のローカルフォルダを指定します。
-3. `選択` でフォルダ picker を開くか、パスを直接入力します。
-4. `読み込み` を押します。
+3. Firmware repository URL に GitHub の repository URL を指定します。
+4. `選択` でフォルダ picker を開くか、パスを直接入力します。
+5. `読み込み` を押します。
 
 デフォルトの想定パスは次です。
 
@@ -226,6 +228,8 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 読み込みに成功すると、左側に layer 一覧、中央に KobitoKey の物理レイアウト、右側に選択中キーの編集 panel が表示されます。
 
 読み込み後に最初に見る場所は、左側の layer 一覧です。layer を切り替えると中央の key 表示が変わります。中央の key をクリックすると、右側の inspector がその key の編集画面になります。
+
+ローカルフォルダは keymap / overlay の読み書きに使います。Firmware repository URL は GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
 
 ### 3.2 キー binding を編集する
 
@@ -341,6 +345,8 @@ KobitoKey Studio は `gh workflow run build.yml` と `gh run list` を使って 
 
 build を起動する前に、`KobitoKey_QWERTY` 側で保存済みの変更を commit / push しているか確認してください。GitHub Actions は GitHub 上の repository 内容から firmware を作るため、ローカルに保存しただけの変更は build に含まれません。
 
+Firmware repository URL を設定している場合、KobitoKey Studio は `gh -R owner/repo` 相当で対象 repository を明示して GitHub Actions を操作します。ローカルフォルダと GitHub repository が別の場合は、push 先と URL が一致しているか確認してください。
+
 ### 4.2 artifact を取得する
 
 1. GitHub Actions の build が成功したことを確認します。
@@ -391,6 +397,8 @@ Direct Mode を使うには、KobitoKey 側に ZMK Studio 対応 firmware が入
 Direct Mode は、接続中の device へ設定を保存します。左右分割 keyboard の場合、現在 Studio device として接続している側に対して操作していることを意識してください。
 
 Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻るわけではありません。長期的に管理したい設定は、あとで Firmware Mode のファイルにも反映しておくと、次回 firmware を作り直したときに差分が消えにくくなります。
+
+Direct Mode の key / Combo / Trackball 書き込みは、成功時に device へ自動保存します。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
 ### 5.2 Tauri デスクトップ版で USB 接続する
 
@@ -620,6 +628,7 @@ firmware に Trackball RPC が含まれていない可能性があります。Fi
 
 - `gh auth login` が済んでいるか確認します。
 - `KobitoKey_QWERTY` の root path が正しいか確認します。
+- Firmware repository URL が正しい GitHub repository を指しているか確認します。
 - GitHub Actions の `build.yml` workflow が対象リポジトリに存在するか確認します。
 - workflow を実行できる GitHub 権限があるか確認します。
 

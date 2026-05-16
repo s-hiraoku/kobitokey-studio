@@ -34,7 +34,7 @@ export type DirectTrackballSettings = {
 type WebStudioNavigator = Navigator & {
   serial?: unknown;
   bluetooth?: {
-    requestDevice?: unknown;
+    requestDevice?: (options: Record<string, unknown>) => Promise<WebBluetoothDevice>;
   };
 };
 
@@ -152,8 +152,7 @@ async function connectWebGattWithFallback() {
     throw new Error("Web Bluetooth API is not supported in this browser. Please use Chrome or Edge.");
   }
 
-  const requestDevice = bluetooth.requestDevice as (options: Record<string, unknown>) => Promise<WebBluetoothDevice>;
-  const device = await requestDevice({
+  const device = await bluetooth.requestDevice({
     filters: [
       { services: [serviceUuid] },
       { namePrefix: "KobitoKey" },
@@ -161,7 +160,7 @@ async function connectWebGattWithFallback() {
       { namePrefix: "ZMK" },
     ],
     optionalServices: [serviceUuid],
-  }).catch((error) => {
+  }).catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "NotFoundError") {
       throw new Error("Bluetooth device was not selected. Put the keyboard in pairing/advertising mode and try again.");
     }

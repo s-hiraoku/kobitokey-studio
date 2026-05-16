@@ -70,6 +70,12 @@ For a production frontend build:
 npm run build
 ```
 
+Run the TypeScript unit tests:
+
+```sh
+npm test
+```
+
 For the full desktop app, Rust and Cargo are required:
 
 ```sh

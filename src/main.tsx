@@ -18,6 +18,12 @@ import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
+  firmwareCombosToStudioSet,
+  studioKeymapToParsedKeymap,
+  type StudioComboSet,
+  type StudioKeymap,
+} from "./lib/directKeymap";
+import {
   BLUETOOTH_ACTION_CHOICES,
   BLUETOOTH_PROFILE_CHOICES,
   KEY_CHOICE_GROUPS,
@@ -31,7 +37,6 @@ import {
 import {
   KeymapCombo,
   KeymapLayer,
-  ParsedKeymap,
   addCombo,
   deleteCombo,
   parseKeymap,
@@ -88,18 +93,10 @@ type StudioPort = {
   portKind: string;
 };
 
-type StudioKeymap = {
-  deviceName: string;
-  serialNumber: string;
-  lockState: string;
-  hasUnsavedChanges: boolean;
-  layers: StudioLayer[];
-};
-
-type StudioLayer = {
-  id: number;
-  name: string;
-  bindings: string[];
+type StudioBluetoothDevice = {
+  deviceId: string;
+  localName?: string;
+  label: string;
 };
 
 type DirectCombo = KeymapCombo & {
@@ -110,20 +107,6 @@ type DirectCombo = KeymapCombo & {
 };
 
 type DirectComboSource = "none" | "device" | "firmware";
-
-type StudioComboSet = {
-  combos: Array<{
-    id: string;
-    index: number;
-    binding: string;
-    keyPositions: number[];
-    timeoutMs: number;
-    requirePriorIdleMs: number;
-    layerMask: number;
-    slowRelease: boolean;
-  }>;
-  maxCombos: number;
-};
 
 type EditorMode = "firmware" | "direct";
 type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
@@ -149,12 +132,16 @@ declare global {
 }
 
 const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
+const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/s-hiraoku/KobitoKey_QWERTY";
 function App() {
   const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
+  const [firmwareRepoUrl, setFirmwareRepoUrl] = React.useState(DEFAULT_FIRMWARE_REPO_URL);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
   const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
   const [selectedStudioPort, setSelectedStudioPort] = React.useState("");
+  const [studioBluetoothDevices, setStudioBluetoothDevices] = React.useState<StudioBluetoothDevice[]>([]);
+  const [selectedBluetoothDevice, setSelectedBluetoothDevice] = React.useState("");
   const [studioConnectionKind, setStudioConnectionKind] = React.useState<StudioConnectionKind>("usb");
   const [studioConnectionState, setStudioConnectionState] = React.useState<StudioConnectionState>("disconnected");
   const [studioConnectionError, setStudioConnectionError] = React.useState("");
@@ -180,6 +167,7 @@ function App() {
   const isDesktopRuntime = isTauriRuntime();
   const canUseWebUsb = supportsWebStudioConnection("usb");
   const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
+  const firmwareRepoLabel = React.useMemo(() => formatFirmwareRepoLabel(firmwareRepoUrl), [firmwareRepoUrl]);
 
   React.useEffect(() => {
     loadFixture();
@@ -338,6 +326,13 @@ function App() {
     return ports;
   }
 
+  async function detectStudioBluetoothDevices() {
+    const devices = await invoke<StudioBluetoothDevice[]>("list_studio_bluetooth_devices");
+    setStudioBluetoothDevices(devices);
+    setSelectedBluetoothDevice((current) => current || devices[0]?.deviceId || "");
+    return devices;
+  }
+
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
       setStatus("ブラウザの接続ダイアログを開きます。表示された device を選択してください。");
@@ -346,8 +341,20 @@ function App() {
     }
 
     try {
-      const ports = await detectStudioPorts();
-      setStatus(`Studio device candidates: ${ports.length}`);
+      const [portsResult, bluetoothResult] = await Promise.allSettled([
+        detectStudioPorts(),
+        detectStudioBluetoothDevices(),
+      ]);
+      const portCount = portsResult.status === "fulfilled" ? portsResult.value.length : 0;
+      const bluetoothCount = bluetoothResult.status === "fulfilled" ? bluetoothResult.value.length : 0;
+      const errors = [portsResult, bluetoothResult]
+        .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+        .map((result) => formatError(result.reason));
+      setStatus(
+        errors.length > 0
+          ? `Studio device candidates: USB ${portCount} / Bluetooth ${bluetoothCount} (${errors.join(" / ")})`
+          : `Studio device candidates: USB ${portCount} / Bluetooth ${bluetoothCount}`,
+      );
     } catch (error) {
       setStatus(`Studio device 検出失敗: ${String(error)}`);
     }
@@ -360,6 +367,9 @@ function App() {
     setDirectComboSource("none");
     setDirectMaxCombos(0);
     setSelectedStudioPort(session.label);
+    if (session.kind === "bluetooth") {
+      setSelectedBluetoothDevice(session.label);
+    }
     setStudioConnectionKind(session.kind);
     setStudioConnectionState("connected");
     setStudioConnectionError("");
@@ -421,10 +431,24 @@ function App() {
       return;
     }
 
+    if (kind === "bluetooth") {
+      let bluetoothDeviceId = selectedBluetoothDevice;
+      if (!selectedBluetoothDevice) {
+        try {
+          const devices = await detectStudioBluetoothDevices();
+          bluetoothDeviceId = devices[0]?.deviceId || "";
+          setSelectedBluetoothDevice(bluetoothDeviceId);
+        } catch {
+          // Let the backend return the actionable Bluetooth error message.
+        }
+      }
+      portPath = bluetoothDeviceId;
+    }
+
     try {
       const session = await invoke<DesktopStudioConnection>("connect_studio_device", {
         kind,
-        portPath: kind === "usb" ? portPath : null,
+        portPath: portPath || null,
       });
       applyStudioConnection({
         kind: session.kind,
@@ -818,8 +842,8 @@ function App() {
 
   async function triggerBuild() {
     try {
-      await invoke<string>("trigger_github_build", { root: projectRoot });
-      setBuildStatus("build workflow を起動しました");
+      await invoke<string>("trigger_github_build", { root: projectRoot, repoUrl: firmwareRepoUrl });
+      setBuildStatus(`build workflow を起動しました: ${firmwareRepoLabel}`);
     } catch (error) {
       setBuildStatus(`起動失敗: ${String(error)}`);
     }
@@ -827,7 +851,7 @@ function App() {
 
   async function refreshBuildStatus() {
     try {
-      const output = await invoke<string>("latest_github_run", { root: projectRoot });
+      const output = await invoke<string>("latest_github_run", { root: projectRoot, repoUrl: firmwareRepoUrl });
       setBuildStatus(formatRunStatus(output));
     } catch (error) {
       setBuildStatus(`確認失敗: ${String(error)}`);
@@ -836,7 +860,7 @@ function App() {
 
   async function downloadArtifacts() {
     try {
-      const output = await invoke<string>("download_latest_artifact", { root: projectRoot });
+      const output = await invoke<string>("download_latest_artifact", { root: projectRoot, repoUrl: firmwareRepoUrl });
       setBuildStatus(output || "artifact を .kobitokey-studio/artifacts に保存しました");
     } catch (error) {
       setBuildStatus(`artifact 取得失敗: ${String(error)}`);
@@ -911,8 +935,17 @@ function App() {
             <div className="project-loader">
               <input
                 aria-label="KobitoKey_QWERTY path"
+                placeholder="ローカル KobitoKey_QWERTY パス"
+                title="keymap と overlay を読み書きするローカルフォルダ"
                 value={projectRoot}
                 onChange={(event) => setProjectRoot(event.target.value)}
+              />
+              <input
+                aria-label="Firmware repository URL"
+                placeholder="Firmware repository URL"
+                title="GitHub Actions を実行する firmware repository URL"
+                value={firmwareRepoUrl}
+                onChange={(event) => setFirmwareRepoUrl(event.target.value)}
               />
               <button type="button" onClick={chooseProjectFolder}>
                 <FolderOpen size={17} />
@@ -975,7 +1008,10 @@ function App() {
           connectionState={studioConnectionState}
           isDesktopRuntime={isDesktopRuntime}
           ports={studioPorts}
+          bluetoothDevices={studioBluetoothDevices}
+          selectedBluetoothDevice={selectedBluetoothDevice}
           selectedPort={selectedStudioPort}
+          onBluetoothDeviceChange={setSelectedBluetoothDevice}
           onConnect={connectStudioDevice}
           onPortChange={setSelectedStudioPort}
           onRefresh={refreshStudioPorts}
@@ -1073,6 +1109,7 @@ function App() {
               {workbenchTab === "build" ? (
                 <BuildWorkbench
                   buildStatus={buildStatus}
+                  firmwareRepoLabel={firmwareRepoLabel}
                   uf2Files={uf2Files}
                   bootloaderVolumes={bootloaderVolumes}
                   selectedUf2={selectedUf2}
@@ -1123,6 +1160,7 @@ function App() {
               bootloaderVolumes={bootloaderVolumes}
               combo={selectedCombo}
               combos={combos}
+              firmwareRepoLabel={firmwareRepoLabel}
               keyIndex={selectedKeyIndex}
               onApplyBinding={applyBinding}
               onCopyUf2={copySelectedUf2}
@@ -1507,12 +1545,12 @@ function SidebarConnectionPanel({
   const isConnecting = connectionState === "connecting";
   const isConnected = connectionState === "connected";
   const connectionLabel = isConnected
-    ? `${connectionKind.toUpperCase()} connected`
+    ? `${connectionKind.toUpperCase()} 接続済み`
     : connectionState === "connecting"
-      ? `${connectionKind.toUpperCase()} connecting`
+      ? `${connectionKind.toUpperCase()} 接続中`
       : connectionState === "error"
-        ? "Connection error"
-        : "Disconnected";
+        ? "接続エラー"
+        : "未接続";
 
   return (
     <section className="sidebar-connection">
@@ -1562,26 +1600,26 @@ function DirectSummaryPanel({
   return (
     <section className="direct-summary">
       <div className="panel-heading compact">
-        <h3>Direct Mode</h3>
-        <span>{keymap ? `${keymap.layers.length} layers` : "未接続"}</span>
+        <h3>Direct モード</h3>
+        <span>{keymap ? `${keymap.layers.length} レイヤー` : "未接続"}</span>
       </div>
       {keymap ? (
         <dl>
           <div>
-            <dt>Device</dt>
-            <dd>{keymap.deviceName || "Unknown ZMK device"}</dd>
+            <dt>デバイス</dt>
+            <dd>{keymap.deviceName || "不明な ZMK デバイス"}</dd>
           </div>
           <div>
-            <dt>{connectionKind === "usb" ? "Port" : "Link"}</dt>
+            <dt>{connectionKind === "usb" ? "ポート" : "接続先"}</dt>
             <dd>{portPath || "-"}</dd>
           </div>
           <div>
-            <dt>Lock</dt>
+            <dt>ロック</dt>
             <dd>{keymap.lockState}</dd>
           </div>
           <div>
-            <dt>Unsaved</dt>
-            <dd>{keymap.hasUnsavedChanges ? "あり" : "なし"}</dd>
+            <dt>保存状態</dt>
+            <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "自動保存済み"}</dd>
           </div>
         </dl>
       ) : (
@@ -1605,40 +1643,46 @@ function DirectConnectionBar({
   return (
     <div className="direct-connection-bar">
       <div>
-        <p className="eyebrow">Connected Keyboard</p>
-        <strong>{keymap?.deviceName || "ZMK Studio device"}</strong>
+        <p className="eyebrow">接続中のキーボード</p>
+        <strong>{keymap?.deviceName || "ZMK Studio デバイス"}</strong>
       </div>
       <span>{connectionKind.toUpperCase()}</span>
-      <span>{portPath || "device 未選択"}</span>
-      <span>{keymap ? `${keymap.layers.length} layers` : "未読み込み"}</span>
-      <span>{connectionState === "connected" ? keymap?.lockState ?? "unknown" : "未接続"}</span>
+      <span>{portPath || "デバイス未選択"}</span>
+      <span>{keymap ? `${keymap.layers.length} レイヤー` : "未読み込み"}</span>
+      <span>{connectionState === "connected" ? keymap?.lockState ?? "不明" : "未接続"}</span>
     </div>
   );
 }
 
 function DirectWelcome({
+  bluetoothDevices,
   canUseWebBluetooth,
   canUseWebUsb,
   connectionError,
   connectionKind,
   connectionState,
   isDesktopRuntime,
+  onBluetoothDeviceChange,
   onConnect,
   onPortChange,
   onRefresh,
   ports,
+  selectedBluetoothDevice,
   selectedPort,
 }: {
+  bluetoothDevices: StudioBluetoothDevice[];
   canUseWebBluetooth: boolean;
   canUseWebUsb: boolean;
   connectionError: string;
   connectionKind: StudioConnectionKind;
   connectionState: StudioConnectionState;
   isDesktopRuntime: boolean;
+  onBluetoothDeviceChange: (deviceId: string) => void;
   onConnect: (kind: StudioConnectionKind) => void;
   onPortChange: (port: string) => void;
   onRefresh: () => void;
   ports: StudioPort[];
+  selectedBluetoothDevice: string;
   selectedPort: string;
 }) {
   const canUseAnyWebConnection = canUseWebUsb || canUseWebBluetooth;
@@ -1684,17 +1728,30 @@ function DirectWelcome({
             </div>
           ) : null}
           {isDesktopRuntime ? (
-            <label>
-              Desktop USB Device
-              <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
-                <option value="">Studio device 未選択</option>
-                {ports.map((port) => (
-                  <option key={port.path} value={port.path}>
-                    {port.label} ({port.path})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>
+                Desktop USB Device
+                <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+                  <option value="">USB device 未選択</option>
+                  {ports.map((port) => (
+                    <option key={port.path} value={port.path}>
+                      {port.label} ({port.path})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Desktop Bluetooth Device
+                <select value={selectedBluetoothDevice} onChange={(event) => onBluetoothDeviceChange(event.target.value)}>
+                  <option value="">Bluetooth device 未選択</option>
+                  {bluetoothDevices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           ) : null}
           <div className="direct-connect-actions">
             <button type="button" disabled={isConnecting} onClick={onRefresh}>
@@ -1737,6 +1794,7 @@ function FirmwareInspectorTabs({
   buildStatus,
   combo,
   combos,
+  firmwareRepoLabel,
   keyIndex,
   onApplyBinding,
   onCopyUf2,
@@ -1763,6 +1821,7 @@ function FirmwareInspectorTabs({
   buildStatus: string;
   combo?: KeymapCombo;
   combos: KeymapCombo[];
+  firmwareRepoLabel: string;
   keyIndex: number;
   onApplyBinding: (binding: string) => void;
   onCopyUf2: () => void;
@@ -1833,6 +1892,7 @@ function FirmwareInspectorTabs({
         <BuildPanel
           bootloaderVolumes={bootloaderVolumes}
           buildStatus={buildStatus}
+          firmwareRepoLabel={firmwareRepoLabel}
           onCopyUf2={onCopyUf2}
           onDownloadArtifacts={onDownloadArtifacts}
           onRefreshBuildStatus={onRefreshBuildStatus}
@@ -1852,6 +1912,7 @@ function FirmwareInspectorTabs({
 function BuildPanel({
   bootloaderVolumes,
   buildStatus,
+  firmwareRepoLabel,
   onCopyUf2,
   onDownloadArtifacts,
   onRefreshBuildStatus,
@@ -1865,6 +1926,7 @@ function BuildPanel({
 }: {
   bootloaderVolumes: string[];
   buildStatus: string;
+  firmwareRepoLabel: string;
   onCopyUf2: () => void;
   onDownloadArtifacts: () => void;
   onRefreshBuildStatus: () => void;
@@ -1882,6 +1944,7 @@ function BuildPanel({
         <p className="eyebrow">Build / Flash</p>
         <h2>アップロード支援</h2>
       </div>
+      <p className="build-target">GitHub Actions 対象: {firmwareRepoLabel}</p>
       <ol>
         <li>Git diff を確認して保存</li>
         <li>GitHub Actions の build を起動</li>
@@ -2410,6 +2473,7 @@ function TrackballWorkbench({
 function BuildWorkbench({
   bootloaderVolumes,
   buildStatus,
+  firmwareRepoLabel,
   onCopySelectedUf2,
   onDownloadArtifacts,
   onRefreshBuildStatus,
@@ -2423,6 +2487,7 @@ function BuildWorkbench({
 }: {
   bootloaderVolumes: string[];
   buildStatus: string;
+  firmwareRepoLabel: string;
   onCopySelectedUf2: () => void;
   onDownloadArtifacts: () => void;
   onRefreshBuildStatus: () => void;
@@ -2441,6 +2506,7 @@ function BuildWorkbench({
           <p className="eyebrow">Build</p>
           <h2>GitHub Actions</h2>
         </div>
+        <p className="build-target">対象 repository: {firmwareRepoLabel}</p>
         <ol>
           <li>Diff を確認して保存</li>
           <li>build workflow を起動</li>
@@ -3057,22 +3123,6 @@ function toggleDisplayKeyPosition(currentPositions: number[], position: number):
     .join(" ");
 }
 
-function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet {
-  return {
-    combos: combos.map((combo, index) => ({
-      id: combo.id,
-      index,
-      binding: combo.binding,
-      keyPositions: combo.keyPositions,
-      timeoutMs: combo.timeoutMs || 50,
-      requirePriorIdleMs: 0,
-      layerMask: 0xffffffff,
-      slowRelease: false,
-    })),
-    maxCombos: combos.length,
-  };
-}
-
 function nextComboId(combos: KeymapCombo[]): string {
   const existing = new Set(combos.map((combo) => combo.id));
   let index = combos.length + 1;
@@ -3090,6 +3140,16 @@ function validateProjectRoot(projectRoot: string): string | undefined {
     return "KobitoKey_QWERTY リポジトリのパスを指定してください";
   }
   return undefined;
+}
+
+function formatFirmwareRepoLabel(repoUrl: string): string {
+  const value = repoUrl
+    .trim()
+    .replace(/\/$/, "")
+    .replace(/\.git$/, "")
+    .replace(/^https?:\/\/github\.com\//, "")
+    .replace(/^git@github\.com:/, "");
+  return value || "ローカル git repository";
 }
 
 function formatRunStatus(output: string): string {
@@ -3229,114 +3289,6 @@ function downloadText(filename: string, contents: string) {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
-  const layers = keymap.layers
-    .map((layer, index) => {
-      const id = sanitizeLayerId(layer.name || `layer_${index}`, index);
-      return [
-        `        ${id} {`,
-        `            display-name = "${escapeDtsString(layer.name || `Layer ${index}`)}";`,
-        "            bindings = <",
-        formatStudioBindings(layer.bindings),
-        "            >;",
-        "        };",
-      ].join("\n");
-    })
-    .join("\n\n");
-
-  return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
-}
-
-function studioKeymapToParsedKeymap(keymap: StudioKeymap, combos: KeymapCombo[]): ParsedKeymap {
-  return {
-    layers: keymap.layers.map((layer, index) => ({
-      id: `direct_layer_${layer.id}`,
-      label: layer.name || `Layer ${index}`,
-      bindings: completeStudioBindings(layer.bindings),
-      blockStart: index,
-      blockEnd: index,
-    })),
-    combos,
-  };
-}
-
-function formatStudioBindings(bindings: string[]): string {
-  const completeBindings = completeStudioBindings(bindings);
-  const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
-
-  return Array.from({ length: 4 }, (_, row) =>
-    completeBindings
-      .slice(row * 10, row * 10 + 10)
-      .map((binding) => binding.padEnd(maxLength, " "))
-      .join("  ")
-      .trimEnd(),
-  ).join("\n");
-}
-
-function completeStudioBindings(bindings: string[]): string[] {
-  return Array.from({ length: 40 }, (_, index) => normalizeDirectBindingForDisplay(bindings[index] ?? "&none"));
-}
-
-function normalizeDirectBindingForDisplay(binding: string): string {
-  const parts = binding.trim().split(/\s+/);
-  if (parts[0] === "&bt") {
-    return `&bt ${formatBtCommand(parts[1])} ${parts[2] ?? "0"}`;
-  }
-  if (parts[0] === "&mkp") {
-    return `&mkp ${formatMouseButton(parts[1])}`;
-  }
-  return binding;
-}
-
-function formatBtCommand(value?: string): string {
-  switch (value) {
-    case "0":
-      return "BT_CLR";
-    case "1":
-      return "BT_NXT";
-    case "2":
-      return "BT_PRV";
-    case "3":
-      return "BT_SEL";
-    case "4":
-      return "BT_CLR_ALL";
-    case "5":
-      return "BT_DISC";
-    default:
-      return value ?? "BT_SEL";
-  }
-}
-
-function formatMouseButton(value?: string): string {
-  switch (value) {
-    case "1":
-      return "MB1";
-    case "2":
-      return "MB2";
-    case "4":
-      return "MB3";
-    case "8":
-      return "MB4";
-    case "16":
-      return "MB5";
-    default:
-      return value ?? "MB1";
-  }
-}
-
-function sanitizeLayerId(name: string, index: number): string {
-  const id = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return id || `layer_${index}`;
-}
-
-function escapeDtsString(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function isTauriRuntime(): boolean {

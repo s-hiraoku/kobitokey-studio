@@ -46,13 +46,14 @@ npm run dev
 
 1. 上部の `Firmware` を選びます。
 2. `KobitoKey_QWERTY` のローカルフォルダを指定します。
-3. `読み込み` を押します。
-4. 左側で layer を選びます。
-5. 中央のキーボード図で変更したい key を選びます。
-6. 右側の `Binding` で新しい binding を選びます。
-7. `反映` を押します。
-8. `Diff` で変更内容を確認します。
-9. `保存` を押します。
+3. Firmware repository URL に `https://github.com/s-hiraoku/KobitoKey_QWERTY` のような GitHub URL を指定します。
+4. `読み込み` を押します。
+5. 左側で layer を選びます。
+6. 中央のキーボード図で変更したい key を選びます。
+7. 右側の `Binding` で新しい binding を選びます。
+8. `反映` を押します。
+9. `Diff` で変更内容を確認します。
+10. `保存` を押します。
 
 よく使う binding 例:
 
@@ -67,6 +68,8 @@ npm run dev
 ## 3. Firmware を反映する
 
 保存しただけでは実機 firmware は変わりません。変更を反映するには build と UF2 書き込みが必要です。
+
+ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
 1. `KobitoKey_QWERTY` 側で変更を commit / push します。
 2. KobitoKey Studio の `GitHub Actions` または `Build` panel を開きます。
@@ -104,7 +107,9 @@ Direct Mode で書いた変更は、ローカルの `KobitoKey_QWERTY` ファイ
 | --- | --- |
 | project が読めない | `KobitoKey_QWERTY` の root を指定しているか |
 | `保存` できない | Tauri デスクトップ版で開いているか |
-| GitHub Actions が動かない | `gh auth login` と repository 権限 |
+| GitHub Actions が動かない | Firmware repository URL、`gh auth login`、repository 権限 |
+| build に変更が入らない | ローカル保存後に `KobitoKey_QWERTY` 側で commit / push したか |
+| artifact が古い | 最新 run の時刻と artifact 取得先を確認する |
 | Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge |
 | UF2 volume が出ない | keyboard half が bootloader mode になっているか |
 

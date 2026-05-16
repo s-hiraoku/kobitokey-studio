@@ -38,12 +38,16 @@ fn read_kobitokey_project(root: String) -> Result<KobitoKeyProject, String> {
 }
 
 #[tauri::command]
-fn trigger_github_build(root: String) -> Result<String, String> {
-    run_gh(&root, &["workflow", "run", "build.yml"])
+fn trigger_github_build(root: String, repo_url: Option<String>) -> Result<String, String> {
+    run_gh(
+        &root,
+        &["workflow", "run", "build.yml"],
+        repo_url.as_deref(),
+    )
 }
 
 #[tauri::command]
-fn latest_github_run(root: String) -> Result<String, String> {
+fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, String> {
     run_gh(
         &root,
         &[
@@ -56,12 +60,13 @@ fn latest_github_run(root: String) -> Result<String, String> {
             "--json",
             "databaseId,status,conclusion,headBranch,createdAt,url",
         ],
+        repo_url.as_deref(),
     )
 }
 
 #[tauri::command]
-fn download_latest_artifact(root: String) -> Result<String, String> {
-    let run_json = latest_github_run(root.clone())?;
+fn download_latest_artifact(root: String, repo_url: Option<String>) -> Result<String, String> {
+    let run_json = latest_github_run(root.clone(), repo_url.clone())?;
     let run_id = run_json
         .split("\"databaseId\":")
         .nth(1)
@@ -80,6 +85,7 @@ fn download_latest_artifact(root: String) -> Result<String, String> {
             "-D".to_string(),
             display_path(&output_dir),
         ],
+        repo_url.as_deref(),
     )
 }
 
@@ -1553,7 +1559,11 @@ fn parse_u32(value: &str) -> Result<u32, String> {
         .map_err(|_| format!("Expected number, got {value}"))
 }
 
-fn run_gh(root: &str, args: &[&str]) -> Result<String, String> {
+fn run_gh(root: &str, args: &[&str], repo_url: Option<&str>) -> Result<String, String> {
+    let args = gh_args_with_repo(
+        args.iter().map(|arg| (*arg).to_string()).collect(),
+        repo_url,
+    )?;
     let output = Command::new("gh")
         .current_dir(root)
         .args(args)
@@ -1567,7 +1577,8 @@ fn run_gh(root: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
-fn run_gh_owned(root: &str, args: Vec<String>) -> Result<String, String> {
+fn run_gh_owned(root: &str, args: Vec<String>, repo_url: Option<&str>) -> Result<String, String> {
+    let args = gh_args_with_repo(args, repo_url)?;
     let output = Command::new("gh")
         .current_dir(root)
         .args(args)
@@ -1579,6 +1590,44 @@ fn run_gh_owned(root: &str, args: Vec<String>) -> Result<String, String> {
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
     }
+}
+
+fn gh_args_with_repo(mut args: Vec<String>, repo_url: Option<&str>) -> Result<Vec<String>, String> {
+    if let Some(repo) = repo_url.and_then(normalize_github_repo_arg) {
+        args.push("-R".to_string());
+        args.push(repo);
+    }
+    Ok(args)
+}
+
+fn normalize_github_repo_arg(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let trimmed = value
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .to_string();
+
+    if let Some(path) = trimmed.strip_prefix("https://github.com/") {
+        return normalize_owner_repo(path);
+    }
+    if let Some(path) = trimmed.strip_prefix("http://github.com/") {
+        return normalize_owner_repo(path);
+    }
+    if let Some(path) = trimmed.strip_prefix("git@github.com:") {
+        return normalize_owner_repo(path);
+    }
+    normalize_owner_repo(&trimmed)
+}
+
+fn normalize_owner_repo(path: &str) -> Option<String> {
+    let mut parts = path.split('/').filter(|part| !part.is_empty());
+    let owner = parts.next()?;
+    let repo = parts.next()?;
+    Some(format!("{owner}/{repo}"))
 }
 
 fn display_path(path: &Path) -> String {
@@ -1852,5 +1901,28 @@ mod tests {
         assert_eq!(decoded.combos.len(), 1);
         assert_eq!(decoded.combos[0].binding, "&mo 2");
         assert_eq!(decoded.combos[0].key_positions, vec![4, 5]);
+    }
+
+    #[test]
+    fn normalizes_github_repository_url_for_gh() {
+        let cases = [
+            (
+                "https://github.com/s-hiraoku/KobitoKey_QWERTY",
+                "s-hiraoku/KobitoKey_QWERTY",
+            ),
+            (
+                "https://github.com/s-hiraoku/KobitoKey_QWERTY.git",
+                "s-hiraoku/KobitoKey_QWERTY",
+            ),
+            (
+                "git@github.com:s-hiraoku/KobitoKey_QWERTY.git",
+                "s-hiraoku/KobitoKey_QWERTY",
+            ),
+            ("s-hiraoku/KobitoKey_QWERTY", "s-hiraoku/KobitoKey_QWERTY"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(normalize_github_repo_arg(input).as_deref(), Some(expected));
+        }
     }
 }

@@ -70,14 +70,9 @@ function parseCombos(source: string): KeymapCombo[] {
   for (const match of combosBlock.body.matchAll(COMBO_PATTERN)) {
     const id = match.groups?.id;
     const body = match.groups?.body ?? "";
-    const keyPositions = body
-      .match(/key-positions\s*=\s*<([^>]+)>/)?.[1]
-      .trim()
-      .split(/\s+/)
-      .map(Number)
-      .filter((value) => Number.isFinite(value)) ?? [];
-    const binding = tokenizeBindings(body.match(/bindings\s*=\s*<([^>]+)>/)?.[1] ?? "")[0] ?? "";
-    const timeoutMs = Number(body.match(/timeout-ms\s*=\s*<(\d+)>/)?.[1] ?? 0);
+    const keyPositions = parseNumberList(readAngleProperty(body, "key-positions"));
+    const binding = tokenizeBindings(readAngleProperty(body, "bindings") ?? "")[0] ?? "";
+    const timeoutMs = Number(readAngleProperty(body, "timeout-ms") ?? 0);
 
     if (!id || keyPositions.length === 0 || !binding) {
       continue;
@@ -94,6 +89,18 @@ function parseCombos(source: string): KeymapCombo[] {
   }
 
   return combos;
+}
+
+function readAngleProperty(source: string, propertyName: string): string | undefined {
+  return source.match(new RegExp(`${propertyName}\\s*=\\s*<([^>]+)>`))?.[1];
+}
+
+function parseNumberList(source: string | undefined): number[] {
+  return source
+    ?.trim()
+    .split(/\s+/)
+    .map(Number)
+    .filter((value) => Number.isFinite(value)) ?? [];
 }
 
 function extractKeymapBody(source: string): { body: string; bodyStart: number } {
