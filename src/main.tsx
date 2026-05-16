@@ -3285,13 +3285,15 @@ function formatBtCommand(value?: string): string {
     case "0":
       return "BT_CLR";
     case "1":
-      return "BT_SEL";
-    case "2":
       return "BT_NXT";
-    case "3":
+    case "2":
       return "BT_PRV";
+    case "3":
+      return "BT_SEL";
     case "4":
       return "BT_CLR_ALL";
+    case "5":
+      return "BT_DISC";
     default:
       return value ?? "BT_SEL";
   }

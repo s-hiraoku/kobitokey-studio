@@ -693,14 +693,16 @@ function parseBtCommand(value: string): number {
   switch (value) {
     case "BT_CLR":
       return 0;
-    case "BT_SEL":
-      return 1;
     case "BT_NXT":
-      return 2;
+      return 1;
     case "BT_PRV":
+      return 2;
+    case "BT_SEL":
       return 3;
     case "BT_CLR_ALL":
       return 4;
+    case "BT_DISC":
+      return 5;
     default:
       return parseInteger(value);
   }

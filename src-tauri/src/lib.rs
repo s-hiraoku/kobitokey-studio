@@ -1538,10 +1538,11 @@ fn parse_hid_usage(value: &str) -> Result<HidUsage, String> {
 fn parse_command(value: &str) -> Result<u32, String> {
     match value {
         "BT_CLR" => Ok(0),
-        "BT_SEL" => Ok(1),
-        "BT_NXT" => Ok(2),
-        "BT_PRV" => Ok(3),
+        "BT_NXT" => Ok(1),
+        "BT_PRV" => Ok(2),
+        "BT_SEL" => Ok(3),
         "BT_CLR_ALL" => Ok(4),
+        "BT_DISC" => Ok(5),
         _ => parse_u32(value),
     }
 }
@@ -1783,15 +1784,25 @@ mod tests {
 
     #[test]
     fn parse_direct_behavior_accepts_all_bluetooth_commands() {
-        let behavior = parse_direct_behavior("&bt BT_CLR_ALL").expect("BT_CLR_ALL should parse without a value");
+        let cases = [
+            ("&bt BT_CLR 2", 0, 2),
+            ("&bt BT_NXT", 1, 0),
+            ("&bt BT_PRV", 2, 0),
+            ("&bt BT_SEL 4", 3, 4),
+            ("&bt BT_CLR_ALL", 4, 0),
+            ("&bt BT_DISC", 5, 0),
+        ];
 
-        assert!(matches!(
-            behavior,
-            Behavior::Bluetooth {
-                command: 4,
-                value: 0
-            }
-        ));
+        for (binding, expected_command, expected_value) in cases {
+            let behavior = parse_direct_behavior(binding).expect("Bluetooth command should parse");
+            assert!(matches!(
+                behavior,
+                Behavior::Bluetooth {
+                    command,
+                    value
+                } if command == expected_command && value == expected_value
+            ));
+        }
     }
 
     #[test]
