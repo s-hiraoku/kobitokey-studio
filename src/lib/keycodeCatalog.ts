@@ -127,6 +127,7 @@ export const BLUETOOTH_ACTION_CHOICES: KeyChoice[] = [
   ["BT_SEL", "Select profile"],
   ["BT_CLR", "Clear profile"],
   ["BT_CLR_ALL", "Clear all"],
+  ["BT_DISC", "Disconnect"],
   ["BT_NXT", "Next profile"],
   ["BT_PRV", "Previous profile"],
 ].map(([value, label]) => ({ value, label }));

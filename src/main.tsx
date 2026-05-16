@@ -280,9 +280,24 @@ function App() {
   }
 
   async function saveProjectFiles() {
-    if (!files?.keymapPath) {
-      downloadText("KobitoKey.keymap", files?.keymap ?? "");
-      setStatus("ブラウザ表示のため keymap をダウンロードしました");
+    if (!files) {
+      setStatus("保存対象のファイルがありません");
+      return;
+    }
+
+    if (!files.keymapPath) {
+      downloadText("KobitoKey.keymap", files.keymap);
+      downloadText("KobitoKey_left.overlay", files.leftOverlay);
+      downloadText("KobitoKey_right.overlay", files.rightOverlay);
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+      setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
+      return;
+    }
+
+    if (!files.leftOverlayPath || !files.rightOverlayPath) {
+      setStatus("overlay の保存先パスが不足しています");
       return;
     }
 
@@ -295,7 +310,7 @@ function App() {
       setSavedRightOverlay(files.rightOverlay);
       setStatus("変更ファイルを保存しました");
     } catch (error) {
-      setStatus(`保存失敗: ${String(error)}`);
+      setStatus(`保存失敗: ${formatError(error)}`);
     }
   }
 
@@ -325,7 +340,8 @@ function App() {
 
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      setStatus("ブラウザ版では事前のdevice一覧検出はできません。Connect via USB / Bluetooth でブラウザの接続ダイアログを開いてください。");
+      setStatus("ブラウザの接続ダイアログを開きます。表示された device を選択してください。");
+      await connectStudioDevice(studioConnectionKind);
       return;
     }
 
@@ -359,26 +375,7 @@ function App() {
     setStudioConnectionState("connecting");
     setStudioConnectionError("");
 
-    if (isDesktopRuntime && kind === "bluetooth") {
-      const message =
-        "macOS native Bluetooth Direct は現在クラッシュ回避のため無効化しています。USB Direct、またはChrome/EdgeのWeb Bluetoothを使ってください。";
-      setStudioConnectionState("error");
-      setStudioConnectionError(message);
-      setStatus(message);
-      return;
-    }
-
     if (!isDesktopRuntime) {
-      if (!supportsWebStudioConnection(kind)) {
-        const message = kind === "usb"
-          ? "このブラウザは Web Serial に対応していません。Chrome または Edge で開いてください。"
-          : "このブラウザは Web Bluetooth に対応していません。Chrome または Edge で開いてください。";
-        setStudioConnectionState("error");
-        setStudioConnectionError(message);
-        setStatus(message);
-        return;
-      }
-
       try {
         const session = await connectWebStudioDevice(kind);
         applyStudioConnection({
@@ -389,6 +386,8 @@ function App() {
           lockState: session.keymap.lockState,
           keymap: session.keymap,
         });
+        await refreshDirectCombos(kind, "", { silent: true });
+        await refreshDirectTrackballSettings(kind, "", { silent: true });
       } catch (error) {
         const message = `${kind === "usb" ? "Web Serial" : "Web Bluetooth"} 接続失敗: ${String(error)}`;
         setStudioConnectionState("error");
@@ -470,7 +469,7 @@ function App() {
         setBindingDraft(nextBinding);
         setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
       } catch (error) {
-        setStatus(`Web Direct 書き込み失敗: ${String(error)}`);
+        setStatus(`Web Direct 書き込み失敗: ${formatError(error)}`);
       }
       return;
     }
@@ -498,7 +497,7 @@ function App() {
       setBindingDraft(nextBinding);
       setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
     } catch (error) {
-      setStatus(`Direct 書き込み失敗: ${String(error)}`);
+      setStatus(`Direct 書き込み失敗: ${formatError(error)}`);
     }
   }
 
@@ -566,8 +565,13 @@ function App() {
     }
 
     if (!isDesktopRuntime) {
+      const fallbackApplied = applyFirmwareComboFallback();
       if (!options.silent) {
-        setStatus("Direct Combo は現在 Tauri デスクトップアプリで利用してください。");
+        setStatus(
+          fallbackApplied
+            ? "Web Direct では Combo RPC が未公開のため、Firmware keymap の Combo を読み取り専用で表示しています。"
+            : "Web Direct では Combo RPC が未公開です。Combo 編集は Tauri デスクトップアプリで利用してください。",
+        );
       }
       return;
     }
@@ -919,7 +923,7 @@ function App() {
                 読み込み
               </button>
             </div>
-          ) : directKeymap ? (
+          ) : directKeymap && isDesktopRuntime ? (
             <div className="studio-loader">
               <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
                 <option value="">Studio device 未選択</option>
@@ -936,6 +940,17 @@ function App() {
               <button type="button" onClick={() => readStudioDevice()}>
                 <Usb size={17} />
                 読み込み
+              </button>
+            </div>
+          ) : directKeymap ? (
+            <div className="studio-loader web-studio-loader">
+              <button type="button" onClick={() => connectStudioDevice("usb")} disabled={studioConnectionState === "connecting"}>
+                <Usb size={17} />
+                Connect via USB
+              </button>
+              <button type="button" onClick={() => connectStudioDevice("bluetooth")} disabled={studioConnectionState === "connecting"}>
+                <Bluetooth size={17} />
+                Connect via Bluetooth
               </button>
             </div>
           ) : (
@@ -1098,6 +1113,8 @@ function App() {
               selectedCombos={selectedCombos}
               selectedBinding={selectedBinding}
               trackball={directTrackball}
+              canWriteCombos={isDesktopRuntime}
+              canWriteTrackball={isDesktopRuntime}
             />
           ) : (
             <FirmwareInspectorTabs
@@ -1680,14 +1697,14 @@ function DirectWelcome({
             </label>
           ) : null}
           <div className="direct-connect-actions">
-            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
+            <button type="button" disabled={isConnecting} onClick={onRefresh}>
               <RefreshCw size={17} />
-              検出
+              {isDesktopRuntime ? "検出" : "接続ダイアログ"}
             </button>
             <button
               type="button"
               className="primary"
-              disabled={isConnecting || (!isDesktopRuntime && !canUseWebUsb)}
+              disabled={isConnecting}
               onClick={() => onConnect("usb")}
             >
               <Usb size={17} />
@@ -1696,7 +1713,7 @@ function DirectWelcome({
             <button
               type="button"
               className="primary bluetooth-action"
-              disabled={isConnecting || (!isDesktopRuntime && !canUseWebBluetooth)}
+              disabled={isConnecting}
               onClick={() => onConnect("bluetooth")}
             >
               <Bluetooth size={17} />
@@ -1705,9 +1722,9 @@ function DirectWelcome({
           </div>
         </div>
         <div className="direct-capability-strip">
-          <span>Keymap: 直接編集</span>
-          <span>Combo: 直接編集</span>
-          <span>Trackball: 直接編集</span>
+          <span>Key Config: Web / Tauri 書き込み</span>
+          <span>{isDesktopRuntime ? "Combo: Tauri 書き込み" : "Combo: Web は読み取り表示"}</span>
+          <span>{isDesktopRuntime ? "Trackball: Tauri 書き込み" : "Trackball: Web は未対応表示"}</span>
         </div>
       </div>
     </section>
@@ -1871,6 +1888,7 @@ function BuildPanel({
         <li>artifact から左右 UF2 を取得</li>
         <li>左右を順番に bootloader へ書き込み</li>
       </ol>
+      <FirmwareWriteGuide />
       <p className="build-status">{buildStatus}</p>
       <button type="button" onClick={onTriggerBuild}>
         <UploadCloud size={17} />
@@ -1918,6 +1936,8 @@ function BuildPanel({
 
 function DirectInspectorTabs({
   binding,
+  canWriteCombos,
+  canWriteTrackball,
   combos,
   comboSource,
   connectionState,
@@ -1938,6 +1958,8 @@ function DirectInspectorTabs({
   trackball,
 }: {
   binding: string;
+  canWriteCombos: boolean;
+  canWriteTrackball: boolean;
   combos: KeymapCombo[];
   comboSource: DirectComboSource;
   connectionState: StudioConnectionState;
@@ -1988,6 +2010,7 @@ function DirectInspectorTabs({
         </div>
       ) : activeTab === "combo" ? (
         <DirectComboPanel
+          canWrite={canWriteCombos}
           combos={combos}
           connectionState={connectionState}
           comboSource={comboSource}
@@ -2002,6 +2025,7 @@ function DirectInspectorTabs({
         />
       ) : activeTab === "trackball" ? (
         <DirectTrackballPanel
+          canWrite={canWriteTrackball}
           connectionState={connectionState}
           onFirmwareMode={onFirmwareMode}
           onRefresh={onRefreshTrackball}
@@ -2016,12 +2040,14 @@ function DirectInspectorTabs({
 }
 
 function DirectTrackballPanel({
+  canWrite,
   connectionState,
   onFirmwareMode,
   onRefresh,
   onSave,
   settings,
 }: {
+  canWrite: boolean;
   connectionState: StudioConnectionState;
   onFirmwareMode: () => void;
   onRefresh: () => void;
@@ -2030,6 +2056,7 @@ function DirectTrackballPanel({
 }) {
   const [form, setForm] = React.useState<DirectTrackballSettings>(() => settings ?? defaultDirectTrackballSettings());
   const connected = connectionState === "connected";
+  const canSave = connected && canWrite && settings !== null;
 
   React.useEffect(() => {
     if (settings) {
@@ -2053,7 +2080,7 @@ function DirectTrackballPanel({
           <strong>Trackball Direct Write</strong>
           <p>CPI と cursor / scroll 感度を USB または Bluetooth 経由で実機へ保存します。</p>
         </div>
-        <button type="button" onClick={onRefresh} disabled={!connected}>
+        <button type="button" onClick={onRefresh} disabled={!connected || !canWrite}>
           <RefreshCw size={15} />
           読み込み
         </button>
@@ -2062,6 +2089,7 @@ function DirectTrackballPanel({
       <label className="direct-number-field">
         <span>CPI</span>
         <input
+          disabled={!canWrite || settings === null}
           type="number"
           min={100}
           max={3200}
@@ -2072,18 +2100,20 @@ function DirectTrackballPanel({
       </label>
 
       <ScaleSlider
+        disabled={!canWrite || settings === null}
         label="Cursor sensitivity"
         value={scaleToNumber(form.cursorNumerator, form.cursorDenominator)}
         onChange={(value) => updateScale("cursor", value)}
       />
       <ScaleSlider
+        disabled={!canWrite || settings === null}
         label="Scroll sensitivity"
         value={scaleToNumber(form.scrollNumerator, form.scrollDenominator)}
         onChange={(value) => updateScale("scroll", value)}
       />
 
       <div className="timing-actions">
-        <button type="button" disabled={!connected} onClick={() => onSave(form)}>
+        <button type="button" disabled={!canSave} onClick={() => onSave(form)}>
           デバイスに保存
         </button>
         <button type="button" onClick={() => setForm(settings ?? defaultDirectTrackballSettings())}>
@@ -2091,6 +2121,8 @@ function DirectTrackballPanel({
         </button>
       </div>
       {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると保存できます。</p> : null}
+      {connected && !canWrite ? <p className="empty-note">Web Direct では Trackball RPC が未公開です。Tauri デスクトップアプリでは実機へ保存できます。</p> : null}
+      {connected && canWrite && settings === null ? <p className="empty-note">まず読み込みを実行してください。RPC が firmware にない場合は Firmware Mode で編集します。</p> : null}
       <button type="button" className="wide-action" onClick={onFirmwareMode}>
         Firmware Mode の詳細設定を開く
       </button>
@@ -2099,6 +2131,7 @@ function DirectTrackballPanel({
 }
 
 function DirectComboPanel({
+  canWrite,
   combos,
   connectionState,
   comboSource,
@@ -2111,6 +2144,7 @@ function DirectComboPanel({
   selectedCombo,
   selectedCombos,
 }: {
+  canWrite: boolean;
   combos: KeymapCombo[];
   connectionState: StudioConnectionState;
   comboSource: DirectComboSource;
@@ -2125,6 +2159,7 @@ function DirectComboPanel({
 }) {
   const connected = connectionState === "connected";
   const firmwareFallback = comboSource === "firmware";
+  const comboWritable = connected && canWrite && comboSource === "device";
   return (
     <div className="direct-combo-panel">
       <div className="direct-settings-panel">
@@ -2145,12 +2180,14 @@ function DirectComboPanel({
           <span>{firmwareFallback ? "Firmware keymap" : maxCombos > 0 ? `max ${maxCombos}` : "max unknown"}</span>
         </div>
         {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると編集できます。</p> : null}
+        {connected && !canWrite ? <p className="empty-note">Web Direct では Combo RPC が未公開です。Firmware keymap の内容を読み取り専用で確認できます。</p> : null}
         {firmwareFallback ? <p className="empty-note">Direct Combo RPC が読めないため、Firmware keymap の Combo を表示しています。</p> : null}
+        {connected && canWrite && comboSource === "none" ? <p className="empty-note">Combo RPC の読み込みに成功していません。読み込みを実行してください。</p> : null}
       </div>
       <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
       <ComboEditor
         combo={selectedCombo}
-        readOnly={firmwareFallback}
+        readOnly={!comboWritable}
         onCreate={onCreate}
         onDelete={onDelete}
         onSave={onSave}
@@ -2161,10 +2198,12 @@ function DirectComboPanel({
 }
 
 function ScaleSlider({
+  disabled = false,
   label,
   onChange,
   value,
 }: {
+  disabled?: boolean;
   label: string;
   onChange: (value: number) => void;
   value: number;
@@ -2182,6 +2221,7 @@ function ScaleSlider({
         max={3}
         step={0.05}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <div className="timing-presets compact-presets">
@@ -2191,6 +2231,7 @@ function ScaleSlider({
               type="button"
               key={preset}
               className={Math.abs(value - preset) < 0.01 ? "active" : ""}
+              disabled={disabled}
               onClick={() => onChange(preset)}
             >
               {preset}x
@@ -2425,6 +2466,7 @@ function BuildWorkbench({
           <p className="eyebrow">Flash</p>
           <h2>UF2 → Bootloader</h2>
         </div>
+        <FirmwareWriteGuide />
         <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
           UF2 / Volume を更新
         </button>
@@ -2454,6 +2496,22 @@ function BuildWorkbench({
           UF2 を bootloader にコピー
         </button>
       </section>
+    </div>
+  );
+}
+
+function FirmwareWriteGuide() {
+  return (
+    <div className="flash-guide">
+      <strong>左右の書き込み</strong>
+      <p>
+        Firmware は左右別の UF2 を焼きます。左側を USB で bootloader に入れて left UF2 をコピーし、
+        次に右側へ USB を差し替えて right UF2 をコピーします。
+      </p>
+      <p>
+        Direct Mode は UF2 ではなく、USB / Bluetooth で接続中の Studio device に設定を保存します。
+        接続していない側の firmware までは書き換えません。
+      </p>
     </div>
   );
 }
@@ -3237,13 +3295,15 @@ function formatBtCommand(value?: string): string {
     case "0":
       return "BT_CLR";
     case "1":
-      return "BT_SEL";
-    case "2":
       return "BT_NXT";
-    case "3":
+    case "2":
       return "BT_PRV";
+    case "3":
+      return "BT_SEL";
     case "4":
       return "BT_CLR_ALL";
+    case "5":
+      return "BT_DISC";
     default:
       return value ?? "BT_SEL";
   }

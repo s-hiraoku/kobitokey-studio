@@ -93,6 +93,13 @@ export function supportsWebBluetooth(): boolean {
 }
 
 export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb"): Promise<WebStudioSession> {
+  if (!supportsWebStudioConnection(kind)) {
+    throw new Error(
+      kind === "usb"
+        ? "Web Serial is not available. Use Chrome or Edge from localhost/HTTPS, and make sure the page has device permissions."
+        : "Web Bluetooth is not available. Use Chrome or Edge from localhost/HTTPS, and make sure Bluetooth is enabled.",
+    );
+  }
   const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
   const connection = create_rpc_connection(transport, { signal: transport.abortController.signal });
   try {
@@ -426,13 +433,27 @@ function parseWebBinding(binding: string): BehaviorBinding {
     case "&tog":
       return behaviorBinding("toggle-layer", parseInteger(requiredPart(parts, 1, "layer")));
     case "&bt":
-      return behaviorBinding("bluetooth", parseBtCommand(requiredPart(parts, 1, "command")), parseInteger(requiredPart(parts, 2, "value")));
+      return behaviorBinding("bluetooth", parseBtCommand(requiredPart(parts, 1, "command")), parseInteger(parts[2] ?? "0"));
     case "&mkp":
       return behaviorBinding("mouse-key", parseInteger(requiredPart(parts, 1, "value")));
     case "&mmv":
       return behaviorBinding("mouse-move", parseInteger(requiredPart(parts, 1, "value")));
     case "&msc":
       return behaviorBinding("mouse-scroll", parseInteger(requiredPart(parts, 1, "value")));
+    case "&caps_word":
+      return behaviorBinding("caps-word");
+    case "&key_repeat":
+      return behaviorBinding("key-repeat");
+    case "&sys_reset":
+      return behaviorBinding("reset");
+    case "&bootloader":
+      return behaviorBinding("bootloader");
+    case "&soft_off":
+      return behaviorBinding("soft-off");
+    case "&studio_unlock":
+      return behaviorBinding("studio-unlock");
+    case "&gresc":
+      return behaviorBinding("grave-escape");
     case "&trans":
       return behaviorBinding("transparent");
     case "&none":
@@ -672,12 +693,16 @@ function parseBtCommand(value: string): number {
   switch (value) {
     case "BT_CLR":
       return 0;
-    case "BT_SEL":
-      return 1;
     case "BT_NXT":
-      return 2;
+      return 1;
     case "BT_PRV":
+      return 2;
+    case "BT_SEL":
       return 3;
+    case "BT_CLR_ALL":
+      return 4;
+    case "BT_DISC":
+      return 5;
     default:
       return parseInteger(value);
   }
