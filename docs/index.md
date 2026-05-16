@@ -26,10 +26,40 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 - [最初の準備を確認する](./usage-guide/#1-事前準備)
 - [モードの違いを確認する](./usage-guide/#2-モード選択の考え方)
+- [作業前チェックリストを見る](./usage-guide/#作業前チェックリスト)
 - [Firmware Mode で設定する](./usage-guide/#3-firmware-mode-で設定する)
 - [ビルドして UF2 を書き込む](./usage-guide/#4-firmware-を-build-して-uf2-を書き込む)
 - [Direct Mode で実機へ書き込む](./usage-guide/#5-direct-mode-で設定する)
+- [目的別レシピを見る](./usage-guide/#6-目的別レシピ)
 - [困ったときの確認項目を見る](./usage-guide/#7-トラブルシューティング)
+
+## 最短ルート
+
+### 初めて設定する
+
+1. Tauri デスクトップ版を起動する
+2. `Firmware` を選ぶ
+3. `KobitoKey_QWERTY` フォルダを読み込む
+4. keymap を変更する
+5. `Diff` を確認する
+6. 保存して GitHub Actions でビルドする
+7. 左右 UF2 を順番に書き込む
+
+### キーを 1 個だけ試す
+
+1. ZMK Studio 対応 firmware が入った KobitoKey を用意する
+2. `Direct` を選ぶ
+3. USB または Bluetooth で接続する
+4. layer と key を選ぶ
+5. binding を選び、`実機へ書き込み` を押す
+
+### Combo やトラックボールを確実に変える
+
+1. `Firmware` を選ぶ
+2. `Combos` または `Trackball` を開く
+3. 変更する
+4. `Diff` を確認する
+5. 保存して build + UF2 書き込みで反映する
 
 ## 設定別の早見表
 
@@ -63,3 +93,15 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 4. 対象 layer と key を選ぶ
 5. binding を選ぶ
 6. `実機へ書き込み` を押す
+
+## よく使う用語
+
+| 用語 | 意味 |
+| --- | --- |
+| keymap | layer ごとの key binding と Combo を含む設定ファイル |
+| layer | キーボードの面。`&mo` や `&lt` で一時的に切り替える |
+| binding | key に割り当てる動作。例: `&kp A`、`&lt 1 SPACE` |
+| Combo | 複数 key の同時押しで別の binding を発火する設定 |
+| overlay | トラックボールなど、左右 half ごとの hardware 寄り設定 |
+| UF2 | bootloader volume にコピーして書き込む firmware ファイル |
+| ZMK Studio | 実機に接続して対応済み設定を直接読み書きする仕組み |
