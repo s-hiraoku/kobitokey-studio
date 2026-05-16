@@ -325,15 +325,8 @@ function App() {
 
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      if (supportsWebStudioConnection(studioConnectionKind)) {
-        setStatus("ブラウザの接続ダイアログを開きます。表示された device を選択してください。");
-        await connectStudioDevice(studioConnectionKind);
-        return;
-      }
-      const message = "このブラウザは Web Serial / Web Bluetooth に対応していません。Chrome または Edge の localhost / HTTPS から開いてください。";
-      setStudioConnectionState("error");
-      setStudioConnectionError(message);
-      setStatus(message);
+      setStatus("ブラウザの接続ダイアログを開きます。表示された device を選択してください。");
+      await connectStudioDevice(studioConnectionKind);
       return;
     }
 
@@ -955,11 +948,11 @@ function App() {
             </div>
           ) : directKeymap ? (
             <div className="studio-loader web-studio-loader">
-              <button type="button" onClick={() => connectStudioDevice("usb")} disabled={!canUseWebUsb || studioConnectionState === "connecting"}>
+              <button type="button" onClick={() => connectStudioDevice("usb")} disabled={studioConnectionState === "connecting"}>
                 <Usb size={17} />
                 Connect via USB
               </button>
-              <button type="button" onClick={() => connectStudioDevice("bluetooth")} disabled={!canUseWebBluetooth || studioConnectionState === "connecting"}>
+              <button type="button" onClick={() => connectStudioDevice("bluetooth")} disabled={studioConnectionState === "connecting"}>
                 <Bluetooth size={17} />
                 Connect via Bluetooth
               </button>
@@ -1708,14 +1701,14 @@ function DirectWelcome({
             </label>
           ) : null}
           <div className="direct-connect-actions">
-            <button type="button" disabled={isConnecting || (!isDesktopRuntime && !canUseAnyWebConnection)} onClick={onRefresh}>
+            <button type="button" disabled={isConnecting} onClick={onRefresh}>
               <RefreshCw size={17} />
               {isDesktopRuntime ? "検出" : "接続ダイアログ"}
             </button>
             <button
               type="button"
               className="primary"
-              disabled={isConnecting || (!isDesktopRuntime && !canUseWebUsb)}
+              disabled={isConnecting}
               onClick={() => onConnect("usb")}
             >
               <Usb size={17} />
@@ -1724,7 +1717,7 @@ function DirectWelcome({
             <button
               type="button"
               className="primary bluetooth-action"
-              disabled={isConnecting || (!isDesktopRuntime && !canUseWebBluetooth)}
+              disabled={isConnecting}
               onClick={() => onConnect("bluetooth")}
             >
               <Bluetooth size={17} />
@@ -1733,9 +1726,9 @@ function DirectWelcome({
           </div>
         </div>
         <div className="direct-capability-strip">
-          <span>Keymap: 直接編集</span>
-          <span>Combo: 直接編集</span>
-          <span>Trackball: 直接編集</span>
+          <span>Key Config: Web / Tauri 書き込み</span>
+          <span>{isDesktopRuntime ? "Combo: Tauri 書き込み" : "Combo: Web は読み取り表示"}</span>
+          <span>{isDesktopRuntime ? "Trackball: Tauri 書き込み" : "Trackball: Web は未対応表示"}</span>
         </div>
       </div>
     </section>

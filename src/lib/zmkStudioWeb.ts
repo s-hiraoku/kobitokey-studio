@@ -433,6 +433,20 @@ function parseWebBinding(binding: string): BehaviorBinding {
       return behaviorBinding("mouse-move", parseInteger(requiredPart(parts, 1, "value")));
     case "&msc":
       return behaviorBinding("mouse-scroll", parseInteger(requiredPart(parts, 1, "value")));
+    case "&caps_word":
+      return behaviorBinding("caps-word");
+    case "&key_repeat":
+      return behaviorBinding("key-repeat");
+    case "&sys_reset":
+      return behaviorBinding("reset");
+    case "&bootloader":
+      return behaviorBinding("bootloader");
+    case "&soft_off":
+      return behaviorBinding("soft-off");
+    case "&studio_unlock":
+      return behaviorBinding("studio-unlock");
+    case "&gresc":
+      return behaviorBinding("grave-escape");
     case "&trans":
       return behaviorBinding("transparent");
     case "&none":

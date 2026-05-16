@@ -134,7 +134,8 @@ USB or Bluetooth. It is separate from the firmware file workflow.
 
 The write is sent through the ZMK Studio RPC API and saved on the device. The
 app then reloads the keymap from the device so the screen reflects the
-persistent state.
+persistent state. Key Config writes are supported in both the Tauri desktop app
+and the browser build when Web Serial or Web Bluetooth is available.
 
 Direct Mode currently supports these binding families:
 
