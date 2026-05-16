@@ -78,4 +78,30 @@ pointer_accel_right {
     const updated = updateBlockNumberSetting(rightOnlyOverlay, "pointer_accel", "min-factor", 900);
     expect(updated).toBe(rightOnlyOverlay);
   });
+
+  it("does not treat a bare ampersand reference as a block opening", () => {
+    const referenceOnlyOverlay = `
+&pointer_accel;
+
+other_block {
+    min-factor = <900>;
+};
+`;
+
+    expect(parseTrackballSettings(referenceOnlyOverlay, rightOverlay).pointerMinFactor).toBeUndefined();
+    expect(updateBlockNumberSetting(referenceOnlyOverlay, "pointer_accel", "min-factor", 1200)).toBe(
+      referenceOnlyOverlay,
+    );
+  });
+
+  it("updates an ampersand block override", () => {
+    const overrideOverlay = `
+&pointer_accel {
+    min-factor = <800>;
+};
+`;
+    const updated = updateBlockNumberSetting(overrideOverlay, "pointer_accel", "min-factor", 1200);
+
+    expect(parseTrackballSettings(updated, rightOverlay).pointerMinFactor).toBe(1200);
+  });
 });

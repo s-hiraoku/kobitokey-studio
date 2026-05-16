@@ -66,7 +66,7 @@ function readBlockNumber(source: string, blockName: string, propertyName: string
 function findBlockRange(source: string, blockName: string): { start: number; end: number } | undefined {
   const escapedName = escapeRegExp(blockName);
   const blockPattern = new RegExp(
-    `(?:^|[\\s{};])(?:&${escapedName}(?![A-Za-z0-9_-])|${escapedName}(?![A-Za-z0-9_-])\\s*:|${escapedName}(?![A-Za-z0-9_-])\\s*\\{)`,
+    `(?:^|[\\s{};])(?:&${escapedName}(?![A-Za-z0-9_-])\\s*\\{|${escapedName}(?![A-Za-z0-9_-])\\s*:|${escapedName}(?![A-Za-z0-9_-])\\s*\\{)`,
   );
   const match = source.match(blockPattern);
   if (!match || match.index === undefined) {
