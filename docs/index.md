@@ -8,7 +8,7 @@ permalink: /
 
 KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボール設定、ファームウェアのビルド、UF2 書き込みをまとめて扱うための専用設定エディタです。
 
-まずは [使い方ガイド](./usage-guide/) を開いてください。どのモードを使うべきか、どこを押せばよいか、設定後にどう保存・反映するかを順番に確認できます。
+すぐに始める場合は [Quick Start](./quick-start/) を開いてください。背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。
 
 ## まず選ぶこと
 
@@ -24,6 +24,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 ## 使い方の入口
 
+- [Quick Start で最短手順を見る](./quick-start/)
 - [最初の準備を確認する](./usage-guide/#1-事前準備)
 - [モードの違いを確認する](./usage-guide/#2-モード選択の考え方)
 - [作業前チェックリストを見る](./usage-guide/#作業前チェックリスト)
