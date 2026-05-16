@@ -98,18 +98,36 @@ When running inside Tauri, the default project path points at:
 - GitHub Actions build trigger, run status, and artifact download
 - UF2 file and bootloader volume selection with confirmation before copy
 
+## Firmware Flashing
+
+Firmware flashing writes UF2 files to the left and right halves separately.
+This is the same workflow as manually swapping the USB cable:
+
+1. Build or download both artifacts.
+2. Connect the left half over USB and put it into bootloader mode.
+3. Copy the left UF2 to the left bootloader volume.
+4. Move the USB cable to the right half and put it into bootloader mode.
+5. Copy the right UF2 to the right bootloader volume.
+
+If both halves appear as bootloader volumes at the same time, they can be
+flashed without swapping the cable, but the app still treats left and right UF2
+files as separate targets. Direct Mode is different: it saves settings to the
+currently connected ZMK Studio device over USB or Bluetooth and does not replace
+both halves' firmware images.
+
 ## Direct Mode
 
 Direct Mode is for ZMK Studio style editing against a keyboard connected over
-USB. It is separate from the firmware file workflow.
+USB or Bluetooth. It is separate from the firmware file workflow.
 
-1. Build and run the Tauri app with `npm run tauri dev`.
-2. Connect the ZMK Studio enabled half of the keyboard over USB.
+1. Build and run the Tauri app with `npm run tauri dev`, or open the browser
+   build in Chrome/Edge from `localhost` or HTTPS.
+2. Connect the ZMK Studio enabled side of the keyboard over USB or Bluetooth.
 3. Switch the top toolbar from `Firmware` to `Direct`.
-4. Click `読み込み`. If no port is selected yet, the app first detects likely
-   Studio serial ports and uses the first candidate.
-5. If multiple candidates are shown, choose the target port and click
-   `読み込み` again.
+4. In Tauri, click `検出`/`読み込み` to use the serial port list. In the browser,
+   click `Connect via USB` or `Connect via Bluetooth`; browsers do not allow
+   pre-listing devices before the permission picker opens.
+5. If multiple candidates are shown, choose the target device and connect again.
 6. Select a key in the physical layout.
 7. Choose the binding type and keycode from the on-screen picker, then click
    `実機へ書き込み`.
@@ -143,9 +161,11 @@ Direct Mode currently supports these binding families:
 - `&soft_off`
 - `&gresc`
 
-Use Firmware Mode for combo editing, trackball CPI/acceleration/gesture
-settings, and any binding that Direct Mode does not support yet. Those settings
-live in keymap/overlay/conf files and still need build + UF2 flashing.
+Direct Combo and Trackball panels show the same workflow in Tauri and the
+browser. When a browser-side RPC is not exposed by the Web client package yet,
+the panel falls back to read-only firmware data and says so in the UI. Use
+Firmware Mode for any setting that Direct Mode does not support yet; those
+settings live in keymap/overlay/conf files and still need build + UF2 flashing.
 
 ## Binding Picker
 
@@ -167,11 +187,13 @@ or custom ZMK bindings.
 
 ## Remaining Notes
 
-- The browser dev server can show fixture data and most UI behavior, but it
-  does not perform Direct Mode device reads/writes.
+- Browser Direct Mode uses Web Serial / Web Bluetooth. Use Chrome or Edge, and
+  serve the app from `localhost` or HTTPS so the browser exposes those APIs.
+- Browsers cannot pre-detect USB/Bluetooth devices for Direct Mode. The connect
+  buttons open the browser permission picker instead.
 - File saving, folder picking, GitHub Actions, artifact download, and UF2 copy
   require the Tauri app shell.
-- Direct Mode also requires the Tauri app shell, Rust/Cargo, a ZMK Studio
-  enabled firmware, and USB serial access to the connected keyboard.
+- Direct Mode requires ZMK Studio enabled firmware and either USB serial access
+  or Bluetooth Studio service support on the connected keyboard.
 - GitHub tokens are not stored in the renderer; GitHub operations are delegated
   to the backend through `gh`.

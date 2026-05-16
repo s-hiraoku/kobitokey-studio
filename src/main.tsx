@@ -325,7 +325,15 @@ function App() {
 
   async function refreshStudioPorts() {
     if (!isDesktopRuntime) {
-      setStatus("ブラウザ版では事前のdevice一覧検出はできません。Connect via USB / Bluetooth でブラウザの接続ダイアログを開いてください。");
+      if (supportsWebStudioConnection(studioConnectionKind)) {
+        setStatus("ブラウザの接続ダイアログを開きます。表示された device を選択してください。");
+        await connectStudioDevice(studioConnectionKind);
+        return;
+      }
+      const message = "このブラウザは Web Serial / Web Bluetooth に対応していません。Chrome または Edge の localhost / HTTPS から開いてください。";
+      setStudioConnectionState("error");
+      setStudioConnectionError(message);
+      setStatus(message);
       return;
     }
 
@@ -926,7 +934,7 @@ function App() {
                 読み込み
               </button>
             </div>
-          ) : directKeymap ? (
+          ) : directKeymap && isDesktopRuntime ? (
             <div className="studio-loader">
               <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
                 <option value="">Studio device 未選択</option>
@@ -943,6 +951,17 @@ function App() {
               <button type="button" onClick={() => readStudioDevice()}>
                 <Usb size={17} />
                 読み込み
+              </button>
+            </div>
+          ) : directKeymap ? (
+            <div className="studio-loader web-studio-loader">
+              <button type="button" onClick={() => connectStudioDevice("usb")} disabled={!canUseWebUsb || studioConnectionState === "connecting"}>
+                <Usb size={17} />
+                Connect via USB
+              </button>
+              <button type="button" onClick={() => connectStudioDevice("bluetooth")} disabled={!canUseWebBluetooth || studioConnectionState === "connecting"}>
+                <Bluetooth size={17} />
+                Connect via Bluetooth
               </button>
             </div>
           ) : (
@@ -1689,9 +1708,9 @@ function DirectWelcome({
             </label>
           ) : null}
           <div className="direct-connect-actions">
-            <button type="button" disabled={!isDesktopRuntime} onClick={onRefresh}>
+            <button type="button" disabled={isConnecting || (!isDesktopRuntime && !canUseAnyWebConnection)} onClick={onRefresh}>
               <RefreshCw size={17} />
-              検出
+              {isDesktopRuntime ? "検出" : "接続ダイアログ"}
             </button>
             <button
               type="button"
@@ -1880,6 +1899,7 @@ function BuildPanel({
         <li>artifact から左右 UF2 を取得</li>
         <li>左右を順番に bootloader へ書き込み</li>
       </ol>
+      <FirmwareWriteGuide />
       <p className="build-status">{buildStatus}</p>
       <button type="button" onClick={onTriggerBuild}>
         <UploadCloud size={17} />
@@ -2457,6 +2477,7 @@ function BuildWorkbench({
           <p className="eyebrow">Flash</p>
           <h2>UF2 → Bootloader</h2>
         </div>
+        <FirmwareWriteGuide />
         <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
           UF2 / Volume を更新
         </button>
@@ -2486,6 +2507,22 @@ function BuildWorkbench({
           UF2 を bootloader にコピー
         </button>
       </section>
+    </div>
+  );
+}
+
+function FirmwareWriteGuide() {
+  return (
+    <div className="flash-guide">
+      <strong>左右の書き込み</strong>
+      <p>
+        Firmware は左右別の UF2 を焼きます。左側を USB で bootloader に入れて left UF2 をコピーし、
+        次に右側へ USB を差し替えて right UF2 をコピーします。
+      </p>
+      <p>
+        Direct Mode は UF2 ではなく、USB / Bluetooth で接続中の Studio device に設定を保存します。
+        接続していない側の firmware までは書き換えません。
+      </p>
     </div>
   );
 }

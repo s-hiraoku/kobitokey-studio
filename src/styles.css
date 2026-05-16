@@ -2051,6 +2051,26 @@ select:focus-visible {
   margin-top: 6px;
 }
 
+.flash-guide {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-sm);
+  margin: var(--sp-2) 0;
+  padding: var(--sp-3);
+  background: var(--paper);
+}
+.flash-guide strong {
+  color: var(--pine-deep);
+  font-size: 12.5px;
+}
+.flash-guide p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .direct-note h2 {
   font-family: "Fraunces", Georgia, serif;
   font-weight: 500;
