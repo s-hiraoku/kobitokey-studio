@@ -61,6 +61,7 @@ type WebBluetoothCharacteristic = EventTarget & {
 };
 
 let activeConnection: RpcConnection | null = null;
+let activeTransportAbort: AbortController | null = null;
 let activeBehaviorCatalog: Map<number, string> = new Map();
 let behaviorIdByRole: Map<string, number> = new Map();
 
@@ -110,6 +111,7 @@ export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb")
       );
     });
     activeConnection = connection;
+    activeTransportAbort = transport.abortController;
     activeBehaviorCatalog = catalog;
     behaviorIdByRole = invertBehaviorCatalog(catalog);
     return {
@@ -296,8 +298,16 @@ export async function writeWebTrackballSettings(settings: DirectTrackballSetting
 
 function resetWebStudioState() {
   activeConnection = null;
+  activeTransportAbort = null;
   activeBehaviorCatalog = new Map();
   behaviorIdByRole = new Map();
+}
+
+export function disconnectWebStudioDevice(): void {
+  if (activeTransportAbort && !activeTransportAbort.signal.aborted) {
+    activeTransportAbort.abort();
+  }
+  resetWebStudioState();
 }
 
 function requireConnection(): RpcConnection {

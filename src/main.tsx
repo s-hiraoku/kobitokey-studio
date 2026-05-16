@@ -61,6 +61,7 @@ import {
 } from "./lib/trackballParser";
 import {
   connectWebStudioDevice,
+  disconnectWebStudioDevice,
   DirectTrackballSettings,
   readWebTrackballSettings,
   StudioConnectionKind,
@@ -138,6 +139,8 @@ function App() {
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [firmwareRepoUrl, setFirmwareRepoUrl] = React.useState(DEFAULT_FIRMWARE_REPO_URL);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
+  const folderInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [projectDirHandle, setProjectDirHandle] = React.useState<FileSystemDirectoryHandle | null>(null);
   const [studioPorts, setStudioPorts] = React.useState<StudioPort[]>([]);
   const [selectedStudioPort, setSelectedStudioPort] = React.useState("");
   const [studioBluetoothDevices, setStudioBluetoothDevices] = React.useState<StudioBluetoothDevice[]>([]);
@@ -251,19 +254,69 @@ function App() {
   }
 
   async function chooseProjectFolder() {
-    try {
-      const selected = await open({
-        defaultPath: projectRoot,
-        directory: true,
-        multiple: false,
-        title: "KobitoKey_QWERTY フォルダを選択",
-      });
-      if (typeof selected === "string") {
-        setProjectRoot(selected);
-        setStatus("フォルダを選択しました");
+    // Tauri (desktop): native folder picker via @tauri-apps/plugin-dialog
+    if (isDesktopRuntime) {
+      try {
+        const selected = await open({
+          defaultPath: projectRoot,
+          directory: true,
+          multiple: false,
+          title: "KobitoKey_QWERTY フォルダを選択",
+        });
+        if (typeof selected === "string") {
+          setProjectRoot(selected);
+          setStatus("フォルダを選択しました");
+        }
+      } catch (error) {
+        setStatus(`フォルダ選択でエラー: ${String(error)}`);
       }
+      return;
+    }
+
+    // Browser: try the File System Access API (Chrome/Edge).
+    const picker = (window as unknown as { showDirectoryPicker?: (options?: { mode?: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
+    if (typeof picker === "function") {
+      try {
+        const handle = await picker.call(window, { mode: "readwrite" });
+        await loadProjectFromDirectoryHandle(handle);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setStatus(`フォルダ選択でエラー: ${String(error)}`);
+      }
+      return;
+    }
+
+    // Fallback: trigger a hidden <input webkitdirectory>.
+    folderInputRef.current?.click();
+  }
+
+  async function loadProjectFromDirectoryHandle(handle: FileSystemDirectoryHandle) {
+    try {
+      const project = await readProjectFromDirectoryHandle(handle);
+      setProjectRoot(handle.name);
+      setProjectDirHandle(handle);
+      setFiles(project);
+      setSavedKeymap(project.keymap);
+      setSavedLeftOverlay(project.leftOverlay);
+      setSavedRightOverlay(project.rightOverlay);
+      setStatus(`フォルダ "${handle.name}" を読み込みました`);
     } catch (error) {
-      setStatus(`フォルダ選択は Tauri アプリ内で利用できます: ${String(error)}`);
+      setStatus(`読み込み失敗: ${String(error)}`);
+    }
+  }
+
+  async function loadProjectFromFileList(fileList: FileList) {
+    try {
+      const project = await readProjectFromFileList(fileList);
+      setProjectRoot(project.rootLabel);
+      setProjectDirHandle(null);
+      setFiles(project.files);
+      setSavedKeymap(project.files.keymap);
+      setSavedLeftOverlay(project.files.leftOverlay);
+      setSavedRightOverlay(project.files.rightOverlay);
+      setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
+    } catch (error) {
+      setStatus(`読み込み失敗: ${String(error)}`);
     }
   }
 
@@ -273,7 +326,22 @@ function App() {
       return;
     }
 
+    // Browser path: try the FS Access API directory handle first so the
+    // edit lands back in the user's original folder.
     if (!files.keymapPath) {
+      if (projectDirHandle) {
+        try {
+          await writeProjectToDirectoryHandle(projectDirHandle, files);
+          setSavedKeymap(files.keymap);
+          setSavedLeftOverlay(files.leftOverlay);
+          setSavedRightOverlay(files.rightOverlay);
+          setStatus(`フォルダ "${projectDirHandle.name}" に保存しました`);
+          return;
+        } catch (error) {
+          // Permission revoked, handle stale, etc. — fall through to download.
+          setStatus(`直接書き込みに失敗したためダウンロードに切り替えます: ${String(error)}`);
+        }
+      }
       downloadText("KobitoKey.keymap", files.keymap);
       downloadText("KobitoKey_left.overlay", files.leftOverlay);
       downloadText("KobitoKey_right.overlay", files.rightOverlay);
@@ -470,6 +538,30 @@ function App() {
 
   async function readStudioDevice(kind: StudioConnectionKind = studioConnectionKind) {
     await connectStudioDevice(kind);
+  }
+
+  async function disconnectStudioDevice() {
+    if (!isDesktopRuntime) {
+      try {
+        disconnectWebStudioDevice();
+      } catch {
+        // best-effort
+      }
+    } else {
+      try {
+        await invoke("disconnect_studio_device");
+      } catch {
+        // command may not exist yet on older builds; safe to ignore
+      }
+    }
+    setDirectKeymap(null);
+    setDirectTrackball(null);
+    setDirectCombos([]);
+    setDirectComboSource("none");
+    setDirectMaxCombos(0);
+    setStudioConnectionState("disconnected");
+    setStudioConnectionError("");
+    setStatus("device を切断しました");
   }
 
   async function writeDirectBinding(nextBinding: string) {
@@ -932,58 +1024,83 @@ function App() {
             </button>
           </div>
           {editorMode === "firmware" ? (
-            <div className="project-loader">
-              <input
-                aria-label="KobitoKey_QWERTY path"
-                placeholder="ローカル KobitoKey_QWERTY パス"
-                title="keymap と overlay を読み書きするローカルフォルダ"
-                value={projectRoot}
-                onChange={(event) => setProjectRoot(event.target.value)}
-              />
-              <input
-                aria-label="Firmware repository URL"
-                placeholder="Firmware repository URL"
-                title="GitHub Actions を実行する firmware repository URL"
-                value={firmwareRepoUrl}
-                onChange={(event) => setFirmwareRepoUrl(event.target.value)}
-              />
-              <button type="button" onClick={chooseProjectFolder}>
+            <div className="project-loader" role="group" aria-label="プロジェクトフォルダ">
+              <label className="project-loader-field">
+                <span className="project-loader-label">
+                  プロジェクトフォルダ
+                  {projectDirHandle ? (
+                    <em className="project-loader-write-chip" title="このフォルダに直接保存されます">直接保存</em>
+                  ) : null}
+                </span>
+                <input
+                  aria-label="KobitoKey_QWERTY フォルダのパス"
+                  placeholder="例: ~/dev/KobitoKey_QWERTY"
+                  title="keymap と overlay を読み書きするローカルフォルダ"
+                  value={projectRoot}
+                  onChange={(event) => {
+                    setProjectRoot(event.target.value);
+                    // Typed paths cannot map back to an FS handle, so the
+                    // user has implicitly opted out of direct writes.
+                    setProjectDirHandle(null);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="project-loader-browse"
+                onClick={chooseProjectFolder}
+                title={isDesktopRuntime ? "ローカルフォルダを選ぶ" : "ブラウザでフォルダを選ぶ"}
+              >
                 <FolderOpen size={17} />
-                選択
+                参照…
               </button>
-              <button type="button" onClick={loadProject}>
-                <FolderOpen size={17} />
+              <button
+                type="button"
+                className="primary project-loader-load"
+                onClick={loadProject}
+                title="このフォルダから keymap / overlay を読み込む"
+              >
+                <Download size={17} />
                 読み込み
               </button>
-            </div>
-          ) : directKeymap && isDesktopRuntime ? (
-            <div className="studio-loader">
-              <select value={selectedStudioPort} onChange={(event) => setSelectedStudioPort(event.target.value)}>
-                <option value="">Studio device 未選択</option>
-                {studioPorts.map((port) => (
-                  <option key={port.path} value={port.path}>
-                    {port.label} ({port.path})
-                  </option>
-                ))}
-              </select>
-              <button type="button" onClick={refreshStudioPorts}>
-                <RefreshCw size={17} />
-                検出
-              </button>
-              <button type="button" onClick={() => readStudioDevice()}>
-                <Usb size={17} />
-                読み込み
-              </button>
+              <input
+                ref={folderInputRef}
+                type="file"
+                /* eslint-disable @typescript-eslint/ban-ts-comment */
+                /* @ts-ignore — non-standard but widely supported attribute */
+                webkitdirectory=""
+                directory=""
+                multiple
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const list = event.currentTarget.files;
+                  if (list && list.length > 0) {
+                    void loadProjectFromFileList(list);
+                  }
+                  event.currentTarget.value = "";
+                }}
+              />
             </div>
           ) : directKeymap ? (
-            <div className="studio-loader web-studio-loader">
-              <button type="button" onClick={() => connectStudioDevice("usb")} disabled={studioConnectionState === "connecting"}>
-                <Usb size={17} />
-                Connect via USB
+            <div className="studio-loader connected-loader" role="group" aria-label="接続状態">
+              <span className="connected-chip">
+                {studioConnectionKind === "bluetooth" ? <Bluetooth size={14} /> : <Usb size={14} />}
+                <strong>
+                  {directKeymap.deviceName || (studioConnectionKind === "bluetooth" ? "Bluetooth device" : "USB device")}
+                </strong>
+                <em>{studioConnectionKind.toUpperCase()} 接続中</em>
+              </span>
+              <button type="button" onClick={() => readStudioDevice()} disabled={studioConnectionState === "connecting"}>
+                <RefreshCw size={17} />
+                再読み込み
               </button>
-              <button type="button" onClick={() => connectStudioDevice("bluetooth")} disabled={studioConnectionState === "connecting"}>
-                <Bluetooth size={17} />
-                Connect via Bluetooth
+              <button
+                type="button"
+                className="danger"
+                onClick={() => void disconnectStudioDevice()}
+                disabled={studioConnectionState === "connecting"}
+              >
+                切断
               </button>
             </div>
           ) : (
@@ -1015,6 +1132,7 @@ function App() {
           onConnect={connectStudioDevice}
           onPortChange={setSelectedStudioPort}
           onRefresh={refreshStudioPorts}
+          onTransportChange={setStudioConnectionKind}
         />
       ) : (
       <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
@@ -1110,12 +1228,14 @@ function App() {
                 <BuildWorkbench
                   buildStatus={buildStatus}
                   firmwareRepoLabel={firmwareRepoLabel}
+                  firmwareRepoUrl={firmwareRepoUrl}
                   uf2Files={uf2Files}
                   bootloaderVolumes={bootloaderVolumes}
                   selectedUf2={selectedUf2}
                   selectedVolume={selectedVolume}
                   onSelectUf2={setSelectedUf2}
                   onSelectVolume={setSelectedVolume}
+                  onFirmwareRepoUrlChange={setFirmwareRepoUrl}
                   onTriggerBuild={triggerBuild}
                   onRefreshBuildStatus={refreshBuildStatus}
                   onDownloadArtifacts={downloadArtifacts}
@@ -1161,12 +1281,14 @@ function App() {
               combo={selectedCombo}
               combos={combos}
               firmwareRepoLabel={firmwareRepoLabel}
+              firmwareRepoUrl={firmwareRepoUrl}
               keyIndex={selectedKeyIndex}
               onApplyBinding={applyBinding}
               onCopyUf2={copySelectedUf2}
               onCreateCombo={createCombo}
               onDeleteCombo={removeCombo}
               onDownloadArtifacts={downloadArtifacts}
+              onFirmwareRepoUrlChange={setFirmwareRepoUrl}
               onRefreshBuildStatus={refreshBuildStatus}
               onRefreshFlashTargets={refreshFlashTargets}
               onSaveCombo={saveCombo}
@@ -1666,6 +1788,7 @@ function DirectWelcome({
   onConnect,
   onPortChange,
   onRefresh,
+  onTransportChange,
   ports,
   selectedBluetoothDevice,
   selectedPort,
@@ -1681,6 +1804,7 @@ function DirectWelcome({
   onConnect: (kind: StudioConnectionKind) => void;
   onPortChange: (port: string) => void;
   onRefresh: () => void;
+  onTransportChange: (kind: StudioConnectionKind) => void;
   ports: StudioPort[];
   selectedBluetoothDevice: string;
   selectedPort: string;
@@ -1754,28 +1878,34 @@ function DirectWelcome({
             </>
           ) : null}
           <div className="direct-connect-actions">
-            <button type="button" disabled={isConnecting} onClick={onRefresh}>
-              <RefreshCw size={17} />
-              {isDesktopRuntime ? "検出" : "接続ダイアログ"}
-            </button>
+            <label className="connect-transport-field">
+              <span>接続方法</span>
+              <select
+                value={connectionKind}
+                disabled={isConnecting}
+                onChange={(event) => onTransportChange(event.target.value as StudioConnectionKind)}
+              >
+                <option value="usb">USB</option>
+                <option value="bluetooth">Bluetooth</option>
+              </select>
+            </label>
             <button
               type="button"
-              className="primary"
+              className={`primary connect-action ${connectionKind === "bluetooth" ? "bluetooth-action" : ""}`}
               disabled={isConnecting}
-              onClick={() => onConnect("usb")}
+              onClick={() => onConnect(connectionKind)}
             >
-              <Usb size={17} />
-              {isConnecting && connectionKind === "usb" ? "USB 接続中" : "Connect via USB"}
+              {connectionKind === "bluetooth" ? <Bluetooth size={17} /> : <Usb size={17} />}
+              {isConnecting
+                ? `${connectionKind === "bluetooth" ? "Bluetooth" : "USB"} 接続中…`
+                : `${connectionKind === "bluetooth" ? "Bluetooth" : "USB"} で接続`}
             </button>
-            <button
-              type="button"
-              className="primary bluetooth-action"
-              disabled={isConnecting}
-              onClick={() => onConnect("bluetooth")}
-            >
-              <Bluetooth size={17} />
-              {isConnecting && connectionKind === "bluetooth" ? "Bluetooth 接続中" : "Connect via Bluetooth"}
-            </button>
+            {isDesktopRuntime ? (
+              <button type="button" className="connect-secondary" disabled={isConnecting} onClick={onRefresh}>
+                <RefreshCw size={17} />
+                device 検出
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="direct-capability-strip">
@@ -1795,12 +1925,14 @@ function FirmwareInspectorTabs({
   combo,
   combos,
   firmwareRepoLabel,
+  firmwareRepoUrl,
   keyIndex,
   onApplyBinding,
   onCopyUf2,
   onCreateCombo,
   onDeleteCombo,
   onDownloadArtifacts,
+  onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
   onSaveCombo,
@@ -1822,12 +1954,14 @@ function FirmwareInspectorTabs({
   combo?: KeymapCombo;
   combos: KeymapCombo[];
   firmwareRepoLabel: string;
+  firmwareRepoUrl: string;
   keyIndex: number;
   onApplyBinding: (binding: string) => void;
   onCopyUf2: () => void;
   onCreateCombo: () => void;
   onDeleteCombo: (combo: KeymapCombo) => void;
   onDownloadArtifacts: () => void;
+  onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
   onSaveCombo: (combo: KeymapCombo, input: ComboFormValue) => void;
@@ -1893,8 +2027,10 @@ function FirmwareInspectorTabs({
           bootloaderVolumes={bootloaderVolumes}
           buildStatus={buildStatus}
           firmwareRepoLabel={firmwareRepoLabel}
+          firmwareRepoUrl={firmwareRepoUrl}
           onCopyUf2={onCopyUf2}
           onDownloadArtifacts={onDownloadArtifacts}
+          onFirmwareRepoUrlChange={onFirmwareRepoUrlChange}
           onRefreshBuildStatus={onRefreshBuildStatus}
           onRefreshFlashTargets={onRefreshFlashTargets}
           onSelectedUf2Change={onSelectedUf2Change}
@@ -1913,8 +2049,10 @@ function BuildPanel({
   bootloaderVolumes,
   buildStatus,
   firmwareRepoLabel,
+  firmwareRepoUrl,
   onCopyUf2,
   onDownloadArtifacts,
+  onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
   onSelectedUf2Change,
@@ -1927,8 +2065,10 @@ function BuildPanel({
   bootloaderVolumes: string[];
   buildStatus: string;
   firmwareRepoLabel: string;
+  firmwareRepoUrl: string;
   onCopyUf2: () => void;
   onDownloadArtifacts: () => void;
+  onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
   onSelectedUf2Change: (value: string) => void;
@@ -1944,7 +2084,18 @@ function BuildPanel({
         <p className="eyebrow">Build / Flash</p>
         <h2>アップロード支援</h2>
       </div>
-      <p className="build-target">GitHub Actions 対象: {firmwareRepoLabel}</p>
+      <label className="build-repo-field">
+        <span>Firmware repository URL</span>
+        <input
+          type="url"
+          placeholder="https://github.com/<owner>/<repo>"
+          value={firmwareRepoUrl}
+          onChange={(event) => onFirmwareRepoUrlChange(event.target.value)}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <small>build workflow を起動する repository ({firmwareRepoLabel})</small>
+      </label>
       <ol>
         <li>Git diff を確認して保存</li>
         <li>GitHub Actions の build を起動</li>
@@ -2474,8 +2625,10 @@ function BuildWorkbench({
   bootloaderVolumes,
   buildStatus,
   firmwareRepoLabel,
+  firmwareRepoUrl,
   onCopySelectedUf2,
   onDownloadArtifacts,
+  onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
   onSelectUf2,
@@ -2488,8 +2641,10 @@ function BuildWorkbench({
   bootloaderVolumes: string[];
   buildStatus: string;
   firmwareRepoLabel: string;
+  firmwareRepoUrl: string;
   onCopySelectedUf2: () => void;
   onDownloadArtifacts: () => void;
+  onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
   onSelectUf2: (value: string) => void;
@@ -2506,7 +2661,18 @@ function BuildWorkbench({
           <p className="eyebrow">Build</p>
           <h2>GitHub Actions</h2>
         </div>
-        <p className="build-target">対象 repository: {firmwareRepoLabel}</p>
+        <label className="build-repo-field">
+          <span>Firmware repository URL</span>
+          <input
+            type="url"
+            placeholder="https://github.com/<owner>/<repo>"
+            value={firmwareRepoUrl}
+            onChange={(event) => onFirmwareRepoUrlChange(event.target.value)}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <small>build workflow を起動する repository ({firmwareRepoLabel})</small>
+        </label>
         <ol>
           <li>Diff を確認して保存</li>
           <li>build workflow を起動</li>
@@ -3316,6 +3482,90 @@ function getWebRuntimeDiagnostics(isDesktopRuntime: boolean): {
     serial: "serial" in navigator,
     url: window.location.href,
   };
+}
+
+async function ensureWritablePermission(handle: FileSystemDirectoryHandle): Promise<void> {
+  const h = handle as unknown as {
+    queryPermission?: (opts: { mode: "read" | "readwrite" }) => Promise<PermissionState>;
+    requestPermission?: (opts: { mode: "read" | "readwrite" }) => Promise<PermissionState>;
+  };
+  if (typeof h.queryPermission === "function") {
+    const state = await h.queryPermission({ mode: "readwrite" });
+    if (state === "granted") return;
+  }
+  if (typeof h.requestPermission === "function") {
+    const next = await h.requestPermission({ mode: "readwrite" });
+    if (next === "granted") return;
+  }
+  throw new Error("フォルダへの書き込み権限がありません");
+}
+
+async function writeProjectToDirectoryHandle(
+  handle: FileSystemDirectoryHandle,
+  files: ProjectFiles,
+): Promise<void> {
+  await ensureWritablePermission(handle);
+  const targets: Array<[string, string]> = [
+    ["KobitoKey.keymap", files.keymap],
+    ["KobitoKey_left.overlay", files.leftOverlay],
+    ["KobitoKey_right.overlay", files.rightOverlay],
+  ];
+  for (const [name, contents] of targets) {
+    const fileHandle = await handle.getFileHandle(name, { create: true });
+    const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
+    await writable.write(contents);
+    await writable.close();
+  }
+}
+
+async function readProjectFromDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<ProjectFiles> {
+  const wanted = {
+    "KobitoKey.keymap": "keymap" as const,
+    "KobitoKey_left.overlay": "leftOverlay" as const,
+    "KobitoKey_right.overlay": "rightOverlay" as const,
+  };
+  const project: ProjectFiles = { keymap: "", leftOverlay: "", rightOverlay: "" };
+  const found: Partial<Record<keyof typeof wanted, true>> = {};
+  for await (const [name, entry] of (handle as unknown as { entries: () => AsyncIterable<[string, FileSystemHandle]> }).entries()) {
+    if (entry.kind !== "file") continue;
+    const slot = (wanted as Record<string, "keymap" | "leftOverlay" | "rightOverlay" | undefined>)[name];
+    if (!slot) continue;
+    const file = await (entry as FileSystemFileHandle).getFile();
+    project[slot] = await file.text();
+    found[name as keyof typeof wanted] = true;
+  }
+  const missing = Object.keys(wanted).filter((n) => !found[n as keyof typeof wanted]);
+  if (missing.length > 0) {
+    throw new Error(`ファイルが見つかりません: ${missing.join(", ")}`);
+  }
+  return project;
+}
+
+async function readProjectFromFileList(list: FileList): Promise<{ files: ProjectFiles; rootLabel: string }> {
+  const targets: Record<string, "keymap" | "leftOverlay" | "rightOverlay"> = {
+    "KobitoKey.keymap": "keymap",
+    "KobitoKey_left.overlay": "leftOverlay",
+    "KobitoKey_right.overlay": "rightOverlay",
+  };
+  const files: ProjectFiles = { keymap: "", leftOverlay: "", rightOverlay: "" };
+  const found: Partial<Record<string, true>> = {};
+  let rootLabel = "";
+  for (const file of Array.from(list)) {
+    const rel = (file as unknown as { webkitRelativePath?: string }).webkitRelativePath ?? file.name;
+    const parts = rel.split("/");
+    if (parts.length > 1 && !rootLabel) rootLabel = parts[0];
+    const basename = parts[parts.length - 1];
+    const slot = targets[basename];
+    if (!slot) continue;
+    files[slot] = await file.text();
+    found[basename] = true;
+  }
+  const missing = Object.keys(targets).filter((n) => !found[n]);
+  if (missing.length > 0) {
+    throw new Error(`ファイルが見つかりません: ${missing.join(", ")}`);
+  }
+  if (!rootLabel) rootLabel = "(選択フォルダ)";
+  return { files, rootLabel };
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
