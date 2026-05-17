@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Save,
   SlidersHorizontal,
+  Smartphone,
   UploadCloud,
   Usb,
 } from "lucide-react";
@@ -134,7 +135,46 @@ declare global {
 
 const DEFAULT_PROJECT_ROOT = "";
 const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
+const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
+
+function useMobileUnsupported() {
+  const [isMobileUnsupported, setIsMobileUnsupported] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(MOBILE_UNSUPPORTED_QUERY).matches;
+  });
+
+  React.useEffect(() => {
+    const query = window.matchMedia(MOBILE_UNSUPPORTED_QUERY);
+    const update = () => setIsMobileUnsupported(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isMobileUnsupported;
+}
+
+function MobileUnsupportedScreen() {
+  return (
+    <main className="mobile-unsupported" aria-labelledby="mobile-unsupported-title">
+      <section className="mobile-unsupported-card">
+        <div className="mobile-unsupported-icon" aria-hidden="true">
+          <Smartphone size={24} />
+        </div>
+        <p className="eyebrow">KobitoKey Studio</p>
+        <h1 id="mobile-unsupported-title">スマホは未対応でーす</h1>
+        <p>
+          このエディタはキーボード接続と広い編集画面が必要なため、初版ではPCブラウザからの利用を想定しています。
+        </p>
+        <p className="mobile-unsupported-note">PCのChromeまたはEdgeでアクセスしてください。</p>
+      </section>
+    </main>
+  );
+}
+
 function App() {
+  const isMobileUnsupported = useMobileUnsupported();
+  const isDesktopRuntime = isTauriRuntime();
   const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
   const [firmwareRepoUrl, setFirmwareRepoUrl] = React.useState(DEFAULT_FIRMWARE_REPO_URL);
@@ -167,7 +207,6 @@ function App() {
   const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
-  const isDesktopRuntime = isTauriRuntime();
   const canUseWebUsb = supportsWebStudioConnection("usb");
   const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
   const firmwareRepoLabel = React.useMemo(() => formatFirmwareRepoLabel(firmwareRepoUrl), [firmwareRepoUrl]);
@@ -1006,6 +1045,10 @@ function App() {
     } catch (error) {
       setBuildStatus(`UF2 コピー失敗: ${String(error)}`);
     }
+  }
+
+  if (isMobileUnsupported && !isDesktopRuntime) {
+    return <MobileUnsupportedScreen />;
   }
 
   return (
