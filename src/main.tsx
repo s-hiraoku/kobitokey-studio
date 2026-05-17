@@ -1823,7 +1823,7 @@ function DirectWelcome({
           {!isDesktopRuntime && canUseAnyWebConnection ? (
             <div className="runtime-notice">
               <strong>ブラウザの接続ダイアログを使います</strong>
-              <span>USB はWeb Serial、BluetoothはWeb Bluetoothで接続します。ブラウザ版では事前のdevice一覧検出はできないため、Connectボタンでpermission pickerを開きます。</span>
+              <span>USB はWeb Serial、BluetoothはWeb Bluetoothで接続します。Bluetooth は通常のキーボード接続ではなく、ZMK Studio BLE service を広告している device を選びます。</span>
             </div>
           ) : null}
           {!isDesktopRuntime ? (

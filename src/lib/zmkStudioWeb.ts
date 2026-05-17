@@ -158,16 +158,11 @@ async function connectWebGattWithFallback() {
   }
 
   const device = await bluetooth.requestDevice({
-    filters: [
-      { services: [serviceUuid] },
-      { namePrefix: "KobitoKey" },
-      { namePrefix: "Conductor" },
-      { namePrefix: "ZMK" },
-    ],
+    filters: [{ services: [serviceUuid] }],
     optionalServices: [serviceUuid],
   }).catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "NotFoundError") {
-      throw new Error("Bluetooth device was not selected. Put the keyboard in pairing/advertising mode and try again.");
+      throw new Error("ZMK Studio Bluetooth device was not selected. Put the keyboard in pairing/advertising mode and make sure the firmware exposes the ZMK Studio BLE service.");
     }
     throw error;
   });
@@ -179,8 +174,14 @@ async function connectWebGattWithFallback() {
   if (!device.gatt.connected) {
     await device.gatt.connect();
   }
-  const service = await device.gatt.getPrimaryService(serviceUuid);
-  const characteristic = await service.getCharacteristic(rpcCharacteristicUuid);
+  const service = await device.gatt.getPrimaryService(serviceUuid).catch((error: unknown) => {
+    throw new Error(
+      `Selected Bluetooth device does not expose the ZMK Studio service. Reconnect from the Studio service entry, not the normal keyboard HID entry. (${formatWebError(error)})`,
+    );
+  });
+  const characteristic = await service.getCharacteristic(rpcCharacteristicUuid).catch((error: unknown) => {
+    throw new Error(`Selected Bluetooth device exposes ZMK Studio service but not the RPC characteristic. (${formatWebError(error)})`);
+  });
   const abortController = new AbortController();
   let cleanupNotifications: (() => void) | undefined;
 
