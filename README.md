@@ -1,7 +1,7 @@
 # KobitoKey Studio
 
 KobitoKey Studio is a dedicated editor for
-[`s-hiraoku/KobitoKey_QWERTY`](https://github.com/s-hiraoku/KobitoKey_QWERTY).
+[`juichi50iii/KobitoKey_QWERTY`](https://github.com/juichi50iii/KobitoKey_QWERTY).
 
 The app is intentionally KobitoKey-specific at this stage. It is not trying to
 be a general ZMK editor yet.
@@ -106,11 +106,8 @@ The app ships with fixture copies of the current KobitoKey files in
 `public/fixtures/`, so the UI can run in a browser before the Tauri shell is
 available.
 
-When running inside Tauri, the default project path points at:
-
-```txt
-/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY
-```
+The project folder is empty by default; pick your local `KobitoKey_QWERTY`
+clone with the `参照…` button in Firmware mode.
 
 ## Implemented Workflows
 

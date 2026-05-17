@@ -232,11 +232,7 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 3. `読み込み` を押します。
 4. (任意)ビルドまで進める場合は `Build & Flash` タブを開き、`Firmware repository URL` に GitHub の repository URL を指定します。
 
-デフォルトの想定パスは次です。
-
-```txt
-/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY
-```
+プロジェクトフォルダの初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
 
 読み込みに成功すると、左側に layer 一覧、中央に KobitoKey の物理レイアウト、右側に選択中キーの編集 panel が表示されます。
 

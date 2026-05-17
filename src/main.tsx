@@ -132,8 +132,8 @@ declare global {
   }
 }
 
-const DEFAULT_PROJECT_ROOT = "/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY";
-const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/s-hiraoku/KobitoKey_QWERTY";
+const DEFAULT_PROJECT_ROOT = "";
+const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
 function App() {
   const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
