@@ -1809,7 +1809,7 @@ function DirectWelcome({
           <p className="eyebrow">Direct Mode</p>
           <h2>キーボードを接続</h2>
           <p>
-            USB または Bluetooth で KobitoKey を接続して、実機の keymap を読み込みます。読み込んだ後は、
+            USB 推奨です。Bluetooth も使えますが、ZMK Studio 用のデバイスが表示される場合のみ接続できます。読み込んだ後は、
             キーを選んでその場で binding を書き込めます。
           </p>
         </div>
@@ -1822,8 +1822,8 @@ function DirectWelcome({
           ) : null}
           {!isDesktopRuntime && canUseAnyWebConnection ? (
             <div className="runtime-notice">
-              <strong>ブラウザの接続ダイアログを使います</strong>
-              <span>USB はWeb Serial、BluetoothはWeb Bluetoothで接続します。Bluetooth は通常のキーボード接続ではなく、ZMK Studio 用として表示されるデバイスを選びます。</span>
+              <strong>USB 接続を推奨します</strong>
+              <span>Bluetooth は実験的対応です。通常のキーボード接続ではなく、ZMK Studio 用として表示されるデバイスが見つかる場合だけ使えます。見つからない場合は USB を選んでください。</span>
             </div>
           ) : null}
           {!isDesktopRuntime ? (

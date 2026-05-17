@@ -19,7 +19,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 | 目的 | 選ぶモード | 反映方法 |
 | --- | --- | --- |
 | すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右 UF2 を書き込み |
-| キーを少しだけ素早く変えたい | Direct Mode | USB/Bluetooth で接続 → 実機へ書き込み |
+| キーを少しだけ素早く変えたい | Direct Mode | USB 推奨。Bluetooth は見つかる場合のみ → 実機へ書き込み |
 | Combo やトラックボールも実機へ直接保存したい | Direct Mode + Tauri版 | Tauri デスクトップ版で読み込み → 保存 |
 
 迷ったら `Firmware Mode` を使ってください。ファイルに残るため見直しやすく、Direct Mode 未対応の設定も扱えます。
@@ -55,7 +55,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 1. ZMK Studio 対応 firmware が入った KobitoKey を用意する
 2. `Direct` を選ぶ
-3. USB または Bluetooth で接続する
+3. USB で接続する(Bluetooth は見つかる場合のみ)
 4. layer と key を選ぶ
 5. binding を選び、`実機へ書き込み` を押す
 
@@ -94,7 +94,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 ### 実機へすぐ反映する流れ
 
 1. `Direct` を選ぶ
-2. USB または Bluetooth で KobitoKey を接続する
+2. USB で KobitoKey を接続する(Bluetooth は見つかる場合のみ)
 3. 実機の keymap を読み込む
 4. 対象 layer と key を選ぶ
 5. binding を選ぶ

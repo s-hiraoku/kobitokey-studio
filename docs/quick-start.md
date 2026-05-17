@@ -103,14 +103,16 @@ left / right の UF2 を取り違えないように、コピー前の確認 dial
 ZMK Studio 対応 firmware が入っている場合は、build せずに対応済み binding を実機へ保存できます。ブラウザ版・デスクトップ版どちらでも使えます。
 
 1. 上部の `Direct` を選びます(ブラウザ版は最初から Direct です)。
-2. USB または Bluetooth で KobitoKey を接続します。
-3. welcome card の「接続方法」select で `USB` か `Bluetooth` を選び、その横の Connect ボタンを押します。ブラウザのデバイス選択ダイアログが開くので、KobitoKey を選びます。
+2. まず USB data cable で KobitoKey を接続します。
+3. welcome card の「接続方法」select で `USB` を選び、その横の Connect ボタンを押します。ブラウザのデバイス選択ダイアログが開くので、KobitoKey を選びます。
 4. 接続後、ヘッダにデバイス名のチップと `再読み込み` / `切断` ボタンが表示されます。
 5. layer と key を選びます。
 6. 右側の `Binding` で binding を選びます。
 7. `実機へ書き込み` を押します。
 
 Direct Mode で書いた変更は、ローカルの `KobitoKey_QWERTY` ファイルへ自動では戻りません。次回 build でも同じ状態を残したい場合は、Firmware Mode(デスクトップ版)側にも同じ設定を入れてください。
+
+Bluetooth は実験的対応です。ZMK Studio 用として表示されるデバイスが見つかる場合だけ使えます。見つからない、または接続が不安定な場合は USB を使ってください。
 
 ## 5. 最初に確認すること
 
@@ -123,7 +125,7 @@ Direct Mode で書いた変更は、ローカルの `KobitoKey_QWERTY` ファイ
 | GitHub Actions が動かない | Firmware repository URL、`gh auth login`、repository 権限(デスクトップ版のみ) |
 | build に変更が入らない | ローカル保存後に `KobitoKey_QWERTY` 側で commit / push したか |
 | artifact が古い | 最新 run の時刻と artifact 取得先を確認する |
-| Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge、`127.0.0.1` / `localhost` / HTTPS で開いているか |
+| Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge、`127.0.0.1` / `localhost` / HTTPS で開いているか。Bluetooth で見つからない場合は USB を使う |
 | UF2 volume が出ない | keyboard half が bootloader mode になっているか(デスクトップ版のみ) |
 
 次に詳しく確認する場合は [使い方ガイド](../usage-guide/) の「目的別レシピ」と「トラブルシューティング」を見てください。

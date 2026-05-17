@@ -113,7 +113,7 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 ### Direct Mode の基本フロー
 
 1. `Direct` を選ぶ
-2. USB または Bluetooth で KobitoKey を接続する
+2. USB で KobitoKey を接続する(Bluetooth は見つかる場合のみ)
 3. 実機 keymap を読み込む
 4. layer と key を選ぶ
 5. binding を選ぶ
@@ -200,7 +200,7 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 | Artifact download | 対応 | — |
 | UF2 bootloader copy | 対応 | — |
 | Direct USB | 対応 | Chrome/Edge の Web Serial で対応 |
-| Direct Bluetooth | 対応環境で利用 | Chrome/Edge の Web Bluetooth で対応 |
+| Direct Bluetooth | 対応環境で利用 | 実験的対応。見つからない場合は USB 推奨 |
 | Direct key binding write | 対応 | 対応 |
 | Direct Combo write | 対応 | 読み取り表示または未対応 |
 | Direct Trackball write | 対応 | 未対応表示 |
@@ -409,18 +409,18 @@ Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻
 
 Direct Mode の key / Combo / Trackball 書き込みは、成功時に device へ自動保存します。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
-### 5.2 USB / Bluetooth で接続する(共通手順)
+### 5.2 USB / Bluetooth で接続する(USB 推奨)
 
-1. KobitoKey を USB または Bluetooth で接続できる状態にします。
+1. まず USB data cable で KobitoKey を接続します。
 2. 上部のモード切り替えで `Direct` を選びます(ブラウザ版は最初から Direct です)。
-3. welcome card の「接続方法」select で `USB` または `Bluetooth` を選びます。
-4. その右の Connect ボタン(`USB で接続` または `Bluetooth で接続`)を押します。
+3. welcome card の「接続方法」select で `USB` を選びます。
+4. その右の Connect ボタン(`USB で接続`)を押します。
 5. ブラウザのデバイス選択ダイアログ(Tauri 版ではネイティブの permission picker)が開くので、KobitoKey を選びます。
 6. 接続後、ヘッダにデバイス名のチップと `再読み込み` / `切断` ボタンが表示されます。中央には実機の keymap が表示され、右側の `Binding` / `Combos` / `Trackball` / `Timing` tabs が使えます。
 
 ブラウザは USB / Bluetooth device 一覧を事前に列挙できません。`検出` のような事前一覧操作はなく、Connect ボタンを押した時点で browser の permission picker が開く動きになります。
 
-Bluetooth Direct では、通常のキーボード接続ではなく ZMK Studio 用として表示される device を選びます。接続が不安定な場合や ZMK Studio 用の device が見えない場合は、USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
+Bluetooth Direct は実験的対応です。試す場合は「接続方法」で `Bluetooth` を選び、通常のキーボード接続ではなく ZMK Studio 用として表示される device を選びます。ZMK Studio 用の device が見えない、接続が不安定、または書き込みが失敗する場合は USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
 
 ### 5.3 Direct Mode でキー binding を書き込む
 

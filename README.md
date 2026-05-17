@@ -19,7 +19,7 @@ KobitoKey Studio supports two editing workflows.
 
 | Workflow | Available in | What it changes |
 | --- | --- | --- |
-| Direct Mode | Browser app and Tauri desktop app | Writes supported ZMK Studio settings directly to a connected keyboard over USB or Bluetooth |
+| Direct Mode | Browser app and Tauri desktop app | Writes supported ZMK Studio settings directly to a connected keyboard. USB is recommended; Bluetooth is experimental and only works when the ZMK Studio device appears |
 | Firmware Mode | Tauri desktop app only | Edits local `KobitoKey_QWERTY` files, triggers GitHub Actions builds, downloads artifacts, and helps copy UF2 files |
 
 Use Direct Mode for quick supported key-binding edits. Use Firmware Mode when
@@ -38,7 +38,7 @@ For end-user steps, start with the published docs:
 - Show the KobitoKey physical layout across 10 layers
 - Render the left half from hand-tuned coordinates and mirror it for the right half
 - Edit common ZMK binding types with structured controls
-- Detect and read ZMK Studio compatible devices over USB serial or Bluetooth
+- Detect and read ZMK Studio compatible devices over USB serial; Bluetooth is available only when the ZMK Studio device appears
 - Write supported key bindings directly to a connected keyboard
 - Display, add, edit, and delete keymap combos
 - Read and edit trackball parameters from the left/right overlay files
