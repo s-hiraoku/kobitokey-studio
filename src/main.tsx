@@ -1837,11 +1837,33 @@ function DirectWelcome({
             ) : null}
           </div>
         </div>
-        <div className="direct-capability-strip">
-          <span>Key Config: Web / Tauri 書き込み</span>
-          <span>{isDesktopRuntime ? "Combo: Tauri 書き込み" : "Combo: Web は読み取り表示"}</span>
-          <span>{isDesktopRuntime ? "Trackball: Tauri 書き込み" : "Trackball: Web は未対応表示"}</span>
-        </div>
+        <ul className="direct-capability-strip" aria-label="この環境でできること">
+          <li>
+            <span className="capability-label">キー割り当て</span>
+            <span className="capability-state ok">書き込み可</span>
+          </li>
+          <li>
+            <span className="capability-label">コンボ</span>
+            {isDesktopRuntime ? (
+              <span className="capability-state ok">書き込み可</span>
+            ) : (
+              <span className="capability-state read">読み取りのみ</span>
+            )}
+          </li>
+          <li>
+            <span className="capability-label">トラックボール</span>
+            {isDesktopRuntime ? (
+              <span className="capability-state ok">書き込み可</span>
+            ) : (
+              <span className="capability-state none">未対応</span>
+            )}
+          </li>
+        </ul>
+        {!isDesktopRuntime ? (
+          <p className="direct-capability-note">
+            コンボの書き込みとトラックボール設定はデスクトップ版でのみ可能です。
+          </p>
+        ) : null}
       </div>
     </section>
   );
