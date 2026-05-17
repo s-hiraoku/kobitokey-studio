@@ -366,6 +366,10 @@ input[type="url"] {
 }
 
 .mode-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 34px;
   min-width: 92px;
   border: 0;
@@ -382,6 +386,27 @@ input[type="url"] {
 }
 .mode-toggle button:hover { background: var(--paper-2); color: var(--ink); }
 .mode-toggle button:last-child { border-right: 0; }
+.mode-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.mode-toggle button:disabled:hover {
+  background: transparent;
+  color: var(--ink-muted);
+}
+.mode-toggle-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-full);
+  padding: 1px 6px;
+  background: var(--paper-2);
+}
 .mode-toggle button.active {
   background: linear-gradient(180deg, var(--pine) 0%, var(--pine-deep) 100%);
   color: var(--on-pine);

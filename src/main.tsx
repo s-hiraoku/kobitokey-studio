@@ -176,6 +176,15 @@ function App() {
     loadFixture();
   }, []);
 
+  // Firmware mode is excluded from the browser release for now. If the
+  // user lands on it (e.g. older saved state), bounce them back to
+  // Direct so they don't see disabled UI half the page.
+  React.useEffect(() => {
+    if (!isDesktopRuntime && editorMode === "firmware") {
+      setEditorMode("direct");
+    }
+  }, [isDesktopRuntime, editorMode]);
+
   const isDirectMode = editorMode === "direct";
   const activeKeymapSource = React.useMemo(
     () => files?.keymap ?? "",
@@ -1012,8 +1021,16 @@ function App() {
               type="button"
               className={editorMode === "firmware" ? "active" : ""}
               onClick={() => setEditorMode("firmware")}
+              disabled={!isDesktopRuntime}
+              aria-disabled={!isDesktopRuntime}
+              title={
+                !isDesktopRuntime
+                  ? "Firmware モードは初版のリリース対象外です。デスクトップ版でのみ利用できます。"
+                  : undefined
+              }
             >
               Firmware
+              {!isDesktopRuntime ? <em className="mode-toggle-badge">Desktop限定</em> : null}
             </button>
             <button
               type="button"
