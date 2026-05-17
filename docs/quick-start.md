@@ -39,7 +39,7 @@ KobitoKey Studio のリポジトリで依存関係を入れます。
 npm install
 ```
 
-ブラウザで起動するには次のコマンドを実行し、Chrome / Edge で `http://localhost:1420/` を開きます。初版のブラウザ版は Direct Mode 専用です。
+ブラウザで起動するには次のコマンドを実行し、Chrome / Edge で `http://127.0.0.1:1420/` を開きます。初版のブラウザ版は Direct Mode 専用です。
 
 ```sh
 npm run dev
@@ -123,7 +123,7 @@ Direct Mode で書いた変更は、ローカルの `KobitoKey_QWERTY` ファイ
 | GitHub Actions が動かない | Firmware repository URL、`gh auth login`、repository 権限(デスクトップ版のみ) |
 | build に変更が入らない | ローカル保存後に `KobitoKey_QWERTY` 側で commit / push したか |
 | artifact が古い | 最新 run の時刻と artifact 取得先を確認する |
-| Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge、`localhost` または HTTPS で開いているか |
+| Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge、`127.0.0.1` / `localhost` / HTTPS で開いているか |
 | UF2 volume が出ない | keyboard half が bootloader mode になっているか(デスクトップ版のみ) |
 
 次に詳しく確認する場合は [使い方ガイド](../usage-guide/) の「目的別レシピ」と「トラブルシューティング」を見てください。

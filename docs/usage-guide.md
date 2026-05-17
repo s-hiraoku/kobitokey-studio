@@ -151,7 +151,7 @@ npm install
 npm run dev
 ```
 
-起動後、Chrome または Edge で `http://localhost:1420/` を開きます。初版のブラウザ版は Direct Mode 専用です(`Firmware` トグルは disabled)。
+起動後、Chrome または Edge で `http://127.0.0.1:1420/` を開きます。初版のブラウザ版は Direct Mode 専用です(`Firmware` トグルは disabled)。
 
 Firmware Mode を含むフル機能を使うには、Rust と Cargo を用意したうえで Tauri デスクトップ版を起動します。
 
@@ -205,7 +205,7 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 | Direct Combo write | 対応 | 読み取り表示または未対応 |
 | Direct Trackball write | 対応 | 未対応表示 |
 
-ブラウザ版で Direct Mode を使う場合は、Chrome または Edge で `localhost` または HTTPS から開いてください。Web Serial / Web Bluetooth は、通常の `file://` や安全でない HTTP では利用できません。
+ブラウザ版で Direct Mode を使う場合は、Chrome または Edge で `127.0.0.1`、`localhost`、または HTTPS から開いてください。Web Serial / Web Bluetooth は、通常の `file://` や安全でない HTTP では利用できません。
 
 ### 保存先と反映先の違い
 
@@ -420,9 +420,9 @@ Direct Mode の key / Combo / Trackball 書き込みは、成功時に device �
 
 ブラウザは USB / Bluetooth device 一覧を事前に列挙できません。`検出` のような事前一覧操作はなく、Connect ボタンを押した時点で browser の permission picker が開く動きになります。
 
-Bluetooth Direct は、ZMK Studio service を公開している device が対象です。接続が不安定な場合や firmware 側の Studio service が見えない場合は、USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
+Bluetooth Direct では、通常のキーボード接続ではなく ZMK Studio 用として表示される device を選びます。接続が不安定な場合や ZMK Studio 用の device が見えない場合は、USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
 
-### 5.5 Direct Mode でキー binding を書き込む
+### 5.3 Direct Mode でキー binding を書き込む
 
 1. Direct Mode で device を読み込みます。
 2. layer を選びます。
@@ -462,7 +462,7 @@ Direct Mode で対応している主な binding は次です。
 
 書き込み後は device から keymap を再読み込みします。表示が戻った、または変わらないように見える場合は、書き込み対象 layer と key position が正しいか、Direct Mode 対応 binding かを確認してください。
 
-### 5.6 Direct Mode で Combo を編集する
+### 5.4 Direct Mode で Combo を編集する
 
 Direct Combo の書き込みは Tauri デスクトップ版で使います。
 
@@ -475,7 +475,7 @@ Direct Combo の書き込みは Tauri デスクトップ版で使います。
 
 ブラウザ版では Combo RPC が Web client package から公開されていない場合があります。その場合は Firmware keymap の Combo を読み取り専用で表示するか、未対応として表示されます。Combo を確実に編集したい場合は Tauri デスクトップ版か Firmware Mode を使ってください。
 
-### 5.7 Direct Mode でトラックボール設定を編集する
+### 5.5 Direct Mode でトラックボール設定を編集する
 
 Direct Trackball の書き込みは Tauri デスクトップ版で使います。
 
@@ -488,7 +488,7 @@ Direct Trackball の書き込みは Tauri デスクトップ版で使います�
 
 firmware に Trackball RPC が入っていない場合、読み込みや保存に失敗します。その場合は Firmware Mode で overlay を編集し、build + flash してください。
 
-### 5.8 Timing tab について
+### 5.6 Timing tab について
 
 Direct Mode の `Timing` tab は、予定している操作 UI を表示します。現在は保存対象ではありません。timing 系の詳細設定を確実に反映したい場合は Firmware Mode で該当ファイルを編集し、firmware を build してください。
 
@@ -603,7 +603,7 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 - USB ケーブルが data 通信対応か確認します。
 - ZMK Studio 対応 firmware が入っているか確認します。
 - Tauri 版では `検出` を押して候補 port を再取得します。
-- ブラウザ版では Chrome/Edge を使い、`localhost` または HTTPS から開きます。
+- ブラウザ版では Chrome/Edge を使い、`127.0.0.1`、`localhost`、または HTTPS から開きます。
 - ブラウザの permission picker で正しい device を選びます。
 
 ### Direct 書き込みに失敗する
@@ -636,20 +636,6 @@ firmware に Trackball RPC が含まれていない可能性があります。�
 - `UF2 / Volume 更新` を押して再スキャンします。
 - left / right のどちらを接続しているか確認します。
 
-## 8. 公開ページの更新方法
+## 8. 関連ドキュメント
 
-このガイドは GitHub Pages 用に `docs/` 配下へ置いています。変更を公開するには、変更を commit して repository の default branch へ push します。
-
-初回だけ、GitHub repository の `Settings` → `Pages` で source を `GitHub Actions` に設定してください。以後は `.github/workflows/pages.yml` が `docs/` を Pages artifact として deploy します。
-
-公開 URL は次の形式です。
-
-```txt
-https://s-hiraoku.github.io/kobitokey-studio/
-```
-
-使い方ガイドの直接 URL は次です。
-
-```txt
-https://s-hiraoku.github.io/kobitokey-studio/usage-guide/
-```
+開発時の起動コマンド、公開 URL、Cloudflare Pages、GitHub Pages の更新方法は [Deployment](../deployment/) に集約しています。

@@ -35,7 +35,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 - [Firmware Mode で設定する](./usage-guide/#3-firmware-mode-で設定する)
 - [ビルドして UF2 を書き込む](./usage-guide/#4-firmware-を-build-して-uf2-を書き込む)
 - [Direct Mode で実機へ書き込む](./usage-guide/#5-direct-mode-で設定する)
-- [公開と Cloudflare Pages 設定を確認する](./deployment/)
+- [公開とドキュメント更新手順を確認する](./deployment/)
 - [目的別レシピを見る](./usage-guide/#6-目的別レシピ)
 - [困ったときの確認項目を見る](./usage-guide/#7-トラブルシューティング)
 
