@@ -10,12 +10,16 @@ permalink: /quick-start/
 
 ## 初版での機能差(重要)
 
+ブラウザ版の公開 URL は <https://kobitokey-studio.pages.dev/> です。
+
 | ビルド | Direct Mode | Firmware Mode |
 | --- | --- | --- |
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | ❌ 初版では無効化(`Firmware` トグルが disabled) |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 利用可 |
 
 初版リリースのブラウザ版は **Direct Mode 専用** です。Combo の書き込みと Trackball 設定はデスクトップ版でのみ利用できます。
+
+スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
 
 ## まず選ぶ
 

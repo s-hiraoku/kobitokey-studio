@@ -5,6 +5,7 @@ theme: minima
 header_pages:
   - quick-start.md
   - usage-guide.md
+  - deployment.md
 
 github_username: s-hiraoku
 show_excerpts: false

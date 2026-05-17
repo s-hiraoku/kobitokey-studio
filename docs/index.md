@@ -8,7 +8,9 @@ permalink: /
 
 KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボール設定、ファームウェアのビルド、UF2 書き込みをまとめて扱うための専用設定エディタです。
 
-すぐに始める場合は [Quick Start](./quick-start/) を開いてください。背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。
+すぐに始める場合は [Quick Start](./quick-start/) を開いてください。背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。公開とリリース確認は [Deployment](./deployment/) にまとめています。
+
+ブラウザ版の公開 URL は <https://kobitokey-studio.pages.dev/> です。
 
 ## まず選ぶこと
 
@@ -22,6 +24,8 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 迷ったら `Firmware Mode` を使ってください。ファイルに残るため見直しやすく、Direct Mode 未対応の設定も扱えます。
 
+スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
+
 ## 使い方の入口
 
 - [Quick Start で最短手順を見る](./quick-start/)
@@ -31,6 +35,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 - [Firmware Mode で設定する](./usage-guide/#3-firmware-mode-で設定する)
 - [ビルドして UF2 を書き込む](./usage-guide/#4-firmware-を-build-して-uf2-を書き込む)
 - [Direct Mode で実機へ書き込む](./usage-guide/#5-direct-mode-で設定する)
+- [公開と Cloudflare Pages 設定を確認する](./deployment/)
 - [目的別レシピを見る](./usage-guide/#6-目的別レシピ)
 - [困ったときの確認項目を見る](./usage-guide/#7-トラブルシューティング)
 

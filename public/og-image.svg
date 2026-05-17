@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">KobitoKey Studio</title>
+  <desc id="desc">KobitoKey Studio social preview image</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f8fa"/>
+      <stop offset="1" stop-color="#dde3e7"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#334e5f"/>
+      <stop offset="1" stop-color="#1c2c38"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <path d="M0 504 C190 464 326 536 500 498 C706 453 818 396 1200 444 L1200 630 L0 630 Z" fill="#e7ebee"/>
+  <g transform="translate(105 98)">
+    <rect x="0" y="0" width="990" height="434" rx="28" fill="#eef1f3" stroke="#c2cad3" stroke-width="2"/>
+    <g transform="translate(54 64)">
+      <text x="0" y="32" fill="#5e6976" font-family="Hanken Grotesk, Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="3">KOBITOKEY STUDIO</text>
+      <text x="0" y="112" fill="#0f1318" font-family="Georgia, serif" font-size="72" font-weight="600">KobitoKey</text>
+      <text x="0" y="190" fill="#0f1318" font-family="Georgia, serif" font-size="72" font-weight="600">設定エディタ</text>
+      <text x="2" y="254" fill="#3a4450" font-family="Hanken Grotesk, Arial, sans-serif" font-size="30" font-weight="600">Direct Mode for browser release</text>
+      <g transform="translate(0 298)">
+        <rect x="0" y="0" width="170" height="42" rx="8" fill="#2c4250"/>
+        <text x="85" y="28" text-anchor="middle" fill="#e6ecf1" font-family="Hanken Grotesk, Arial, sans-serif" font-size="20" font-weight="800">USB / BLE</text>
+        <rect x="186" y="0" width="156" height="42" rx="8" fill="#e1e9ef" stroke="#b3c2d0"/>
+        <text x="264" y="28" text-anchor="middle" fill="#1c2c38" font-family="Hanken Grotesk, Arial, sans-serif" font-size="20" font-weight="800">Chrome / Edge</text>
+      </g>
+    </g>
+    <g transform="translate(610 136)">
+      <rect x="0" y="0" width="300" height="190" rx="26" fill="url(#plate)"/>
+      <g fill="#e3a526" stroke="#a86c0c" stroke-width="3">
+        <rect x="34" y="44" width="50" height="42" rx="8"/>
+        <rect x="98" y="34" width="50" height="42" rx="8"/>
+        <rect x="162" y="44" width="50" height="42" rx="8"/>
+        <rect x="226" y="60" width="40" height="42" rx="8"/>
+        <rect x="54" y="104" width="50" height="42" rx="8"/>
+        <rect x="118" y="98" width="50" height="42" rx="8"/>
+        <rect x="182" y="104" width="84" height="42" rx="8"/>
+      </g>
+      <circle cx="232" cy="34" r="15" fill="#f6c84a"/>
+    </g>
+  </g>
+</svg>

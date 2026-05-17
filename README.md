@@ -6,6 +6,12 @@ KobitoKey Studio is a dedicated editor for
 The app is intentionally KobitoKey-specific at this stage. It is not trying to
 be a general ZMK editor yet.
 
+## 公開 URL
+
+- ブラウザ版: <https://kobitokey-studio.pages.dev/>
+- 対応ブラウザ: PC の Chrome / Edge
+- スマホブラウザ: 初版では未対応画面を表示
+
 ## 初版リリース時点のスコープ
 
 - **ブラウザ版**: Direct モードのみ。USB / Bluetooth で実機に接続して
@@ -22,6 +28,7 @@ be a general ZMK editor yet.
 GitHub Pages で日本語の詳細ガイドを公開します。
 
 - [KobitoKey Studio 使い方ガイド](https://s-hiraoku.github.io/kobitokey-studio/usage-guide/)
+- [公開とリリース確認](https://s-hiraoku.github.io/kobitokey-studio/deployment/)
 
 Firmware Mode、Direct Mode、Tauri デスクトップ版とブラウザ版の違い、
 Combo / Trackball 設定、GitHub Actions build、artifact download、UF2
@@ -80,6 +87,24 @@ For a production frontend build:
 ```sh
 npm run build
 ```
+
+Cloudflare Pages uses these build settings:
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `main` |
+| Framework preset | `None` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Root directory | `/` |
+
+Push to `main` to trigger the production deployment. The default production
+URL is <https://kobitokey-studio.pages.dev/>.
+
+To add a custom domain, open the Cloudflare dashboard and go to
+`Workers & Pages` → `kobitokey-studio` → `Custom domains` →
+`Set up a custom domain`. Add the DNS record Cloudflare shows, then wait for
+the domain status to become active.
 
 Run the TypeScript unit tests:
 
