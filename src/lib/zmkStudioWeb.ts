@@ -162,7 +162,7 @@ async function connectWebGattWithFallback() {
     optionalServices: [serviceUuid],
   }).catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "NotFoundError") {
-      throw new Error("ZMK Studio Bluetooth device was not selected. Put the keyboard in pairing/advertising mode and make sure the firmware exposes the ZMK Studio BLE service.");
+      throw new Error("ZMK Studio 用の Bluetooth デバイスが選択されませんでした。キーボードを接続待ち状態にして、通常のキーボード接続ではなく ZMK Studio 用として表示されるデバイスを選んでください。");
     }
     throw error;
   });
@@ -176,7 +176,7 @@ async function connectWebGattWithFallback() {
   }
   const service = await device.gatt.getPrimaryService(serviceUuid).catch((error: unknown) => {
     throw new Error(
-      `Selected Bluetooth device does not expose the ZMK Studio service. Reconnect from the Studio service entry, not the normal keyboard HID entry. (${formatWebError(error)})`,
+      `選択した Bluetooth デバイスは ZMK Studio 用の接続に対応していません。通常のキーボード接続ではなく、ZMK Studio 用として表示されるデバイスを選んでください。(${formatWebError(error)})`,
     );
   });
   const characteristic = await service.getCharacteristic(rpcCharacteristicUuid).catch((error: unknown) => {
