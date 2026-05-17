@@ -1,10 +1,21 @@
 # KobitoKey Studio
 
-KobitoKey Studio is a dedicated desktop editor for
-[`s-hiraoku/KobitoKey_QWERTY`](https://github.com/s-hiraoku/KobitoKey_QWERTY).
+KobitoKey Studio is a dedicated editor for
+[`juichi50iii/KobitoKey_QWERTY`](https://github.com/juichi50iii/KobitoKey_QWERTY).
 
 The app is intentionally KobitoKey-specific at this stage. It is not trying to
 be a general ZMK editor yet.
+
+## 初版リリース時点のスコープ
+
+- **ブラウザ版**: Direct モードのみ。USB / Bluetooth で実機に接続して
+  キーマップを編集します。
+- **デスクトップ版 (Tauri)**: Direct モードに加えて Firmware モード(ローカル
+  リポジトリの編集、GitHub Actions ビルド連携、UF2 書き込み補助)が利用
+  できます。Firmware モードはブラウザ版では無効化されています。
+
+初版以降に Firmware モードのブラウザ対応(repo への書き戻しなど)を順次
+検討します。
 
 ## 使い方ガイド
 
@@ -95,11 +106,8 @@ The app ships with fixture copies of the current KobitoKey files in
 `public/fixtures/`, so the UI can run in a browser before the Tauri shell is
 available.
 
-When running inside Tauri, the default project path points at:
-
-```txt
-/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY
-```
+The project folder is empty by default; pick your local `KobitoKey_QWERTY`
+clone with the `参照…` button in Firmware mode.
 
 ## Implemented Workflows
 
@@ -139,11 +147,14 @@ USB or Bluetooth. It is separate from the firmware file workflow.
 1. Build and run the Tauri app with `npm run tauri dev`, or open the browser
    build in Chrome/Edge from `localhost` or HTTPS.
 2. Connect the ZMK Studio enabled side of the keyboard over USB or Bluetooth.
-3. Switch the top toolbar from `Firmware` to `Direct`.
-4. In Tauri, click `検出`/`読み込み` to use the serial port list. In the browser,
-   click `Connect via USB` or `Connect via Bluetooth`; browsers do not allow
-   pre-listing devices before the permission picker opens.
-5. If multiple candidates are shown, choose the target device and connect again.
+3. The top toolbar opens on `Direct`. (In the browser build `Firmware` is
+   disabled — Firmware mode is desktop-only for the initial release.)
+4. Pick `USB` or `Bluetooth` from the transport select on the welcome card,
+   then press the single Connect button. The browser permission picker
+   appears; choose the target device.
+5. After connecting, the header shows a device chip with `再読み込み` and
+   `切断` actions. Use those to reload state from the keyboard or to drop
+   the connection.
 6. Select a key in the physical layout.
 7. Choose the binding type and keycode from the on-screen picker, then click
    `実機へ書き込み`.
@@ -204,12 +215,14 @@ or custom ZMK bindings.
 
 ## Remaining Notes
 
+- **Firmware mode is disabled in the browser build for the initial release.**
+  Use the desktop (Tauri) build for keymap/overlay editing, GitHub Actions
+  builds, artifact download, and UF2 copy. The browser ships with Direct
+  mode only.
 - Browser Direct Mode uses Web Serial / Web Bluetooth. Use Chrome or Edge, and
   serve the app from `localhost` or HTTPS so the browser exposes those APIs.
 - Browsers cannot pre-detect USB/Bluetooth devices for Direct Mode. The connect
-  buttons open the browser permission picker instead.
-- File saving, folder picking, GitHub Actions, artifact download, and UF2 copy
-  require the Tauri app shell.
+  button opens the browser permission picker instead.
 - Direct Mode requires ZMK Studio enabled firmware and either USB serial access
   or Bluetooth Studio service support on the connected keyboard.
 - GitHub tokens are not stored in the renderer; GitHub operations are delegated

@@ -8,19 +8,31 @@ permalink: /usage-guide/
 
 このガイドのゴールは、ユーザが自分で KobitoKey Studio を起動し、目的に合うモードを選び、キーマップ、Combo、トラックボール設定、Firmware build、UF2 書き込みまで進められるようにすることです。
 
+## 初版でできること(重要)
+
+初版リリースでは、ブラウザ版とデスクトップ版で使える機能が大きく違います。
+
+| ビルド | Direct Mode (キー) | Direct Mode (Combo / Trackball) | Firmware Mode |
+| --- | --- | --- | --- |
+| ブラウザ版 (`npm run dev`) | ✅ 利用可 | 読み取りのみ / 未対応 | ❌ **初版では無効化** |
+| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 書き込み可 | ✅ 利用可 |
+
+- 初版のブラウザ版は **Direct Mode 専用** です。ヘッダの `Firmware` トグルは disabled になっています。
+- Firmware モードのファイル編集、GitHub Actions ビルド、UF2 書き込み補助はすべてデスクトップ版でのみ利用できます。
+- 初版以降に Firmware モードのブラウザ対応(リポジトリへの書き戻しなど)を順次検討します。
+
 ## まず結論
 
-KobitoKey Studio では、最初に `Firmware Mode` と `Direct Mode` のどちらを使うかを選びます。
+KobitoKey Studio では、最初に `Firmware Mode`(デスクトップ版のみ)と `Direct Mode` のどちらを使うかを選びます。
 
 | 迷っている内容 | 選ぶもの | 理由 |
 | --- | --- | --- |
-| 初めて設定する | Firmware Mode | 変更がファイルに残り、あとから diff で確認できるため |
-| Combo やトラックボールを確実に設定したい | Firmware Mode | Direct Mode 未対応の設定も扱えるため |
 | キーを 1 個だけ素早く変更したい | Direct Mode | ビルドと UF2 書き込みなしで実機へ保存できるため |
-| ブラウザで試している | Direct Mode は Chrome/Edge のみ | Web Serial / Web Bluetooth が必要なため |
-| GitHub Actions から UF2 まで進めたい | Tauri版 + Firmware Mode | ローカルファイル保存、artifact 取得、UF2 コピーが必要なため |
+| ブラウザだけで試したい | Direct Mode (Chrome/Edge) | 初版のブラウザ版は Direct Mode 専用 |
+| Combo やトラックボールを確実に設定したい | デスクトップ版 + Direct Mode または Firmware Mode | ブラウザ版 Direct ではどちらも書き込めない |
+| 設定をファイルとして残したい / GitHub Actions ビルドまで進めたい | デスクトップ版 + Firmware Mode | ローカル保存、artifact 取得、UF2 コピーが必要なため |
 
-迷った場合は `Firmware Mode` を選んでください。Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファームウェアを作り直して反映します。Direct Mode は、ZMK Studio 対応 firmware が入った実機へ、対応済みの設定だけを直接保存するための高速な編集モードです。
+Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファームウェアを作り直して反映します。Direct Mode は、ZMK Studio 対応 firmware が入った実機へ、対応済みの設定だけを直接保存するための高速な編集モードです。
 
 ## このガイドの読み方
 
@@ -47,7 +59,7 @@ KobitoKey Studio では、最初に `Firmware Mode` と `Direct Mode` のどち�
 | USB data 通信できるケーブルがある | UF2 書き込みに必須 | USB Direct に必須 |
 | Chrome または Edge を使っている | ブラウザ版では推奨 | ブラウザ Direct では必須 |
 
-Tauri デスクトップ版で作業する場合は、ローカルファイル保存、GitHub Actions 操作、artifact download、UF2 コピーまで一つの画面で進められます。ブラウザ版は試用や Direct key binding の書き込みに便利ですが、ローカルファイルへ直接保存できません。
+Tauri デスクトップ版で作業する場合は、Firmware Mode のローカルファイル保存、GitHub Actions 操作、artifact download、UF2 コピーまで一つの画面で進められます。初版のブラウザ版は Direct Mode 専用で、Firmware Mode のトグルは disabled になっています。
 
 ## 画面の見方
 
@@ -55,8 +67,8 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 
 | 場所 | 役割 |
 | --- | --- |
-| 上部バー | `Firmware` / `Direct` の切り替え、プロジェクト読み込み、device 読み込み |
-| 左側 | layer 一覧、Direct Mode の接続操作 |
+| 上部バー | `Firmware` / `Direct` の切り替え、プロジェクト読み込み、接続状態 |
+| 左側 | layer 一覧 |
 | 中央 | 実際の KobitoKey 形状に沿った keymap 表示、Combo overlay、作業 tabs |
 | 右側 | 選択中 key の binding、Combo、Trackball、Build/Flash 操作 |
 
@@ -66,16 +78,15 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 
 | ボタン | ある場所 | 何をするか |
 | --- | --- | --- |
-| `選択` | Firmware Mode 上部 | `KobitoKey_QWERTY` フォルダを picker で選ぶ |
+| `参照…` | Firmware Mode 上部 | `KobitoKey_QWERTY` フォルダを picker で選ぶ(ブラウザ・デスクトップ両対応) |
 | `読み込み` | Firmware Mode 上部 | 指定した project から keymap と overlay を読む |
-| Firmware repository URL | Firmware Mode 上部 | GitHub Actions を実行する firmware repository を指定する |
-| `保存` | Firmware Mode 中央上部 | 編集した keymap / overlay をローカルファイルへ保存する |
-| `書き出し` | ブラウザ版 Firmware Mode | ブラウザで編集したファイルを download する |
-| `検出` | Direct Mode 上部 | Tauri 版で Studio device candidate を探す |
-| `Connect via USB` | ブラウザ版 Direct Mode | Web Serial の permission picker を開く |
-| `Connect via Bluetooth` | ブラウザ版 Direct Mode | Web Bluetooth の permission picker を開く |
+| Firmware repository URL | `Build & Flash` タブ | GitHub Actions を実行する firmware repository を指定する |
+| `保存` | Firmware Mode 中央上部 | 編集した keymap / overlay をローカルへ保存する(ハンドルがあればフォルダに直接上書き、なければダウンロード) |
+| 接続方法 select + Connect ボタン | Direct welcome card | USB か Bluetooth を選んでブラウザのデバイス選択ダイアログを開く |
+| `再読み込み` | Direct Mode 上部 (接続済み) | 実機から keymap などを再取得する |
+| `切断` | Direct Mode 上部 (接続済み) | 実機との接続を切る |
 | `実機へ書き込み` | Direct Mode 右側 | 選択中 key の binding を実機へ保存する |
-| `UF2 / Volume 更新` | Firmware Mode Build/Flash | artifact と bootloader volume を再スキャンする |
+| `UF2 / Volume 更新` | Firmware Mode Build/Flash | artifact と bootloader volume を再スキャンする(デスクトップ版のみ) |
 
 ## モード早見表
 
@@ -126,29 +137,29 @@ Direct Mode で Combo やトラックボールを書き込む場合は、Tauri �
 
 | 起動方法 | 向いている用途 |
 | --- | --- |
-| Tauri デスクトップ版 | 実際の設定作業、ファイル保存、ビルド、artifact 取得、UF2 コピー、Direct Combo/Trackball 書き込み |
-| ブラウザ版 | UI の確認、fixture の確認、Web Serial / Web Bluetooth を使った Direct key binding 書き込み |
+| Tauri デスクトップ版 | 実際の設定作業、Firmware Mode のファイル編集、ビルド、artifact 取得、UF2 コピー、Direct の Combo / Trackball 書き込み |
+| ブラウザ版(初版) | Direct Mode の試用と key binding の書き込み (Web Serial / Web Bluetooth) |
 
-設定作業を最後まで進めるなら、Tauri デスクトップ版を推奨します。ブラウザ版は便利ですが、ローカルファイルへ直接保存できず、GitHub Actions や UF2 コピーも使えません。
+設定作業を最後まで進めるなら、Tauri デスクトップ版を推奨します。**初版のブラウザ版は Direct Mode 専用** で、Firmware Mode、GitHub Actions、UF2 コピーは使えません。
 
 ### ローカル開発版の起動
 
-ブラウザで UI を確認するだけなら、KobitoKey Studio のリポジトリで次を実行します。
+ブラウザで Direct Mode を試すなら、KobitoKey Studio のリポジトリで次を実行します。
 
 ```sh
 npm install
 npm run dev
 ```
 
-起動後、`http://127.0.0.1:1420/` を開きます。
+起動後、Chrome または Edge で `http://localhost:1420/` を開きます。初版のブラウザ版は Direct Mode 専用です(`Firmware` トグルは disabled)。
 
-Tauri デスクトップ版を使う場合は、Rust と Cargo を用意したうえで次を実行します。
+Firmware Mode を含むフル機能を使うには、Rust と Cargo を用意したうえで Tauri デスクトップ版を起動します。
 
 ```sh
 npm run tauri dev
 ```
 
-Tauri デスクトップ版では、ローカルファイルの読み書き、GitHub Actions 操作、artifact download、UF2 コピー、Direct Combo/Trackball 書き込みなど、ブラウザだけでは制限される機能を使えます。
+Tauri デスクトップ版では、ローカルファイルの読み書き、GitHub Actions 操作、artifact download、UF2 コピー、Direct Combo/Trackball 書き込みなど、ブラウザでは制限される機能をすべて使えます。
 
 ### GitHub CLI の準備
 
@@ -180,13 +191,14 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 
 ### Tauri デスクトップ版とブラウザ版の違い
 
-| 機能 | Tauri デスクトップ版 | ブラウザ版 |
+| 機能 | Tauri デスクトップ版 | ブラウザ版 (初版) |
 | --- | --- | --- |
-| Firmware ファイル読み込み | ローカルフォルダから読み込み | fixture 表示、保存時は download |
-| Firmware ファイル保存 | ローカルファイルへ直接保存 | `KobitoKey.keymap` と overlay を download |
-| GitHub Actions build | 対応 | 非対応 |
-| Artifact download | 対応 | 非対応 |
-| UF2 bootloader copy | 対応 | 非対応 |
+| Firmware Mode (トグル) | 利用可 | **無効化** |
+| Firmware ファイル読み込み | ローカルフォルダから読み込み | — |
+| Firmware ファイル保存 | ローカルファイルへ直接保存 | — |
+| GitHub Actions build | 対応 | — |
+| Artifact download | 対応 | — |
+| UF2 bootloader copy | 対応 | — |
 | Direct USB | 対応 | Chrome/Edge の Web Serial で対応 |
 | Direct Bluetooth | 対応環境で利用 | Chrome/Edge の Web Bluetooth で対応 |
 | Direct key binding write | 対応 | 対応 |
@@ -209,27 +221,24 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 
 Firmware Mode は「ファイルを更新してから firmware に焼き込む」流れです。Direct Mode は「接続中の実機へその場で保存する」流れです。どちらで変更したか分からなくなった場合は、最終的に反映したい状態を Firmware Mode のファイルへ残しておくと管理しやすくなります。
 
-## 3. Firmware Mode で設定する
+## 3. Firmware Mode で設定する(デスクトップ版のみ)
+
+> 初版のブラウザ版では `Firmware` トグルが disabled になっており、本セクションの手順は実行できません。`npm run tauri dev` でデスクトップ版を起動してください。
 
 ### 3.1 プロジェクトを読み込む
 
 1. 上部のモード切り替えで `Firmware` を選びます。
-2. `KobitoKey_QWERTY` のローカルフォルダを指定します。
-3. Firmware repository URL に GitHub の repository URL を指定します。
-4. `選択` でフォルダ picker を開くか、パスを直接入力します。
-5. `読み込み` を押します。
+2. ヘッダの「プロジェクトフォルダ」入力欄の隣にある `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
+3. `読み込み` を押します。
+4. (任意)ビルドまで進める場合は `Build & Flash` タブを開き、`Firmware repository URL` に GitHub の repository URL を指定します。
 
-デフォルトの想定パスは次です。
-
-```txt
-/Volumes/SSD/ghq/github.com/s-hiraoku/KobitoKey_QWERTY
-```
+プロジェクトフォルダの初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
 
 読み込みに成功すると、左側に layer 一覧、中央に KobitoKey の物理レイアウト、右側に選択中キーの編集 panel が表示されます。
 
 読み込み後に最初に見る場所は、左側の layer 一覧です。layer を切り替えると中央の key 表示が変わります。中央の key をクリックすると、右側の inspector がその key の編集画面になります。
 
-ローカルフォルダは keymap / overlay の読み書きに使います。Firmware repository URL は GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
+ローカルフォルダは keymap / overlay の読み書きに使います。Firmware repository URL は `Build & Flash` タブにあり、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
 
 ### 3.2 キー binding を編集する
 
@@ -321,7 +330,7 @@ Firmware Mode のトラックボール設定は overlay ファイルへ反映さ
 2. `KobitoKey.keymap`、左 overlay、右 overlay の変更行を確認します。
 3. 内容に問題がなければ、中央上部の `保存` を押します。
 
-Tauri デスクトップ版では、読み込んだ `KobitoKey_QWERTY` のファイルへ直接保存されます。ブラウザ版ではローカルファイルへ直接書き込めないため、変更済みの `KobitoKey.keymap` と overlay ファイルが download されます。
+Tauri デスクトップ版では、読み込んだ `KobitoKey_QWERTY` のファイルへ直接保存されます。なお、`参照…` で File System Access API 対応ブラウザのフォルダピッカーを使った場合は、選んだフォルダのハンドルが残っている間は同じフォルダに直接上書き保存されます(ヘッダに「直接保存」chip が点灯します)。ハンドルが取得できない環境では、変更済みの `KobitoKey.keymap` と overlay ファイルがダウンロードされます。
 
 保存前に見るべきポイントは次です。
 
@@ -400,34 +409,18 @@ Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻
 
 Direct Mode の key / Combo / Trackball 書き込みは、成功時に device へ自動保存します。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
-### 5.2 Tauri デスクトップ版で USB 接続する
+### 5.2 USB / Bluetooth で接続する(共通手順)
 
-1. KobitoKey を USB で接続します。
-2. 上部のモード切り替えで `Direct` を選びます。
-3. `検出` を押します。
-4. device candidate が表示されたら対象 port を選びます。
-5. `読み込み` を押します。
-6. 中央に実機の keymap が表示されます。
+1. KobitoKey を USB または Bluetooth で接続できる状態にします。
+2. 上部のモード切り替えで `Direct` を選びます(ブラウザ版は最初から Direct です)。
+3. welcome card の「接続方法」select で `USB` または `Bluetooth` を選びます。
+4. その右の Connect ボタン(`USB で接続` または `Bluetooth で接続`)を押します。
+5. ブラウザのデバイス選択ダイアログ(Tauri 版ではネイティブの permission picker)が開くので、KobitoKey を選びます。
+6. 接続後、ヘッダにデバイス名のチップと `再読み込み` / `切断` ボタンが表示されます。中央には実機の keymap が表示され、右側の `Binding` / `Combos` / `Trackball` / `Timing` tabs が使えます。
 
-読み込み後は、右側の `Binding`、`Combos`、`Trackball`、`Timing` tabs が使えます。未接続の場合は、Direct welcome 画面や左下の接続 panel から USB 接続を開始してください。
+ブラウザは USB / Bluetooth device 一覧を事前に列挙できません。`検出` のような事前一覧操作はなく、Connect ボタンを押した時点で browser の permission picker が開く動きになります。
 
-### 5.3 ブラウザ版で USB 接続する
-
-1. Chrome または Edge で `http://localhost:1420/` または HTTPS の Pages URL を開きます。
-2. `Direct` を選びます。
-3. `Connect via USB` を押します。
-4. ブラウザの permission picker で KobitoKey を選びます。
-5. 接続後、実機 keymap が読み込まれます。
-
-ブラウザは USB device 一覧を事前に列挙できません。`検出` ではなく、接続ボタンで browser permission picker を開く動きになります。
-
-### 5.4 Bluetooth で接続する
-
-Bluetooth Direct は、ZMK Studio service を公開している device が対象です。
-
-Tauri デスクトップ版では `Direct` で Bluetooth 接続を選び、読み込みます。ブラウザ版では Chrome/Edge の Web Bluetooth permission picker から device を選びます。
-
-Bluetooth 接続が不安定な場合や firmware 側の Studio service が見えない場合は、USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
+Bluetooth Direct は、ZMK Studio service を公開している device が対象です。接続が不安定な場合や firmware 側の Studio service が見えない場合は、USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
 
 ### 5.5 Direct Mode でキー binding を書き込む
 
@@ -555,9 +548,9 @@ Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で commit / push �
 
 ### ブラウザ版で試した変更を正式反映したい
 
-ブラウザ版 Firmware Mode では、保存時に変更済みファイルが download されます。正式に反映するには、download した `KobitoKey.keymap` と overlay を `KobitoKey_QWERTY` の対応する場所へ置き換え、内容を確認してから commit / push します。
+初版のブラウザ版は Direct Mode 専用で、Firmware Mode は無効化されています。ブラウザの Direct Mode で実機へ直接書いた変更は、ローカルの `KobitoKey_QWERTY` ファイルへ自動では戻りません。
 
-Direct Mode で実機へ直接書いた変更は、ローカルの `KobitoKey_QWERTY` へ自動では反映されません。次回 firmware build でも同じ状態を残したい場合は、Firmware Mode 側の keymap にも同じ binding を設定してください。
+設定をファイルとして残し、次回 firmware build でも同じ状態を残したい場合は、デスクトップ版を起動し、Firmware Mode の keymap や overlay に同じ設定を反映してください。
 
 ### 設定後に動作確認したい
 
@@ -591,6 +584,10 @@ Direct Mode で実機へ直接書いた変更は、ローカルの `KobitoKey_QW
 
 ## 7. トラブルシューティング
 
+### `Firmware` トグルが押せない
+
+初版のブラウザ版では Firmware Mode を無効化しています。ヘッダの `Firmware` ボタンには `Desktop限定` バッジが付き、disabled になっています。Firmware Mode を使うには `npm run tauri dev` でデスクトップ版を起動してください。
+
 ### `読み込み失敗` になる
 
 指定したフォルダが `KobitoKey_QWERTY` のルートか確認してください。少なくとも次のファイルが存在する必要があります。
@@ -618,11 +615,11 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 
 ### Combo が Direct Mode で編集できない
 
-ブラウザ版では Combo RPC が未公開のため、読み取り表示または未対応になる場合があります。Tauri デスクトップ版で試すか、Firmware Mode で `KobitoKey.keymap` の Combo を編集してください。
+ブラウザ版では Combo RPC が未公開のため、読み取り表示または未対応になる場合があります。デスクトップ版で試すか、Firmware Mode(デスクトップ版のみ)で `KobitoKey.keymap` の Combo を編集してください。
 
 ### Trackball が Direct Mode で保存できない
 
-firmware に Trackball RPC が含まれていない可能性があります。Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。
+firmware に Trackball RPC が含まれていない可能性があります。デスクトップ版の Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。ブラウザ版では Trackball は未対応として表示されます。
 
 ### GitHub Actions build が起動できない
 

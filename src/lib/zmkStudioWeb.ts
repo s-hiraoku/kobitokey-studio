@@ -61,6 +61,7 @@ type WebBluetoothCharacteristic = EventTarget & {
 };
 
 let activeConnection: RpcConnection | null = null;
+let activeTransportAbort: AbortController | null = null;
 let activeBehaviorCatalog: Map<number, string> = new Map();
 let behaviorIdByRole: Map<string, number> = new Map();
 
@@ -100,6 +101,9 @@ export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb")
         : "Web Bluetooth is not available. Use Chrome or Edge from localhost/HTTPS, and make sure Bluetooth is enabled.",
     );
   }
+  // Tear down any prior session before starting a new one so we never leak
+  // a transport on reconnect.
+  disconnectWebStudioDevice();
   const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
   const connection = create_rpc_connection(transport, { signal: transport.abortController.signal });
   try {
@@ -110,6 +114,7 @@ export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb")
       );
     });
     activeConnection = connection;
+    activeTransportAbort = transport.abortController;
     activeBehaviorCatalog = catalog;
     behaviorIdByRole = invertBehaviorCatalog(catalog);
     return {
@@ -296,8 +301,16 @@ export async function writeWebTrackballSettings(settings: DirectTrackballSetting
 
 function resetWebStudioState() {
   activeConnection = null;
+  activeTransportAbort = null;
   activeBehaviorCatalog = new Map();
   behaviorIdByRole = new Map();
+}
+
+export function disconnectWebStudioDevice(): void {
+  if (activeTransportAbort && !activeTransportAbort.signal.aborted) {
+    activeTransportAbort.abort();
+  }
+  resetWebStudioState();
 }
 
 function requireConnection(): RpcConnection {
