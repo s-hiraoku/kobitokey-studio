@@ -101,6 +101,9 @@ export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb")
         : "Web Bluetooth is not available. Use Chrome or Edge from localhost/HTTPS, and make sure Bluetooth is enabled.",
     );
   }
+  // Tear down any prior session before starting a new one so we never leak
+  // a transport on reconnect.
+  disconnectWebStudioDevice();
   const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
   const connection = create_rpc_connection(transport, { signal: transport.abortController.signal });
   try {

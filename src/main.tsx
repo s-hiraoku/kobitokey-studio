@@ -3468,41 +3468,70 @@ async function ensureWritablePermission(handle: FileSystemDirectoryHandle): Prom
   throw new Error("フォルダへの書き込み権限がありません");
 }
 
+// Layout of the three managed files inside a KobitoKey_QWERTY project.
+// Keymap lives at config/KobitoKey.keymap and the overlay pair lives under
+// config/boards/shields/KobitoKey/. Both the FS Access API helpers and the
+// <input webkitdirectory> fallback follow this exact tree.
+const PROJECT_FILE_PATHS: Record<"keymap" | "leftOverlay" | "rightOverlay", string[]> = {
+  keymap: ["config", "KobitoKey.keymap"],
+  leftOverlay: ["config", "boards", "shields", "KobitoKey", "KobitoKey_left.overlay"],
+  rightOverlay: ["config", "boards", "shields", "KobitoKey", "KobitoKey_right.overlay"],
+};
+
+async function resolveSubdirectoryHandle(
+  root: FileSystemDirectoryHandle,
+  segments: string[],
+  create: boolean,
+): Promise<FileSystemDirectoryHandle> {
+  let current = root;
+  for (const segment of segments) {
+    current = await current.getDirectoryHandle(segment, { create });
+  }
+  return current;
+}
+
 async function writeProjectToDirectoryHandle(
   handle: FileSystemDirectoryHandle,
   files: ProjectFiles,
 ): Promise<void> {
   await ensureWritablePermission(handle);
-  const targets: Array<[string, string]> = [
-    ["KobitoKey.keymap", files.keymap],
-    ["KobitoKey_left.overlay", files.leftOverlay],
-    ["KobitoKey_right.overlay", files.rightOverlay],
+  const targets: Array<[(keyof typeof PROJECT_FILE_PATHS), string]> = [
+    ["keymap", files.keymap],
+    ["leftOverlay", files.leftOverlay],
+    ["rightOverlay", files.rightOverlay],
   ];
-  for (const [name, contents] of targets) {
-    const fileHandle = await handle.getFileHandle(name, { create: true });
+  for (const [slot, contents] of targets) {
+    const segments = PROJECT_FILE_PATHS[slot];
+    const dirSegments = segments.slice(0, -1);
+    const filename = segments[segments.length - 1];
+    const dir = await resolveSubdirectoryHandle(handle, dirSegments, true);
+    const fileHandle = await dir.getFileHandle(filename, { create: true });
     const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
-    await writable.write(contents);
-    await writable.close();
+    try {
+      await writable.write(contents);
+    } finally {
+      await writable.close();
+    }
   }
 }
 
 async function readProjectFromDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<ProjectFiles> {
-  const wanted = {
-    "KobitoKey.keymap": "keymap" as const,
-    "KobitoKey_left.overlay": "leftOverlay" as const,
-    "KobitoKey_right.overlay": "rightOverlay" as const,
-  };
   const project: ProjectFiles = { keymap: "", leftOverlay: "", rightOverlay: "" };
-  const found: Partial<Record<keyof typeof wanted, true>> = {};
-  for await (const [name, entry] of (handle as unknown as { entries: () => AsyncIterable<[string, FileSystemHandle]> }).entries()) {
-    if (entry.kind !== "file") continue;
-    const slot = (wanted as Record<string, "keymap" | "leftOverlay" | "rightOverlay" | undefined>)[name];
-    if (!slot) continue;
-    const file = await (entry as FileSystemFileHandle).getFile();
-    project[slot] = await file.text();
-    found[name as keyof typeof wanted] = true;
+  const slots = Object.keys(PROJECT_FILE_PATHS) as Array<keyof typeof PROJECT_FILE_PATHS>;
+  const missing: string[] = [];
+  for (const slot of slots) {
+    const segments = PROJECT_FILE_PATHS[slot];
+    const dirSegments = segments.slice(0, -1);
+    const filename = segments[segments.length - 1];
+    try {
+      const dir = await resolveSubdirectoryHandle(handle, dirSegments, false);
+      const fileHandle = await dir.getFileHandle(filename, { create: false });
+      const file = await fileHandle.getFile();
+      project[slot] = await file.text();
+    } catch {
+      missing.push(segments.join("/"));
+    }
   }
-  const missing = Object.keys(wanted).filter((n) => !found[n as keyof typeof wanted]);
   if (missing.length > 0) {
     throw new Error(`ファイルが見つかりません: ${missing.join(", ")}`);
   }
@@ -3510,25 +3539,31 @@ async function readProjectFromDirectoryHandle(handle: FileSystemDirectoryHandle)
 }
 
 async function readProjectFromFileList(list: FileList): Promise<{ files: ProjectFiles; rootLabel: string }> {
-  const targets: Record<string, "keymap" | "leftOverlay" | "rightOverlay"> = {
-    "KobitoKey.keymap": "keymap",
-    "KobitoKey_left.overlay": "leftOverlay",
-    "KobitoKey_right.overlay": "rightOverlay",
-  };
+  // Map "config/KobitoKey.keymap" → slot, etc. Matching against the trailing
+  // suffix lets us tolerate the optional <root>/ prefix that browsers include
+  // in webkitRelativePath.
+  const wanted: Array<[string, keyof typeof PROJECT_FILE_PATHS]> = (
+    Object.entries(PROJECT_FILE_PATHS) as Array<[keyof typeof PROJECT_FILE_PATHS, string[]]>
+  ).map(([slot, segments]) => [segments.join("/"), slot]);
+
   const files: ProjectFiles = { keymap: "", leftOverlay: "", rightOverlay: "" };
-  const found: Partial<Record<string, true>> = {};
+  const found = new Set<keyof typeof PROJECT_FILE_PATHS>();
   let rootLabel = "";
   for (const file of Array.from(list)) {
     const rel = (file as unknown as { webkitRelativePath?: string }).webkitRelativePath ?? file.name;
     const parts = rel.split("/");
     if (parts.length > 1 && !rootLabel) rootLabel = parts[0];
-    const basename = parts[parts.length - 1];
-    const slot = targets[basename];
-    if (!slot) continue;
-    files[slot] = await file.text();
-    found[basename] = true;
+    for (const [suffix, slot] of wanted) {
+      if (rel === suffix || rel.endsWith(`/${suffix}`)) {
+        files[slot] = await file.text();
+        found.add(slot);
+        break;
+      }
+    }
   }
-  const missing = Object.keys(targets).filter((n) => !found[n]);
+  const missing = (Object.keys(PROJECT_FILE_PATHS) as Array<keyof typeof PROJECT_FILE_PATHS>)
+    .filter((slot) => !found.has(slot))
+    .map((slot) => PROJECT_FILE_PATHS[slot].join("/"));
   if (missing.length > 0) {
     throw new Error(`ファイルが見つかりません: ${missing.join(", ")}`);
   }
