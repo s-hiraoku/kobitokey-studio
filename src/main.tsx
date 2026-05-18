@@ -3,10 +3,13 @@ import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  AlertTriangle,
   Bluetooth,
+  CheckCircle2,
   Clock,
   Download,
   FolderOpen,
+  Loader2,
   MousePointer,
   RefreshCw,
   Save,
@@ -112,6 +115,11 @@ type DirectComboSource = "none" | "device" | "firmware";
 
 type EditorMode = "firmware" | "direct";
 type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
+type DirectKeyWriteFeedback = {
+  kind: "idle" | "writing" | "success" | "error";
+  message: string;
+  binding?: string;
+};
 type StudioConnectionSession = {
   kind: StudioConnectionKind;
   label: string;
@@ -194,6 +202,10 @@ function App() {
   const [directComboSource, setDirectComboSource] = React.useState<DirectComboSource>("none");
   const [directMaxCombos, setDirectMaxCombos] = React.useState(0);
   const [bindingDraft, setBindingDraft] = React.useState("");
+  const [directKeyWriteFeedback, setDirectKeyWriteFeedback] = React.useState<DirectKeyWriteFeedback>({
+    kind: "idle",
+    message: "",
+  });
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
   const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
@@ -268,6 +280,10 @@ function App() {
   React.useEffect(() => {
     setBindingDraft(selectedBinding);
   }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
+
+  React.useEffect(() => {
+    setDirectKeyWriteFeedback({ kind: "idle", message: "" });
+  }, [activeLayerIndex, selectedKeyIndex]);
 
   async function loadFixture() {
     const [keymap, leftOverlay, rightOverlay] = await Promise.all([
@@ -482,6 +498,7 @@ function App() {
     setDirectCombos([]);
     setDirectComboSource("none");
     setDirectMaxCombos(0);
+    setDirectKeyWriteFeedback({ kind: "idle", message: "" });
     setSelectedStudioPort(session.label);
     if (session.kind === "bluetooth") {
       setSelectedBluetoothDevice(session.label);
@@ -607,6 +624,7 @@ function App() {
     setDirectCombos([]);
     setDirectComboSource("none");
     setDirectMaxCombos(0);
+    setDirectKeyWriteFeedback({ kind: "idle", message: "" });
     setStudioConnectionState("disconnected");
     setStudioConnectionError("");
     setStatus("device を切断しました");
@@ -615,41 +633,65 @@ function App() {
   async function writeDirectBinding(nextBinding: string) {
     if (!isDesktopRuntime) {
       if (!supportsWebStudioConnection(studioConnectionKind)) {
-        setStatus("このブラウザは現在の Direct 接続方式に対応していません。");
+        const message = "このブラウザは現在の Direct 接続方式に対応していません。";
+        setDirectKeyWriteFeedback({ kind: "error", message });
+        setStatus(message);
         return;
       }
       if (!directKeymap) {
-        setStatus("Direct Mode で device を読み込んでから書き込んでください");
+        const message = "Direct Mode で device を読み込んでから書き込んでください";
+        setDirectKeyWriteFeedback({ kind: "error", message });
+        setStatus(message);
         return;
       }
       const directLayer = directKeymap.layers[activeLayerIndex];
       if (!directLayer) {
-        setStatus("Direct Mode の layer が選択されていません");
+        const message = "Direct Mode の layer が選択されていません";
+        setDirectKeyWriteFeedback({ kind: "error", message });
+        setStatus(message);
         return;
       }
       try {
+        setDirectKeyWriteFeedback({
+          kind: "writing",
+          message: `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み中です`,
+          binding: nextBinding,
+        });
         const nextKeymap = await writeWebStudioKey(directLayer.id, selectedKeyIndex, nextBinding);
         setDirectKeymap(nextKeymap);
         setBindingDraft(nextBinding);
-        setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+        const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
+        setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
+        setStatus(message);
       } catch (error) {
-        setStatus(`Web Direct 書き込み失敗: ${formatError(error)}`);
+        const message = `Web Direct 書き込み失敗: ${formatError(error)}`;
+        setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
+        setStatus(message);
       }
       return;
     }
 
     if (!directKeymap || !selectedStudioPort) {
-      setStatus("Direct Mode で接続中の device がありません");
+      const message = "Direct Mode で接続中の device がありません";
+      setDirectKeyWriteFeedback({ kind: "error", message });
+      setStatus(message);
       return;
     }
 
     const directLayer = directKeymap.layers[activeLayerIndex];
     if (!directLayer) {
-      setStatus("Direct Mode の layer が選択されていません");
+      const message = "Direct Mode の layer が選択されていません";
+      setDirectKeyWriteFeedback({ kind: "error", message });
+      setStatus(message);
       return;
     }
 
     try {
+      setDirectKeyWriteFeedback({
+        kind: "writing",
+        message: `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み中です`,
+        binding: nextBinding,
+      });
       const nextKeymap = await invoke<StudioKeymap>("write_studio_key", {
         kind: studioConnectionKind,
         portPath: selectedStudioPort,
@@ -659,9 +701,13 @@ function App() {
       });
       setDirectKeymap(nextKeymap);
       setBindingDraft(nextBinding);
-      setStatus(`Key ${selectedKeyIndex + 1} を実機へ書き込みました`);
+      const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
+      setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
+      setStatus(message);
     } catch (error) {
-      setStatus(`Direct 書き込み失敗: ${formatError(error)}`);
+      const message = `Direct 書き込み失敗: ${formatError(error)}`;
+      setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
+      setStatus(message);
     }
   }
 
@@ -1218,10 +1264,13 @@ function App() {
         <section className="keyboard-panel">
           {isDirectMode ? (
             <DirectConnectionBar
+              comboSource={directComboSource}
               connectionKind={studioConnectionKind}
               connectionState={studioConnectionState}
+              isDesktopRuntime={isDesktopRuntime}
               keymap={directKeymap}
               portPath={selectedStudioPort}
+              trackballAvailable={directTrackball !== null}
             />
           ) : null}
           <div className="panel-heading">
@@ -1321,7 +1370,9 @@ function App() {
               selectedBinding={selectedBinding}
               trackball={directTrackball}
               canWriteCombos={isDesktopRuntime}
+              canWriteKey={studioConnectionState === "connected"}
               canWriteTrackball={isDesktopRuntime}
+              keyWriteFeedback={directKeyWriteFeedback}
             />
           ) : (
             <FirmwareInspectorTabs
@@ -1741,27 +1792,85 @@ function DirectSummaryPanel({
 }
 
 function DirectConnectionBar({
+  comboSource,
   connectionKind,
   connectionState,
+  isDesktopRuntime,
   keymap,
   portPath,
+  trackballAvailable,
 }: {
+  comboSource: DirectComboSource;
   connectionKind: StudioConnectionKind;
   connectionState: StudioConnectionState;
+  isDesktopRuntime: boolean;
   keymap: StudioKeymap | null;
   portPath: string;
+  trackballAvailable: boolean;
 }) {
   return (
     <div className="direct-connection-bar">
-      <div>
-        <p className="eyebrow">接続中のキーボード</p>
-        <strong>{keymap?.deviceName || "ZMK Studio デバイス"}</strong>
+      <div className="direct-connection-main">
+        <div>
+          <p className="eyebrow">接続中のキーボード</p>
+          <strong>{keymap?.deviceName || "ZMK Studio デバイス"}</strong>
+        </div>
+        <div className="direct-connection-meta">
+          <span>{connectionKind.toUpperCase()}</span>
+          <span>{portPath || "デバイス未選択"}</span>
+          <span>{keymap ? `${keymap.layers.length} レイヤー` : "未読み込み"}</span>
+          <span>{connectionState === "connected" ? keymap?.lockState ?? "不明" : "未接続"}</span>
+        </div>
       </div>
-      <span>{connectionKind.toUpperCase()}</span>
-      <span>{portPath || "デバイス未選択"}</span>
-      <span>{keymap ? `${keymap.layers.length} レイヤー` : "未読み込み"}</span>
-      <span>{connectionState === "connected" ? keymap?.lockState ?? "不明" : "未接続"}</span>
+      <DirectCapabilityStrip
+        compact
+        comboSource={comboSource}
+        isDesktopRuntime={isDesktopRuntime}
+        trackballAvailable={trackballAvailable}
+      />
     </div>
+  );
+}
+
+function DirectCapabilityStrip({
+  compact = false,
+  comboSource,
+  isDesktopRuntime,
+  trackballAvailable,
+}: {
+  compact?: boolean;
+  comboSource?: DirectComboSource;
+  isDesktopRuntime: boolean;
+  trackballAvailable?: boolean;
+}) {
+  const comboState = !isDesktopRuntime
+    ? { className: "read", label: "読取のみ" }
+    : comboSource === undefined || comboSource === "device"
+      ? { className: "ok", label: "書込可" }
+      : comboSource === "firmware"
+        ? { className: "read", label: "参照中" }
+        : { className: "pending", label: "確認中" };
+  const trackballState = !isDesktopRuntime
+    ? { className: "none", label: "未対応" }
+    : trackballAvailable === undefined || trackballAvailable
+      ? { className: "ok", label: "書込可" }
+      : { className: "pending", label: "確認中" };
+
+  return (
+    <ul className={`direct-capability-strip ${compact ? "compact" : ""}`} aria-label="この環境でできること">
+      <li>
+        <span className="capability-label">キー割り当て</span>
+        <span className="capability-state ok">書込可</span>
+      </li>
+      <li>
+        <span className="capability-label">コンボ</span>
+        <span className={`capability-state ${comboState.className}`}>{comboState.label}</span>
+      </li>
+      <li>
+        <span className="capability-label">トラックボール</span>
+        <span className={`capability-state ${trackballState.className}`}>{trackballState.label}</span>
+      </li>
+    </ul>
   );
 }
 
@@ -1801,6 +1910,9 @@ function DirectWelcome({
   const canUseAnyWebConnection = canUseWebUsb || canUseWebBluetooth;
   const isConnecting = connectionState === "connecting";
   const webDiagnostics = getWebRuntimeDiagnostics(isDesktopRuntime);
+  const selectedTransportAvailable = isDesktopRuntime || (connectionKind === "usb" ? canUseWebUsb : canUseWebBluetooth);
+  const connectDisabled = isConnecting || !selectedTransportAvailable;
+  const connectionProfile = isDesktopRuntime ? "Desktop app" : "Browser";
 
   return (
     <section className="direct-welcome">
@@ -1813,6 +1925,25 @@ function DirectWelcome({
             キーを選んでその場で binding を書き込めます。
           </p>
         </div>
+        <div className="direct-runtime-strip" aria-label="Direct Mode connection profile">
+          <span>{connectionProfile}</span>
+          <span>USB 推奨</span>
+          <span>Bluetooth 実験的</span>
+        </div>
+        <ol className="direct-connect-steps">
+          <li>
+            <strong>1</strong>
+            <span>USB data cable で接続します。Bluetooth は ZMK Studio 用 device が見える場合だけ使います。</span>
+          </li>
+          <li>
+            <strong>2</strong>
+            <span>接続方法を選び、{isDesktopRuntime ? "必要なら device を検出してから" : "ブラウザの選択ダイアログで"} KobitoKey を選びます。</span>
+          </li>
+          <li>
+            <strong>3</strong>
+            <span>読み込み後に key を選び、右側の Key Config から実機へ書き込みます。</span>
+          </li>
+        </ol>
         <div className="direct-connect-controls">
           {!isDesktopRuntime && !canUseAnyWebConnection ? (
             <div className="runtime-warning">
@@ -1840,33 +1971,7 @@ function DirectWelcome({
               <span>{connectionError}</span>
             </div>
           ) : null}
-          {isDesktopRuntime ? (
-            <>
-              <label>
-                Desktop USB Device
-                <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
-                  <option value="">USB device 未選択</option>
-                  {ports.map((port) => (
-                    <option key={port.path} value={port.path}>
-                      {port.label} ({port.path})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Desktop Bluetooth Device
-                <select value={selectedBluetoothDevice} onChange={(event) => onBluetoothDeviceChange(event.target.value)}>
-                  <option value="">Bluetooth device 未選択</option>
-                  {bluetoothDevices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : null}
-          <div className="direct-connect-actions">
+          <div className="direct-connect-grid">
             <label className="connect-transport-field">
               <span>接続方法</span>
               <select
@@ -1878,10 +1983,44 @@ function DirectWelcome({
                 <option value="bluetooth">Bluetooth</option>
               </select>
             </label>
+            {isDesktopRuntime && connectionKind === "usb" ? (
+              <label>
+                USB デバイス
+                <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+                  <option value="">USB device 未選択</option>
+                  {ports.map((port) => (
+                    <option key={port.path} value={port.path}>
+                      {port.label} ({port.path})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {isDesktopRuntime && connectionKind === "bluetooth" ? (
+              <label>
+                Bluetooth デバイス
+                <select value={selectedBluetoothDevice} onChange={(event) => onBluetoothDeviceChange(event.target.value)}>
+                  <option value="">Bluetooth device 未選択</option>
+                  {bluetoothDevices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+          {!selectedTransportAvailable ? (
+            <div className="runtime-warning">
+              <strong>{connectionKind === "usb" ? "Web Serial" : "Web Bluetooth"} が使えません</strong>
+              <span>Chrome/Edge と localhost/HTTPS の条件を確認し、利用できる接続方法を選んでください。</span>
+            </div>
+          ) : null}
+          <div className="direct-connect-actions">
             <button
               type="button"
               className={`primary connect-action ${connectionKind === "bluetooth" ? "bluetooth-action" : ""}`}
-              disabled={isConnecting}
+              disabled={connectDisabled}
               onClick={() => onConnect(connectionKind)}
             >
               {connectionKind === "bluetooth" ? <Bluetooth size={17} /> : <Usb size={17} />}
@@ -1897,28 +2036,7 @@ function DirectWelcome({
             ) : null}
           </div>
         </div>
-        <ul className="direct-capability-strip" aria-label="この環境でできること">
-          <li>
-            <span className="capability-label">キー割り当て</span>
-            <span className="capability-state ok">書き込み可</span>
-          </li>
-          <li>
-            <span className="capability-label">コンボ</span>
-            {isDesktopRuntime ? (
-              <span className="capability-state ok">書き込み可</span>
-            ) : (
-              <span className="capability-state read">読み取りのみ</span>
-            )}
-          </li>
-          <li>
-            <span className="capability-label">トラックボール</span>
-            {isDesktopRuntime ? (
-              <span className="capability-state ok">書き込み可</span>
-            ) : (
-              <span className="capability-state none">未対応</span>
-            )}
-          </li>
-        </ul>
+        <DirectCapabilityStrip isDesktopRuntime={isDesktopRuntime} />
         {!isDesktopRuntime ? (
           <p className="direct-capability-note">
             コンボの書き込みとトラックボール設定はデスクトップ版でのみ可能です。
@@ -2162,11 +2280,13 @@ function BuildPanel({
 function DirectInspectorTabs({
   binding,
   canWriteCombos,
+  canWriteKey,
   canWriteTrackball,
   combos,
   comboSource,
   connectionState,
   keyIndex,
+  keyWriteFeedback,
   maxCombos,
   onApply,
   onCreateCombo,
@@ -2184,11 +2304,13 @@ function DirectInspectorTabs({
 }: {
   binding: string;
   canWriteCombos: boolean;
+  canWriteKey: boolean;
   canWriteTrackball: boolean;
   combos: KeymapCombo[];
   comboSource: DirectComboSource;
   connectionState: StudioConnectionState;
   keyIndex: number;
+  keyWriteFeedback: DirectKeyWriteFeedback;
   maxCombos: number;
   onApply: (binding: string) => void;
   onCreateCombo: () => void;
@@ -2229,9 +2351,21 @@ function DirectInspectorTabs({
       </div>
       {activeTab === "key" ? (
         <div className="direct-key-editor">
-          <p className="eyebrow">Key {keyIndex + 1}</p>
-          <h2>{selectedBinding}</h2>
-          <BindingEditor actionLabel="実機へ書き込み" binding={binding} onApply={onApply} />
+          <div className="direct-key-editor-heading">
+            <div>
+              <p className="eyebrow">Key {keyIndex + 1}</p>
+              <h2>{selectedBinding}</h2>
+            </div>
+            <DirectKeyWriteStatus feedback={keyWriteFeedback} />
+          </div>
+          <BindingEditor
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "実機へ書き込み"}
+            binding={binding}
+            currentBinding={selectedBinding}
+            disabled={!canWriteKey || keyWriteFeedback.kind === "writing"}
+            disabledReason={!canWriteKey ? "KobitoKey に接続すると書き込めます。" : undefined}
+            onApply={onApply}
+          />
         </div>
       ) : activeTab === "combo" ? (
         <DirectComboPanel
@@ -2261,6 +2395,28 @@ function DirectInspectorTabs({
         <DirectTimingPanel />
       )}
     </section>
+  );
+}
+
+function DirectKeyWriteStatus({ feedback }: { feedback: DirectKeyWriteFeedback }) {
+  if (feedback.kind === "idle") {
+    return <span className="direct-write-state idle">未書き込み</span>;
+  }
+
+  const icon =
+    feedback.kind === "writing" ? (
+      <Loader2 size={14} />
+    ) : feedback.kind === "success" ? (
+      <CheckCircle2 size={14} />
+    ) : (
+      <AlertTriangle size={14} />
+    );
+
+  return (
+    <div className={`direct-write-state ${feedback.kind}`}>
+      {icon}
+      <span>{feedback.message}</span>
+    </div>
   );
 }
 
@@ -2999,11 +3155,17 @@ function ComboKeyPicker({
 function BindingEditor({
   actionLabel,
   binding,
+  currentBinding,
+  disabled = false,
+  disabledReason,
   onApply,
 }: {
   actionLabel: string;
   binding: string;
-  onApply: (binding: string) => void;
+  currentBinding?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  onApply: (binding: string) => void | Promise<void>;
 }) {
   const [form, setForm] = React.useState<BindingForm>(() => parseBindingForm(binding));
   const builtBinding = React.useMemo(() => buildBindingFromForm(form), [form]);
@@ -3014,10 +3176,23 @@ function BindingEditor({
 
   return (
     <div className="binding-editor">
-      <div className="binding-preview">
-        <span>Preview</span>
-        <strong>{builtBinding}</strong>
-      </div>
+      {currentBinding !== undefined ? (
+        <div className="binding-review" aria-label="Direct key write preview">
+          <div>
+            <span>Current</span>
+            <strong>{currentBinding}</strong>
+          </div>
+          <div className={currentBinding === builtBinding ? "" : "changed"}>
+            <span>Write target</span>
+            <strong>{builtBinding}</strong>
+          </div>
+        </div>
+      ) : (
+        <div className="binding-preview">
+          <span>Preview</span>
+          <strong>{builtBinding}</strong>
+        </div>
+      )}
 
       <ChoiceStrip
         label="Type"
@@ -3036,7 +3211,8 @@ function BindingEditor({
         </label>
       </details>
 
-      <button type="button" className="primary wide-action" onClick={() => onApply(builtBinding)}>
+      {disabledReason ? <p className="empty-note">{disabledReason}</p> : null}
+      <button type="button" className="primary wide-action" disabled={disabled} onClick={() => onApply(builtBinding)}>
         {actionLabel}
       </button>
     </div>

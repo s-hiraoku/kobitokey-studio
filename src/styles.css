@@ -779,6 +779,58 @@ select:focus-visible {
   letter-spacing: -0.002em;
 }
 
+.direct-runtime-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.direct-runtime-strip span {
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-full);
+  padding: 5px 10px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.direct-connect-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.direct-connect-steps li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.52);
+}
+.direct-connect-steps strong {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--pine-deep);
+  color: var(--on-pine);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+.direct-connect-steps span {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .direct-connect-controls {
   display: grid;
   gap: var(--sp-4);
@@ -863,14 +915,20 @@ select:focus-visible {
 }
 .runtime-diagnostics span:first-child::before { content: none; }
 
-.direct-connect-actions {
+.direct-connect-grid {
   display: grid;
   grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.direct-connect-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
 }
 .direct-connect-actions .connect-secondary {
-  grid-column: 1 / -1;
+  min-width: 132px;
 }
 .direct-connect-actions button {
   display: inline-flex;
@@ -976,12 +1034,33 @@ select:focus-visible {
   color: var(--ink-soft);
 }
 .capability-state.read::before { background: var(--ink-muted); }
+.capability-state.pending {
+  border: 1px solid var(--hairline);
+  background: var(--card);
+  color: var(--ink-muted);
+}
+.capability-state.pending::before { background: var(--ink-faint); }
 .capability-state.none {
   border: 1px solid #e3c79a;
   background: var(--amber-warn-bg);
   color: #6a4b07;
 }
 .capability-state.none::before { background: var(--amber-warn); }
+
+.direct-capability-strip.compact {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+.direct-capability-strip.compact li {
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.52);
+}
+.direct-capability-strip.compact .capability-label {
+  font-size: 11px;
+}
+.direct-capability-strip.compact .capability-state {
+  padding: 2px 7px;
+  font-size: 9.5px;
+}
 
 .direct-capability-note {
   margin: 0;
@@ -1089,8 +1168,8 @@ select:focus-visible {
 
 .direct-connection-bar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(180px, 0.8fr) auto auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: var(--sp-3);
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
@@ -1101,6 +1180,13 @@ select:focus-visible {
     var(--shadow-1),
     0 1px 2px rgba(31, 29, 23, 0.04);
 }
+.direct-connection-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
 .direct-connection-bar strong {
   display: block;
   font-family: "Fraunces", Georgia, serif;
@@ -1108,7 +1194,14 @@ select:focus-visible {
   font-size: 16px;
   letter-spacing: -0.01em;
 }
-.direct-connection-bar span {
+.direct-connection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.direct-connection-meta span {
   overflow: hidden;
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-full);
@@ -1832,6 +1925,12 @@ select:focus-visible {
   border-color: var(--pine-line);
   background: linear-gradient(180deg, #eef3f6 0%, #e1e9ef 100%);
 }
+.direct-key-editor-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
 .direct-key-editor h2,
 .key-editor h2 {
   font-family: "JetBrains Mono", monospace;
@@ -1840,6 +1939,48 @@ select:focus-visible {
   letter-spacing: -0.005em;
   color: var(--ink-strong);
   word-break: break-all;
+}
+
+.direct-write-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-full);
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--ink-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
+}
+.direct-write-state span {
+  overflow: hidden;
+  max-width: 230px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.direct-write-state.writing {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+  color: var(--pine-deep);
+}
+.direct-write-state.writing svg {
+  animation: spin 900ms linear infinite;
+}
+.direct-write-state.success {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+  color: var(--pine-deep);
+}
+.direct-write-state.error {
+  border-color: var(--amber-warn);
+  background: var(--amber-warn-bg);
+  color: #6a4b07;
 }
 
 .direct-inspector,
@@ -2141,6 +2282,43 @@ select:focus-visible {
   font-weight: 700;
   color: var(--pine-deep);
   letter-spacing: -0.005em;
+}
+
+.binding-review {
+  display: grid;
+  gap: 8px;
+}
+.binding-review > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(28, 44, 56, 0.04);
+}
+.binding-review > div.changed {
+  border-color: var(--pine-line);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, #eef3f6 100%);
+}
+.binding-review span {
+  color: var(--ink-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.binding-review strong {
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.binding-review > div.changed strong {
+  color: var(--pine-deep);
 }
 
 /* ----------------------------------------------------------------
@@ -2566,6 +2744,9 @@ select:focus-visible {
 @keyframes wb-rise {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 .topbar          { animation: wb-rise 360ms ease both; }
 .sidebar         { animation: wb-rise 420ms ease 40ms both; }
