@@ -1168,7 +1168,7 @@ function App() {
               {canUseWebBluetooth ? <Bluetooth size={17} /> : <Usb size={17} />}
               <span>
                 {canUseWebUsb || canUseWebBluetooth
-                  ? "左ペイン下部から USB または Bluetooth で KobitoKey に接続します"
+                  ? "接続パネルから USB または Bluetooth で KobitoKey に接続します"
                   : "Web Serial / Web Bluetooth がこのページから見えていません。Chrome/Edge と localhost/HTTPS を確認してください"}
               </span>
             </div>
@@ -2345,7 +2345,7 @@ function DirectTrackballPanel({
           リセット
         </button>
       </div>
-      {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると保存できます。</p> : null}
+      {!connected ? <p className="empty-note">接続パネルから USB または Bluetooth で接続すると保存できます。</p> : null}
       {connected && !canWrite ? <p className="empty-note">Web Direct では Trackball RPC が未公開です。Tauri デスクトップアプリでは実機へ保存できます。</p> : null}
       {connected && canWrite && settings === null ? <p className="empty-note">まず読み込みを実行してください。RPC が firmware にない場合は Firmware Mode で編集します。</p> : null}
       <button type="button" className="wide-action" onClick={onFirmwareMode}>
@@ -2404,7 +2404,7 @@ function DirectComboPanel({
           <span>{combos.length} combos</span>
           <span>{firmwareFallback ? "Firmware keymap" : maxCombos > 0 ? `max ${maxCombos}` : "max unknown"}</span>
         </div>
-        {!connected ? <p className="empty-note">左ペイン下部から USB または Bluetooth で接続すると編集できます。</p> : null}
+        {!connected ? <p className="empty-note">接続パネルから USB または Bluetooth で接続すると編集できます。</p> : null}
         {connected && !canWrite ? <p className="empty-note">Web Direct では Combo RPC が未公開です。Firmware keymap の内容を読み取り専用で確認できます。</p> : null}
         {firmwareFallback ? <p className="empty-note">Direct Combo RPC が読めないため、Firmware keymap の Combo を表示しています。</p> : null}
         {connected && canWrite && comboSource === "none" ? <p className="empty-note">Combo RPC の読み込みに成功していません。読み込みを実行してください。</p> : null}
