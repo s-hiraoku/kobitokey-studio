@@ -206,6 +206,7 @@ function App() {
     kind: "idle",
     message: "",
   });
+  const directWriteRequestRef = React.useRef(0);
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
   const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
@@ -282,6 +283,7 @@ function App() {
   }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
 
   React.useEffect(() => {
+    directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
   }, [activeLayerIndex, selectedKeyIndex]);
 
@@ -498,6 +500,7 @@ function App() {
     setDirectCombos([]);
     setDirectComboSource("none");
     setDirectMaxCombos(0);
+    directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
     setSelectedStudioPort(session.label);
     if (session.kind === "bluetooth") {
@@ -624,6 +627,7 @@ function App() {
     setDirectCombos([]);
     setDirectComboSource("none");
     setDirectMaxCombos(0);
+    directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
     setStudioConnectionState("disconnected");
     setStudioConnectionError("");
@@ -631,6 +635,7 @@ function App() {
   }
 
   async function writeDirectBinding(nextBinding: string) {
+    const requestId = ++directWriteRequestRef.current;
     if (!isDesktopRuntime) {
       if (!supportsWebStudioConnection(studioConnectionKind)) {
         const message = "このブラウザは現在の Direct 接続方式に対応していません。";
@@ -658,12 +663,14 @@ function App() {
           binding: nextBinding,
         });
         const nextKeymap = await writeWebStudioKey(directLayer.id, selectedKeyIndex, nextBinding);
+        if (requestId !== directWriteRequestRef.current) return;
         setDirectKeymap(nextKeymap);
         setBindingDraft(nextBinding);
         const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
         setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
         setStatus(message);
       } catch (error) {
+        if (requestId !== directWriteRequestRef.current) return;
         const message = `Web Direct 書き込み失敗: ${formatError(error)}`;
         setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
         setStatus(message);
@@ -699,12 +706,14 @@ function App() {
         keyPosition: selectedKeyIndex,
         binding: nextBinding,
       });
+      if (requestId !== directWriteRequestRef.current) return;
       setDirectKeymap(nextKeymap);
       setBindingDraft(nextBinding);
       const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
       setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
       setStatus(message);
     } catch (error) {
+      if (requestId !== directWriteRequestRef.current) return;
       const message = `Direct 書き込み失敗: ${formatError(error)}`;
       setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
       setStatus(message);
@@ -1836,11 +1845,13 @@ function DirectCapabilityStrip({
   compact = false,
   comboSource,
   isDesktopRuntime,
+  keyWritable = true,
   trackballAvailable,
 }: {
   compact?: boolean;
   comboSource?: DirectComboSource;
   isDesktopRuntime: boolean;
+  keyWritable?: boolean;
   trackballAvailable?: boolean;
 }) {
   const comboState = !isDesktopRuntime
@@ -1860,7 +1871,9 @@ function DirectCapabilityStrip({
     <ul className={`direct-capability-strip ${compact ? "compact" : ""}`} aria-label="この環境でできること">
       <li>
         <span className="capability-label">キー割り当て</span>
-        <span className="capability-state ok">書込可</span>
+        <span className={`capability-state ${keyWritable ? "ok" : "pending"}`}>
+          {keyWritable ? "書込可" : "要接続"}
+        </span>
       </li>
       <li>
         <span className="capability-label">コンボ</span>
@@ -2030,7 +2043,10 @@ function DirectWelcome({
             ) : null}
           </div>
         </div>
-        <DirectCapabilityStrip isDesktopRuntime={isDesktopRuntime} />
+        <DirectCapabilityStrip
+          isDesktopRuntime={isDesktopRuntime}
+          keyWritable={selectedTransportAvailable}
+        />
         {!isDesktopRuntime ? (
           <p className="direct-capability-note">
             コンボの書き込みとトラックボール設定はデスクトップ版でのみ可能です。
