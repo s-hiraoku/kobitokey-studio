@@ -1912,7 +1912,6 @@ function DirectWelcome({
   const webDiagnostics = getWebRuntimeDiagnostics(isDesktopRuntime);
   const selectedTransportAvailable = isDesktopRuntime || (connectionKind === "usb" ? canUseWebUsb : canUseWebBluetooth);
   const connectDisabled = isConnecting || !selectedTransportAvailable;
-  const connectionProfile = isDesktopRuntime ? "Desktop app" : "Browser";
 
   return (
     <section className="direct-welcome">
@@ -1924,11 +1923,6 @@ function DirectWelcome({
             USB 推奨です。Bluetooth も使えますが、ZMK Studio 用のデバイスが表示される場合のみ接続できます。読み込んだ後は、
             キーを選んでその場で binding を書き込めます。
           </p>
-        </div>
-        <div className="direct-runtime-strip" aria-label="Direct Mode connection profile">
-          <span>{connectionProfile}</span>
-          <span>USB 推奨</span>
-          <span>Bluetooth 実験的</span>
         </div>
         <ol className="direct-connect-steps">
           <li>
