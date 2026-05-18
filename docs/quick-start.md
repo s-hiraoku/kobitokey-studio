@@ -104,10 +104,10 @@ ZMK Studio 対応 firmware が入っている場合は、build せずに対応�
 
 1. 上部の `Direct` を選びます(ブラウザ版は最初から Direct です)。
 2. まず USB data cable で KobitoKey を接続します。
-3. welcome card の「接続方法」select で `USB` を選び、その横の Connect ボタンを押します。ブラウザのデバイス選択ダイアログが開くので、KobitoKey を選びます。
-4. 接続後、ヘッダにデバイス名のチップと `再読み込み` / `切断` ボタンが表示されます。
+3. 接続パネルの「接続方法」で `USB` を選び、`USB で接続` を押します。ブラウザのデバイス選択ダイアログが開くので、KobitoKey を選びます。
+4. 接続後、ヘッダにデバイス名のチップ、保存状態、`再読み込み` / `切断` ボタンが表示されます。
 5. layer と key を選びます。
-6. 右側の `Binding` で binding を選びます。
+6. 右側の `Key Config` で現在値と書き込み予定の binding を確認します。
 7. `実機へ書き込み` を押します。
 
 Direct Mode で書いた変更は、ローカルの `KobitoKey_QWERTY` ファイルへ自動では戻りません。次回 build でも同じ状態を残したい場合は、Firmware Mode(デスクトップ版)側にも同じ設定を入れてください。

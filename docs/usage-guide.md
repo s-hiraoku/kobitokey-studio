@@ -82,7 +82,7 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | `読み込み` | Firmware Mode 上部 | 指定した project から keymap と overlay を読む |
 | Firmware repository URL | `Build & Flash` タブ | GitHub Actions を実行する firmware repository を指定する |
 | `保存` | Firmware Mode 中央上部 | 編集した keymap / overlay をローカルへ保存する(ハンドルがあればフォルダに直接上書き、なければダウンロード) |
-| 接続方法 select + Connect ボタン | Direct welcome card | USB か Bluetooth を選んでブラウザのデバイス選択ダイアログを開く |
+| 接続方法 select + Connect ボタン | Direct 接続パネル | USB か Bluetooth を選んでブラウザのデバイス選択ダイアログを開く |
 | `再読み込み` | Direct Mode 上部 (接続済み) | 実機から keymap などを再取得する |
 | `切断` | Direct Mode 上部 (接続済み) | 実機との接続を切る |
 | `実機へ書き込み` | Direct Mode 右側 | 選択中 key の binding を実機へ保存する |
@@ -413,10 +413,10 @@ Direct Mode の key / Combo / Trackball 書き込みは、成功時に device �
 
 1. まず USB data cable で KobitoKey を接続します。
 2. 上部のモード切り替えで `Direct` を選びます(ブラウザ版は最初から Direct です)。
-3. welcome card の「接続方法」select で `USB` を選びます。
-4. その右の Connect ボタン(`USB で接続`)を押します。
+3. 接続パネルの「接続方法」で `USB` を選びます。
+4. `USB で接続` を押します。
 5. ブラウザのデバイス選択ダイアログ(Tauri 版ではネイティブの permission picker)が開くので、KobitoKey を選びます。
-6. 接続後、ヘッダにデバイス名のチップと `再読み込み` / `切断` ボタンが表示されます。中央には実機の keymap が表示され、右側の `Binding` / `Combos` / `Trackball` / `Timing` tabs が使えます。
+6. 接続後、ヘッダにデバイス名のチップ、保存状態、対応機能、`再読み込み` / `切断` ボタンが表示されます。中央には実機の keymap が表示され、右側の `Key Config` / `Combos` / `Trackball` / `Timing` tabs が使えます。
 
 ブラウザは USB / Bluetooth device 一覧を事前に列挙できません。`検出` のような事前一覧操作はなく、Connect ボタンを押した時点で browser の permission picker が開く動きになります。
 
@@ -427,7 +427,7 @@ Bluetooth Direct は実験的対応です。試す場合は「接続方法」で
 1. Direct Mode で device を読み込みます。
 2. layer を選びます。
 3. 中央の keyboard で key を選びます。
-4. 右側の `Binding` tab で binding を選びます。
+4. 右側の `Key Config` tab で現在値と書き込み予定の binding を確認します。
 5. `実機へ書き込み` を押します。
 6. 書き込み後、device から keymap が再読み込みされます。
 
