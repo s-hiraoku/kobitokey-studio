@@ -86,6 +86,7 @@ const webDisplayedKeycodes: Record<string, string> = {
 };
 
 const studioDisplayedBindings: Record<string, string> = {
+  "&zoom_hold 9": "&unknown 22 9 0",
   "&to 0": "&trans",
 };
 
@@ -241,6 +242,7 @@ describe("direct keymap conversion", () => {
               "&kp NUMBER_1",
               "&kp LEFT_SHIFT",
               "&trans",
+              "&unknown 22 9 0",
             ],
           },
           { id: 1, name: "Raise", bindings: ["&kp C"] },
@@ -261,6 +263,7 @@ describe("direct keymap conversion", () => {
               "&kp N1",
               "&kp LSHFT",
               "&to 0",
+              "&zoom_hold 9",
             ]),
             blockStart: 0,
             blockEnd: 1,

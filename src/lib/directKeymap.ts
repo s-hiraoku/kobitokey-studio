@@ -9,6 +9,30 @@ import {
 } from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
+const STANDARD_BEHAVIOR_BINDINGS = new Set([
+  "&bt",
+  "&bootloader",
+  "&caps_word",
+  "&gresc",
+  "&key_repeat",
+  "&kp",
+  "&kt",
+  "&lt",
+  "&mkp",
+  "&mmv",
+  "&mo",
+  "&msc",
+  "&mt",
+  "&none",
+  "&sk",
+  "&sl",
+  "&soft_off",
+  "&studio_unlock",
+  "&sys_reset",
+  "&to",
+  "&tog",
+  "&trans",
+]);
 const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
   "0X00070028": "ENTER",
   "0X00070029": "ESC",
@@ -322,7 +346,7 @@ export function diffDirectKeymapAgainstFirmware(
 
     return directBindings.flatMap((directBinding, keyIndex) => {
       const firmwareBinding = firmwareBindings[keyIndex] ?? "&none";
-      if (normalizeComparableBinding(directBinding) === normalizeComparableBinding(firmwareBinding)) {
+      if (sameComparableBinding(directBinding, firmwareBinding)) {
         return [];
       }
 
@@ -440,7 +464,7 @@ function comboSnapshot(combo: KeymapCombo): DirectFirmwareComboSnapshot {
 
 function sameComparableCombo(left: DirectFirmwareComboSnapshot, right: DirectFirmwareComboSnapshot): boolean {
   return (
-    normalizeComparableBinding(left.binding) === normalizeComparableBinding(right.binding) &&
+    sameComparableBinding(left.binding, right.binding) &&
     left.keyPositions.join(" ") === right.keyPositions.join(" ") &&
     left.timeoutMs === right.timeoutMs
   );
@@ -457,6 +481,39 @@ function uniqueComboId(baseId: string, existingIds: string[]): string {
       return candidate;
     }
   }
+}
+
+function sameComparableBinding(left: string, right: string): boolean {
+  return (
+    normalizeComparableBinding(left) === normalizeComparableBinding(right) ||
+    sameUnknownCustomBinding(left, right) ||
+    sameUnknownCustomBinding(right, left)
+  );
+}
+
+function sameUnknownCustomBinding(unknownBinding: string, customBinding: string): boolean {
+  const unknownParts = normalizeDirectBindingForDisplay(unknownBinding).trim().split(/\s+/);
+  const customParts = normalizeDirectBindingForDisplay(customBinding).trim().split(/\s+/);
+  if (unknownParts[0] !== "&unknown" || !isCustomComparableBinding(customParts[0])) {
+    return false;
+  }
+
+  const unknownParam1 = unknownParts[2] ?? "0";
+  const unknownParam2 = unknownParts[3] ?? "0";
+  if (customParts.length === 1) {
+    return unknownParam1 === "0" && unknownParam2 === "0";
+  }
+  if (customParts.length === 2) {
+    return customParts[1] === unknownParam1 && unknownParam2 === "0";
+  }
+  if (customParts.length === 3) {
+    return customParts[1] === unknownParam1 && customParts[2] === unknownParam2;
+  }
+  return false;
+}
+
+function isCustomComparableBinding(bindingName: string | undefined): boolean {
+  return Boolean(bindingName?.startsWith("&") && !STANDARD_BEHAVIOR_BINDINGS.has(bindingName));
 }
 
 function normalizeComparableBinding(binding: string): string {
