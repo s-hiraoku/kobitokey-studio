@@ -5,7 +5,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use zmk_studio_api::transport::{serial::SerialTransport, BleDeviceInfo, PlatformBleTransport};
-use zmk_studio_api::{Behavior, HidUsage, Keycode, StudioClient};
+use zmk_studio_api::{proto::zmk, Behavior, HidUsage, Keycode, StudioClient};
 
 const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = true;
 
@@ -264,7 +264,7 @@ fn read_studio_keymap_from_client<T: Read + Write>(
         .map(|state| format!("{state:?}"))
         .unwrap_or_else(|_| "unknown".to_string());
     let raw_keymap = client.get_keymap().map_err(|error| error.to_string())?;
-    let resolved_layers = client.resolve_keymap().map_err(|error| error.to_string())?;
+    let catalog = load_behavior_catalog_from_client(client)?;
     let has_unsaved_changes = client.check_unsaved_changes().unwrap_or(false);
 
     let layers = raw_keymap
@@ -278,10 +278,11 @@ fn read_studio_keymap_from_client<T: Read + Write>(
             } else {
                 layer.name.clone()
             },
-            bindings: resolved_layers
-                .get(index)
-                .map(|bindings| bindings.iter().map(format_direct_behavior).collect())
-                .unwrap_or_default(),
+            bindings: layer
+                .bindings
+                .iter()
+                .map(|binding| format_raw_behavior_binding(binding, &catalog))
+                .collect(),
         })
         .collect();
 
@@ -1403,6 +1404,48 @@ fn role_from_behavior_display_name(display_name: &str) -> Option<&'static str> {
     }
 }
 
+fn format_raw_behavior_binding(
+    binding: &zmk::keymap::BehaviorBinding,
+    catalog: &BehaviorCatalog,
+) -> String {
+    match catalog.role_by_id.get(&binding.behavior_id).map(String::as_str) {
+        Some("key") => format!("&kp {}", HidUsage::from_encoded(binding.param1)),
+        Some("key-toggle") => format!("&kt {}", HidUsage::from_encoded(binding.param1)),
+        Some("layer-tap") => format!(
+            "&lt {} {}",
+            binding.param1,
+            HidUsage::from_encoded(binding.param2)
+        ),
+        Some("mod-tap") => format!(
+            "&mt {} {}",
+            HidUsage::from_encoded(binding.param1),
+            HidUsage::from_encoded(binding.param2)
+        ),
+        Some("sticky-key") => format!("&sk {}", HidUsage::from_encoded(binding.param1)),
+        Some("sticky-layer") => format!("&sl {}", binding.param1),
+        Some("momentary") => format!("&mo {}", binding.param1),
+        Some("toggle-layer") => format!("&tog {}", binding.param1),
+        Some("to-layer") => format!("&to {}", binding.param1),
+        Some("bluetooth") => format!("&bt {} {}", binding.param1, binding.param2),
+        Some("mouse-key") => format!("&mkp {}", binding.param1),
+        Some("mouse-move") => format!("&mmv {}", binding.param1),
+        Some("mouse-scroll") => format!("&msc {}", binding.param1),
+        Some("caps-word") => "&caps_word".to_string(),
+        Some("key-repeat") => "&key_repeat".to_string(),
+        Some("reset") => "&sys_reset".to_string(),
+        Some("bootloader") => "&bootloader".to_string(),
+        Some("soft-off") => "&soft_off".to_string(),
+        Some("studio-unlock") => "&studio_unlock".to_string(),
+        Some("grave-escape") => "&gresc".to_string(),
+        Some("transparent") => "&trans".to_string(),
+        Some("none") => "&none".to_string(),
+        _ => format!(
+            "&unknown {} {} {}",
+            binding.behavior_id, binding.param1, binding.param2
+        ),
+    }
+}
+
 fn is_likely_studio_port(port: &serialport::SerialPortInfo) -> bool {
     if port.port_name.contains("usbmodem") || port.port_name.contains("ACM") {
         return true;
@@ -1420,42 +1463,6 @@ fn is_likely_studio_port(port: &serialport::SerialPortInfo) -> bool {
                     || value.contains("kobito")
             }),
         _ => false,
-    }
-}
-
-fn format_direct_behavior(behavior: &Behavior) -> String {
-    match behavior {
-        Behavior::KeyPress(key) => format!("&kp {key}"),
-        Behavior::KeyToggle(key) => format!("&kt {key}"),
-        Behavior::LayerTap { layer_id, tap } => format!("&lt {layer_id} {tap}"),
-        Behavior::ModTap { hold, tap } => format!("&mt {hold} {tap}"),
-        Behavior::StickyKey(key) => format!("&sk {key}"),
-        Behavior::StickyLayer { layer_id } => format!("&sl {layer_id}"),
-        Behavior::MomentaryLayer { layer_id } => format!("&mo {layer_id}"),
-        Behavior::ToggleLayer { layer_id } => format!("&tog {layer_id}"),
-        Behavior::ToLayer { layer_id } => format!("&to {layer_id}"),
-        Behavior::Bluetooth { command, value } => format!("&bt {command} {value}"),
-        Behavior::ExternalPower { value } => format!("&ext_power {value}"),
-        Behavior::OutputSelection { value } => format!("&out {value}"),
-        Behavior::Backlight { command, value } => format!("&bl {command} {value}"),
-        Behavior::Underglow { command, value } => format!("&rgb_ug {command} {value}"),
-        Behavior::MouseKeyPress { value } => format!("&mkp {value}"),
-        Behavior::MouseMove { value } => format!("&mmv {value}"),
-        Behavior::MouseScroll { value } => format!("&msc {value}"),
-        Behavior::CapsWord => "&caps_word".to_string(),
-        Behavior::KeyRepeat => "&key_repeat".to_string(),
-        Behavior::Reset => "&sys_reset".to_string(),
-        Behavior::Bootloader => "&bootloader".to_string(),
-        Behavior::SoftOff => "&soft_off".to_string(),
-        Behavior::StudioUnlock => "&studio_unlock".to_string(),
-        Behavior::GraveEscape => "&gresc".to_string(),
-        Behavior::Transparent => "&trans".to_string(),
-        Behavior::None => "&none".to_string(),
-        Behavior::Unknown {
-            behavior_id,
-            param1,
-            param2,
-        } => format!("&unknown {behavior_id} {param1} {param2}"),
     }
 }
 
@@ -1792,11 +1799,15 @@ mod tests {
                 (1, "key".to_string()),
                 (2, "bluetooth".to_string()),
                 (3, "momentary".to_string()),
+                (4, "transparent".to_string()),
+                (5, "layer-tap".to_string()),
             ]),
             id_by_role: std::collections::HashMap::from([
                 ("key".to_string(), 1),
                 ("bluetooth".to_string(), 2),
                 ("momentary".to_string(), 3),
+                ("transparent".to_string(), 4),
+                ("layer-tap".to_string(), 5),
             ]),
         }
     }
@@ -1852,6 +1863,27 @@ mod tests {
                 } if command == expected_command && value == expected_value
             ));
         }
+    }
+
+    #[test]
+    fn raw_behavior_binding_formats_unresolved_layer_entries() {
+        let catalog = test_behavior_catalog();
+        let transparent = zmk::keymap::BehaviorBinding {
+            behavior_id: 4,
+            param1: 0,
+            param2: 0,
+        };
+        let layer_tap = zmk::keymap::BehaviorBinding {
+            behavior_id: 5,
+            param1: 2,
+            param2: Keycode::from_name("SPC").unwrap().to_hid_usage(),
+        };
+
+        assert_eq!(format_raw_behavior_binding(&transparent, &catalog), "&trans");
+        assert_eq!(
+            format_raw_behavior_binding(&layer_tap, &catalog),
+            "&lt 2 SPC"
+        );
     }
 
     #[test]
