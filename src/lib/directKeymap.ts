@@ -1,6 +1,19 @@
 import { type KeymapCombo, type ParsedKeymap } from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
+const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
+  BKSP: "BSPC",
+  CMMA: "COMMA",
+  LCTL: "LCTRL",
+  LGUI: "LCMD",
+  LSFT: "LSHFT",
+  RET: "ENTER",
+  RCTL: "RCTRL",
+  RGUI: "RCMD",
+  RSFT: "RSHFT",
+  SCLN: "SEMI",
+  SPC: "SPACE",
+};
 
 export type StudioKeymap = {
   deviceName: string;
@@ -135,7 +148,31 @@ export function formatStudioBindings(bindings: string[]): string {
 }
 
 function normalizeComparableBinding(binding: string): string {
-  return normalizeDirectBindingForDisplay(binding).trim().replace(/\s+/g, " ");
+  const parts = normalizeDirectBindingForDisplay(binding).trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+    case "&kt":
+    case "&sk":
+      return normalizeComparableParts(parts, [1]);
+    case "&lt":
+      return normalizeComparableParts(parts, [2]);
+    case "&mt":
+      return normalizeComparableParts(parts, [1, 2]);
+    default:
+      return parts.join(" ");
+  }
+}
+
+function normalizeComparableParts(parts: string[], keycodeIndexes: number[]): string {
+  const keycodeIndexSet = new Set(keycodeIndexes);
+  return parts
+    .map((part, index) => (keycodeIndexSet.has(index) ? normalizeComparableKeycode(part) : part))
+    .join(" ");
+}
+
+function normalizeComparableKeycode(value: string): string {
+  const upperValue = value.toUpperCase();
+  return COMPARABLE_KEYCODE_ALIASES[upperValue] ?? upperValue;
 }
 
 export function completeStudioBindings(bindings: string[]): string[] {

@@ -101,7 +101,7 @@ describe("direct keymap conversion", () => {
         lockState: "unlocked",
         hasUnsavedChanges: false,
         layers: [
-          { id: 0, name: "Base", bindings: ["&kp A", "&bt 3 0"] },
+          { id: 0, name: "Base", bindings: ["&kp RET", "&bt 3 0", "&mt LSFT RET", "&lt 1 LGUI"] },
           { id: 1, name: "Raise", bindings: ["&kp C"] },
         ],
       },
@@ -110,7 +110,7 @@ describe("direct keymap conversion", () => {
           {
             id: "default_layer",
             label: "Default",
-            bindings: completeStudioBindings(["&kp A", "&bt BT_SEL 0"]),
+            bindings: completeStudioBindings(["&kp ENTER", "&bt BT_SEL 0", "&mt LSHFT ENTER", "&lt 1 LCMD"]),
             blockStart: 0,
             blockEnd: 1,
           },
