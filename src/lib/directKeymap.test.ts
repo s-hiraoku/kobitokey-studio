@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyDirectFirmwareKeyDiffsToSource,
   completeStudioBindings,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
@@ -8,6 +9,7 @@ import {
   studioKeymapToKeymapSource,
   studioKeymapToParsedKeymap,
 } from "./directKeymap";
+import { parseKeymap } from "./keymapParser";
 import { KeymapCombo } from "./keymapParser";
 
 const combos: KeymapCombo[] = [
@@ -135,5 +137,41 @@ describe("direct keymap conversion", () => {
         directBinding: "&kp C",
       },
     ]);
+  });
+
+  it("applies Direct key diffs back to firmware source", () => {
+    const firmwareSource = [
+      "/ {",
+      "    keymap {",
+      "        compatible = \"zmk,keymap\";",
+      "        default_layer {",
+      "            bindings = <",
+      completeStudioBindings(["&kp A", "&bt BT_SEL 0"]).join("\n"),
+      "            >;",
+      "        };",
+      "        raise_layer {",
+      "            bindings = <",
+      completeStudioBindings(["&kp D"]).join("\n"),
+      "            >;",
+      "        };",
+      "    };",
+      "};",
+    ].join("\n");
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: [
+        { id: 0, name: "Base", bindings: ["&kp A", "&bt 3 0"] },
+        { id: 1, name: "Raise", bindings: ["&kp C"] },
+      ],
+    };
+    const diffs = diffDirectKeymapAgainstFirmware(directKeymap, parseKeymap(firmwareSource));
+
+    const nextSource = applyDirectFirmwareKeyDiffsToSource(firmwareSource, diffs);
+
+    expect(parseKeymap(nextSource).layers[1].bindings[0]).toBe("&kp C");
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, parseKeymap(nextSource))).toEqual([]);
   });
 });
