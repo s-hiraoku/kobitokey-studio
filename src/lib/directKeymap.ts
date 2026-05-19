@@ -1,4 +1,12 @@
-import { parseKeymap, updateLayerBinding, type KeymapCombo, type ParsedKeymap } from "./keymapParser";
+import {
+  addCombo,
+  deleteCombo,
+  parseKeymap,
+  updateCombo,
+  updateLayerBinding,
+  type KeymapCombo,
+  type ParsedKeymap,
+} from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
 const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
@@ -49,6 +57,20 @@ export type DirectFirmwareKeyDiff = {
   keyIndex: number;
   firmwareBinding: string;
   directBinding: string;
+};
+
+export type DirectFirmwareComboSnapshot = {
+  id: string;
+  binding: string;
+  keyPositions: number[];
+  timeoutMs: number;
+};
+
+export type DirectFirmwareComboDiff = {
+  comboIndex: number;
+  kind: "added" | "removed" | "changed";
+  firmwareCombo: DirectFirmwareComboSnapshot | null;
+  directCombo: DirectFirmwareComboSnapshot | null;
 };
 
 export function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet {
@@ -145,6 +167,72 @@ export function applyDirectFirmwareKeyDiffsToSource(source: string, diffs: Direc
   }, source);
 }
 
+export function diffDirectCombosAgainstFirmware(
+  directCombos: KeymapCombo[],
+  firmwareCombos: KeymapCombo[],
+): DirectFirmwareComboDiff[] {
+  const maxCombos = Math.max(directCombos.length, firmwareCombos.length);
+  return Array.from({ length: maxCombos }, (_, comboIndex): DirectFirmwareComboDiff | null => {
+    const directCombo = directCombos[comboIndex] ? comboSnapshot(directCombos[comboIndex]) : null;
+    const firmwareCombo = firmwareCombos[comboIndex] ? comboSnapshot(firmwareCombos[comboIndex]) : null;
+
+    if (!directCombo && !firmwareCombo) {
+      return null;
+    }
+    if (directCombo && !firmwareCombo) {
+      return { comboIndex, kind: "added" as const, firmwareCombo, directCombo };
+    }
+    if (!directCombo && firmwareCombo) {
+      return { comboIndex, kind: "removed" as const, firmwareCombo, directCombo };
+    }
+    if (directCombo && firmwareCombo && !sameComparableCombo(directCombo, firmwareCombo)) {
+      return { comboIndex, kind: "changed" as const, firmwareCombo, directCombo };
+    }
+    return null;
+  }).filter((diff): diff is DirectFirmwareComboDiff => diff !== null);
+}
+
+export function applyDirectFirmwareComboDiffsToSource(source: string, diffs: DirectFirmwareComboDiff[]): string {
+  const changedSource = diffs
+    .filter((diff) => diff.kind === "changed" && diff.directCombo)
+    .reduce((nextSource, diff) => {
+      const combo = parseKeymap(nextSource).combos[diff.comboIndex];
+      if (!combo || !diff.directCombo) {
+        return nextSource;
+      }
+      return updateCombo(nextSource, combo, {
+        id: combo.id,
+        binding: diff.directCombo.binding,
+        keyPositions: diff.directCombo.keyPositions,
+        timeoutMs: diff.directCombo.timeoutMs,
+      });
+    }, source);
+
+  const removedSource = diffs
+    .filter((diff) => diff.kind === "removed")
+    .sort((a, b) => b.comboIndex - a.comboIndex)
+    .reduce((nextSource, diff) => {
+      const combo = parseKeymap(nextSource).combos[diff.comboIndex];
+      return combo ? deleteCombo(nextSource, combo) : nextSource;
+    }, changedSource);
+
+  return diffs
+    .filter((diff) => diff.kind === "added" && diff.directCombo)
+    .reduce((nextSource, diff) => {
+      const existingIds = parseKeymap(nextSource).combos.map((combo) => combo.id);
+      const directCombo = diff.directCombo;
+      if (!directCombo) {
+        return nextSource;
+      }
+      return addCombo(nextSource, {
+        id: uniqueComboId(sanitizeLayerId(directCombo.id, diff.comboIndex), existingIds),
+        binding: directCombo.binding,
+        keyPositions: directCombo.keyPositions,
+        timeoutMs: directCombo.timeoutMs,
+      });
+    }, removedSource);
+}
+
 export function formatStudioBindings(bindings: string[]): string {
   const completeBindings = completeStudioBindings(bindings);
   const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
@@ -156,6 +244,36 @@ export function formatStudioBindings(bindings: string[]): string {
       .join("  ")
       .trimEnd(),
   ).join("\n");
+}
+
+function comboSnapshot(combo: KeymapCombo): DirectFirmwareComboSnapshot {
+  return {
+    id: combo.id,
+    binding: normalizeDirectBindingForDisplay(combo.binding),
+    keyPositions: [...combo.keyPositions],
+    timeoutMs: combo.timeoutMs || 50,
+  };
+}
+
+function sameComparableCombo(left: DirectFirmwareComboSnapshot, right: DirectFirmwareComboSnapshot): boolean {
+  return (
+    normalizeComparableBinding(left.binding) === normalizeComparableBinding(right.binding) &&
+    left.keyPositions.join(" ") === right.keyPositions.join(" ") &&
+    left.timeoutMs === right.timeoutMs
+  );
+}
+
+function uniqueComboId(baseId: string, existingIds: string[]): string {
+  const id = baseId || "direct_combo";
+  if (!existingIds.includes(id)) {
+    return id;
+  }
+  for (let index = 2; ; index += 1) {
+    const candidate = `${id}_${index}`;
+    if (!existingIds.includes(candidate)) {
+      return candidate;
+    }
+  }
 }
 
 function normalizeComparableBinding(binding: string): string {

@@ -22,10 +22,13 @@ import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
+  applyDirectFirmwareComboDiffsToSource,
   applyDirectFirmwareKeyDiffsToSource,
+  diffDirectCombosAgainstFirmware,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   studioKeymapToParsedKeymap,
+  type DirectFirmwareComboDiff,
   type DirectFirmwareKeyDiff,
   type StudioComboSet,
   type StudioKeymap,
@@ -266,6 +269,13 @@ function App() {
     () => diffDirectKeymapAgainstFirmware(directKeymap, firmwareParsedKeymap),
     [directKeymap, firmwareParsedKeymap],
   );
+  const directFirmwareComboDiffs = React.useMemo(
+    () =>
+      directKeymap && directComboSource !== "none"
+        ? diffDirectCombosAgainstFirmware(directCombos, firmwareParsedKeymap.combos)
+        : [],
+    [directComboSource, directCombos, directKeymap, firmwareParsedKeymap.combos],
+  );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
   const showDirectEmptyState = isDirectMode && !directKeymap;
@@ -476,6 +486,18 @@ function App() {
       keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, targetDiffs),
     });
     setStatus(`Direct keymap の差分 ${targetDiffs.length} keys を firmware keymap に反映しました`);
+  }
+
+  function applyDirectFirmwareComboDiffs(targetDiffs: DirectFirmwareComboDiff[] = directFirmwareComboDiffs) {
+    if (!files || targetDiffs.length === 0) {
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: applyDirectFirmwareComboDiffsToSource(files.keymap, targetDiffs),
+    });
+    setStatus(`Direct Combo の差分 ${targetDiffs.length} 件を firmware keymap に反映しました`);
   }
 
   async function detectStudioPorts() {
@@ -1357,8 +1379,10 @@ function App() {
           {isDirectMode ? (
             <DirectSummaryPanel
               connectionKind={studioConnectionKind}
+              firmwareComboDiffs={directFirmwareComboDiffs}
               firmwareDiffs={directFirmwareDiffs}
               keymap={directKeymap}
+              onApplyFirmwareComboDiffs={applyDirectFirmwareComboDiffs}
               onApplyFirmwareDiffs={applyDirectFirmwareDiffs}
               portPath={selectedStudioPort}
             />
@@ -1954,14 +1978,18 @@ function truncateComboLabel(value: string, maxLength: number): string {
 
 function DirectSummaryPanel({
   connectionKind,
+  firmwareComboDiffs,
   firmwareDiffs,
   keymap,
+  onApplyFirmwareComboDiffs,
   onApplyFirmwareDiffs,
   portPath,
 }: {
   connectionKind: StudioConnectionKind;
+  firmwareComboDiffs: DirectFirmwareComboDiff[];
   firmwareDiffs: DirectFirmwareKeyDiff[];
   keymap: StudioKeymap | null;
+  onApplyFirmwareComboDiffs: (diffs?: DirectFirmwareComboDiff[]) => void;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
   portPath: string;
 }) {
@@ -1990,14 +2018,21 @@ function DirectSummaryPanel({
             <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "自動保存済み"}</dd>
           </div>
           <div>
-            <dt>Firmware 差分</dt>
+            <dt>Key 差分</dt>
             <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
+          </div>
+          <div>
+            <dt>Combo 差分</dt>
+            <dd>{firmwareComboDiffs.length === 0 ? "差分なし" : `${firmwareComboDiffs.length} combos`}</dd>
           </div>
         </dl>
       ) : (
         <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
       )}
       {keymap ? <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} /> : null}
+      {keymap ? (
+        <DirectFirmwareComboDiffPanel diffs={firmwareComboDiffs} onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs} />
+      ) : null}
     </section>
   );
 }
@@ -2065,6 +2100,86 @@ function DirectFirmwareDiffPanel({
       )}
     </section>
   );
+}
+
+function DirectFirmwareComboDiffPanel({
+  diffs,
+  onApplyFirmwareComboDiffs,
+}: {
+  diffs: DirectFirmwareComboDiff[];
+  onApplyFirmwareComboDiffs: (diffs?: DirectFirmwareComboDiff[]) => void;
+}) {
+  return (
+    <section className="direct-firmware-diff-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h3>Firmware Combo との差分</h3>
+          <span>{diffs.length === 0 ? "同期済み" : `${diffs.length} combos`}</span>
+        </div>
+        <button
+          type="button"
+          className="primary compact-action"
+          disabled={diffs.length === 0}
+          onClick={() => onApplyFirmwareComboDiffs(diffs)}
+        >
+          <UploadCloud size={15} />
+          Combo を反映
+        </button>
+      </div>
+      {diffs.length === 0 ? (
+        <p className="diff-empty compact-empty">Direct Combo と firmware combo は一致しています。</p>
+      ) : (
+        <>
+          <p className="direct-firmware-note">
+            Direct 側の Combo を firmware keymap に反映します。既存 firmware combo の id は保持します。
+          </p>
+          <div className="direct-firmware-diff-list">
+            {diffs.map((diff) => (
+              <article key={`${diff.kind}-${diff.comboIndex}`}>
+                <header>
+                  <div>
+                    <strong>
+                      Combo {diff.comboIndex + 1} / {comboDiffKindLabel(diff.kind)}
+                    </strong>
+                    <span>{diff.directCombo?.id ?? diff.firmwareCombo?.id ?? "-"}</span>
+                  </div>
+                  <button type="button" className="compact-action" onClick={() => onApplyFirmwareComboDiffs([diff])}>
+                    <UploadCloud size={14} />
+                    反映
+                  </button>
+                </header>
+                <dl>
+                  <div>
+                    <dt>Firmware</dt>
+                    <dd>{formatComboSnapshot(diff.firmwareCombo)}</dd>
+                  </div>
+                  <div>
+                    <dt>Direct</dt>
+                    <dd>{formatComboSnapshot(diff.directCombo)}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function comboDiffKindLabel(kind: DirectFirmwareComboDiff["kind"]): string {
+  switch (kind) {
+    case "added":
+      return "追加";
+    case "removed":
+      return "削除";
+    case "changed":
+      return "変更";
+  }
+}
+
+function formatComboSnapshot(combo: DirectFirmwareComboDiff["directCombo"]): string {
+  return combo ? `${combo.binding} / keys ${combo.keyPositions.join(" ")} / ${combo.timeoutMs}ms` : "-";
 }
 
 function DirectConnectionBar({
