@@ -271,7 +271,7 @@ function App() {
   );
   const directFirmwareComboDiffs = React.useMemo(
     () =>
-      directKeymap && directComboSource !== "none"
+      directKeymap && directComboSource === "device"
         ? diffDirectCombosAgainstFirmware(directCombos, firmwareParsedKeymap.combos)
         : [],
     [directComboSource, directCombos, directKeymap, firmwareParsedKeymap.combos],
@@ -489,7 +489,7 @@ function App() {
   }
 
   function applyDirectFirmwareComboDiffs(targetDiffs: DirectFirmwareComboDiff[] = directFirmwareComboDiffs) {
-    if (!files || targetDiffs.length === 0) {
+    if (!files || directComboSource !== "device" || targetDiffs.length === 0) {
       return;
     }
 
