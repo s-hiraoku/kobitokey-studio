@@ -22,8 +22,10 @@ import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
+  diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   studioKeymapToParsedKeymap,
+  type DirectFirmwareKeyDiff,
   type StudioComboSet,
   type StudioKeymap,
 } from "./lib/directKeymap";
@@ -259,6 +261,10 @@ function App() {
   const activeCombos = combos;
   const displayedDirectComboSource: DirectComboSource = directKeymap ? directComboSource : "firmware";
   const displayedDirectMaxCombos = directKeymap ? directMaxCombos : activeCombos.length;
+  const directFirmwareDiffs = React.useMemo(
+    () => diffDirectKeymapAgainstFirmware(directKeymap, firmwareParsedKeymap),
+    [directKeymap, firmwareParsedKeymap],
+  );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
   const showDirectEmptyState = isDirectMode && !directKeymap;
@@ -1336,7 +1342,12 @@ function App() {
           />
 
           {isDirectMode ? (
-            <DirectSummaryPanel connectionKind={studioConnectionKind} keymap={directKeymap} portPath={selectedStudioPort} />
+            <DirectSummaryPanel
+              connectionKind={studioConnectionKind}
+              firmwareDiffs={directFirmwareDiffs}
+              keymap={directKeymap}
+              portPath={selectedStudioPort}
+            />
           ) : (
             <WorkbenchTabs
               activeTab={workbenchTab}
@@ -1929,10 +1940,12 @@ function truncateComboLabel(value: string, maxLength: number): string {
 
 function DirectSummaryPanel({
   connectionKind,
+  firmwareDiffs,
   keymap,
   portPath,
 }: {
   connectionKind: StudioConnectionKind;
+  firmwareDiffs: DirectFirmwareKeyDiff[];
   keymap: StudioKeymap | null;
   portPath: string;
 }) {
@@ -1960,9 +1973,56 @@ function DirectSummaryPanel({
             <dt>保存状態</dt>
             <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "自動保存済み"}</dd>
           </div>
+          <div>
+            <dt>Firmware 差分</dt>
+            <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
+          </div>
         </dl>
       ) : (
         <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
+      )}
+      {keymap ? <DirectFirmwareDiffPanel diffs={firmwareDiffs} /> : null}
+    </section>
+  );
+}
+
+function DirectFirmwareDiffPanel({ diffs }: { diffs: DirectFirmwareKeyDiff[] }) {
+  return (
+    <section className="direct-firmware-diff-panel">
+      <div className="panel-heading compact">
+        <h3>Firmware との差分</h3>
+        <span>{diffs.length === 0 ? "同期済み" : `${diffs.length} keys`}</span>
+      </div>
+      {diffs.length === 0 ? (
+        <p className="diff-empty compact-empty">Direct keymap と firmware keymap の key binding は一致しています。</p>
+      ) : (
+        <>
+          <p className="direct-firmware-note">
+            表示のみです。firmware ファイルへ反映する操作は次の実装対象です。
+          </p>
+          <div className="direct-firmware-diff-list">
+            {diffs.map((diff) => (
+              <article key={`${diff.layerIndex}-${diff.keyIndex}`}>
+                <div>
+                  <strong>
+                    Layer {diff.layerIndex} / Key {diff.keyIndex + 1}
+                  </strong>
+                  <span>{diff.layerName}</span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Firmware</dt>
+                    <dd>{diff.firmwareBinding}</dd>
+                  </div>
+                  <div>
+                    <dt>Direct</dt>
+                    <dd>{diff.directBinding}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

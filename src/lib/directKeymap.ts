@@ -30,6 +30,14 @@ export type StudioComboSet = {
   maxCombos: number;
 };
 
+export type DirectFirmwareKeyDiff = {
+  layerIndex: number;
+  layerName: string;
+  keyIndex: number;
+  firmwareBinding: string;
+  directBinding: string;
+};
+
 export function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet {
   return {
     combos: combos.map((combo, index) => ({
@@ -77,6 +85,42 @@ export function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
   return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
 }
 
+export function diffDirectKeymapAgainstFirmware(
+  directKeymap: StudioKeymap | null,
+  firmwareKeymap: ParsedKeymap,
+): DirectFirmwareKeyDiff[] {
+  if (!directKeymap) {
+    return [];
+  }
+
+  return directKeymap.layers.flatMap((directLayer, layerIndex) => {
+    const firmwareLayer = firmwareKeymap.layers[layerIndex];
+    if (!firmwareLayer) {
+      return [];
+    }
+
+    const directBindings = completeStudioBindings(directLayer.bindings);
+    const firmwareBindings = completeStudioBindings(firmwareLayer.bindings);
+
+    return directBindings.flatMap((directBinding, keyIndex) => {
+      const firmwareBinding = firmwareBindings[keyIndex] ?? "&none";
+      if (normalizeComparableBinding(directBinding) === normalizeComparableBinding(firmwareBinding)) {
+        return [];
+      }
+
+      return [
+        {
+          layerIndex,
+          layerName: directLayer.name || firmwareLayer.label || `Layer ${layerIndex}`,
+          keyIndex,
+          firmwareBinding,
+          directBinding,
+        },
+      ];
+    });
+  });
+}
+
 export function formatStudioBindings(bindings: string[]): string {
   const completeBindings = completeStudioBindings(bindings);
   const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
@@ -88,6 +132,10 @@ export function formatStudioBindings(bindings: string[]): string {
       .join("  ")
       .trimEnd(),
   ).join("\n");
+}
+
+function normalizeComparableBinding(binding: string): string {
+  return normalizeDirectBindingForDisplay(binding).trim().replace(/\s+/g, " ");
 }
 
 export function completeStudioBindings(bindings: string[]): string[] {
