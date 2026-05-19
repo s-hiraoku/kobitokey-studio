@@ -470,6 +470,8 @@ function normalizeComparableBinding(binding: string): string {
       return normalizeComparableParts(parts, [2]);
     case "&mt":
       return normalizeComparableParts(parts, [1, 2]);
+    case "&to":
+      return parts[1] === "0" ? "&trans" : parts.join(" ");
     default:
       return parts.join(" ");
   }

@@ -85,6 +85,10 @@ const webDisplayedKeycodes: Record<string, string> = {
   UNDER: "0x0207002d",
 };
 
+const studioDisplayedBindings: Record<string, string> = {
+  "&to 0": "&trans",
+};
+
 function comboFixtureSource(): string {
   return [
     "/ {",
@@ -125,6 +129,10 @@ function asWebDisplayedBinding(binding: string): string {
 }
 
 function mapComparableBindingKeys(binding: string, keycodeMap: Record<string, string>): string {
+  if (studioDisplayedBindings[binding]) {
+    return studioDisplayedBindings[binding];
+  }
+
   const parts = binding.trim().split(/\s+/);
   switch (parts[0]) {
     case "&kp":
@@ -232,6 +240,7 @@ describe("direct keymap conversion", () => {
               "&kp EXCLAMATION",
               "&kp NUMBER_1",
               "&kp LEFT_SHIFT",
+              "&trans",
             ],
           },
           { id: 1, name: "Raise", bindings: ["&kp C"] },
@@ -251,6 +260,7 @@ describe("direct keymap conversion", () => {
               "&kp EXCL",
               "&kp N1",
               "&kp LSHFT",
+              "&to 0",
             ]),
             blockStart: 0,
             blockEnd: 1,
