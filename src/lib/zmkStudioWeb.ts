@@ -418,8 +418,32 @@ function formatWebBehaviorBinding(binding: BehaviorBinding): string {
     case "none":
       return "&none";
     default:
-      return `&unknown ${binding.behaviorId} ${binding.param1} ${binding.param2}`;
+      return formatCustomWebBehaviorBinding(role ?? "", binding);
   }
+}
+
+function formatCustomWebBehaviorBinding(displayName: string, binding: BehaviorBinding): string {
+  const name = customBehaviorNameFromDisplayName(displayName);
+  if (!name) {
+    return `&unknown ${binding.behaviorId} ${binding.param1} ${binding.param2}`;
+  }
+  if (binding.param2 !== 0) {
+    return `&${name} ${binding.param1} ${binding.param2}`;
+  }
+  if (binding.param1 !== 0) {
+    return `&${name} ${binding.param1}`;
+  }
+  return `&${name}`;
+}
+
+function customBehaviorNameFromDisplayName(displayName: string): string | null {
+  const name = displayName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+  return /^[a-z_]/.test(name) ? name : null;
 }
 
 function parseWebBinding(binding: string): BehaviorBinding {

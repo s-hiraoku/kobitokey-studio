@@ -439,8 +439,10 @@ fn read_studio_combos(
     }
     let target = resolve_studio_target(&kind, port_path)
         .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
-    with_studio_transport(&target, |transport| read_studio_combos_from_transport(transport))
-        .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
+    with_studio_transport(&target, |transport| {
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
 }
 
 #[tauri::command]
@@ -922,7 +924,11 @@ fn decode_behavior_binding(bytes: &[u8], catalog: &BehaviorCatalog) -> Result<St
             Some("grave-escape") => "&gresc".to_string(),
             Some("transparent") => "&trans".to_string(),
             Some("none") => "&none".to_string(),
-            _ => format!("&unknown {behavior_id} {param1} {param2}"),
+            _ => catalog
+                .custom_name_by_id
+                .get(&behavior_id)
+                .map(|name| format_custom_behavior_binding(name, param1, param2))
+                .unwrap_or_else(|| format!("&unknown {behavior_id} {param1} {param2}")),
         },
     )
 }
@@ -1324,6 +1330,7 @@ fn resolve_studio_target(kind: &str, port_path: Option<String>) -> Result<Studio
 struct BehaviorCatalog {
     role_by_id: HashMap<i32, String>,
     id_by_role: HashMap<String, i32>,
+    custom_name_by_id: HashMap<i32, String>,
 }
 
 impl BehaviorCatalog {
@@ -1350,6 +1357,7 @@ fn load_behavior_catalog_from_client<T: Read + Write>(
         .map_err(|error| error.to_string())?;
     let mut role_by_id = HashMap::new();
     let mut id_by_role = HashMap::new();
+    let mut custom_name_by_id = HashMap::new();
 
     for behavior_id in behavior_ids {
         let details = client
@@ -1360,12 +1368,15 @@ fn load_behavior_catalog_from_client<T: Read + Write>(
             id_by_role
                 .entry(role.to_string())
                 .or_insert(behavior_id as i32);
+        } else if let Some(name) = custom_behavior_name_from_display_name(&details.display_name) {
+            custom_name_by_id.insert(behavior_id as i32, name);
         }
     }
 
     Ok(BehaviorCatalog {
         role_by_id,
         id_by_role,
+        custom_name_by_id,
     })
 }
 
@@ -1404,11 +1415,54 @@ fn role_from_behavior_display_name(display_name: &str) -> Option<&'static str> {
     }
 }
 
+fn custom_behavior_name_from_display_name(display_name: &str) -> Option<String> {
+    let name = display_name
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+
+    if name
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
+fn format_custom_behavior_binding(name: &str, param1: u32, param2: u32) -> String {
+    if param2 != 0 {
+        format!("&{name} {param1} {param2}")
+    } else if param1 != 0 {
+        format!("&{name} {param1}")
+    } else {
+        format!("&{name}")
+    }
+}
+
 fn format_raw_behavior_binding(
     binding: &zmk::keymap::BehaviorBinding,
     catalog: &BehaviorCatalog,
 ) -> String {
-    match catalog.role_by_id.get(&binding.behavior_id).map(String::as_str) {
+    match catalog
+        .role_by_id
+        .get(&binding.behavior_id)
+        .map(String::as_str)
+    {
         Some("key") => format!("&kp {}", HidUsage::from_encoded(binding.param1)),
         Some("key-toggle") => format!("&kt {}", HidUsage::from_encoded(binding.param1)),
         Some("layer-tap") => format!(
@@ -1439,10 +1493,16 @@ fn format_raw_behavior_binding(
         Some("grave-escape") => "&gresc".to_string(),
         Some("transparent") => "&trans".to_string(),
         Some("none") => "&none".to_string(),
-        _ => format!(
-            "&unknown {} {} {}",
-            binding.behavior_id, binding.param1, binding.param2
-        ),
+        _ => catalog
+            .custom_name_by_id
+            .get(&binding.behavior_id)
+            .map(|name| format_custom_behavior_binding(name, binding.param1, binding.param2))
+            .unwrap_or_else(|| {
+                format!(
+                    "&unknown {} {} {}",
+                    binding.behavior_id, binding.param1, binding.param2
+                )
+            }),
     }
 }
 
@@ -1809,6 +1869,7 @@ mod tests {
                 ("transparent".to_string(), 4),
                 ("layer-tap".to_string(), 5),
             ]),
+            custom_name_by_id: std::collections::HashMap::from([(22, "zoom_hold".to_string())]),
         }
     }
 
@@ -1878,11 +1939,23 @@ mod tests {
             param1: 2,
             param2: Keycode::from_name("SPC").unwrap().to_hid_usage(),
         };
+        let custom_macro = zmk::keymap::BehaviorBinding {
+            behavior_id: 22,
+            param1: 9,
+            param2: 0,
+        };
 
-        assert_eq!(format_raw_behavior_binding(&transparent, &catalog), "&trans");
+        assert_eq!(
+            format_raw_behavior_binding(&transparent, &catalog),
+            "&trans"
+        );
         assert_eq!(
             format_raw_behavior_binding(&layer_tap, &catalog),
             "&lt 2 SPC"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&custom_macro, &catalog),
+            "&zoom_hold 9"
         );
     }
 
@@ -1899,7 +1972,8 @@ mod tests {
         };
 
         let config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
-        let decoded = decode_combo_config(0, &config, &catalog).expect("combo config should decode");
+        let decoded =
+            decode_combo_config(0, &config, &catalog).expect("combo config should decode");
 
         assert_eq!(decoded.binding, "&kp A");
         assert_eq!(decoded.key_positions, vec![0, 3]);
@@ -1920,14 +1994,16 @@ mod tests {
             layer_mask: None,
             slow_release: None,
         };
-        let combo_config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
+        let combo_config =
+            encode_combo_config(&combo, &catalog).expect("combo config should encode");
         let mut combos_payload = Vec::new();
         push_len_field(&mut combos_payload, 1, &combo_config);
         push_varint_field(&mut combos_payload, 2, 12);
         let mut response = Vec::new();
         push_len_field(&mut response, 1, &combos_payload);
 
-        let decoded = decode_get_combos_response(&response, &catalog).expect("combo response should decode");
+        let decoded =
+            decode_get_combos_response(&response, &catalog).expect("combo response should decode");
 
         assert_eq!(decoded.max_combos, 12);
         assert_eq!(decoded.combos.len(), 1);
