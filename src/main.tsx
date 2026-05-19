@@ -7,14 +7,17 @@ import {
   Bluetooth,
   CheckCircle2,
   Clock,
+  Copy,
   Download,
   FolderOpen,
   Loader2,
   MousePointer,
+  Plus,
   RefreshCw,
   Save,
   SlidersHorizontal,
   Smartphone,
+  Trash2,
   UploadCloud,
   Usb,
 } from "lucide-react";
@@ -45,7 +48,10 @@ import {
   KeymapCombo,
   KeymapLayer,
   addCombo,
+  addLayer,
   deleteCombo,
+  deleteLayer,
+  nextLayerId,
   parseKeymap,
   updateCombo,
   updateLayerBinding,
@@ -92,6 +98,40 @@ type FileDiff = {
   lines: string[];
 };
 
+type FirmwareBuildStart = {
+  committed: boolean;
+  commitOutput?: string;
+  pushOutput?: string;
+  buildOutput: string;
+};
+
+type FirmwareBuildCheck = {
+  ok: boolean;
+  items: FirmwareBuildCheckItem[];
+};
+
+type FirmwareBuildCheckItem = {
+  label: string;
+  ok: boolean;
+  detail: string;
+};
+
+type FirmwareUf2Targets = {
+  left?: string;
+  right?: string;
+  unknown: string[];
+  manifestPath?: string;
+};
+
+type FirmwareFlashTargets = {
+  uf2Files: string[];
+  bootloaderVolumes: string[];
+  leftUf2?: string;
+  rightUf2?: string;
+  unknownUf2: string[];
+  manifestPath?: string;
+};
+
 type StudioPort = {
   path: string;
   label: string;
@@ -117,6 +157,7 @@ type DirectCombo = KeymapCombo & {
 type DirectComboSource = "none" | "device" | "firmware";
 
 type EditorMode = "firmware" | "direct";
+type FlashSide = "left" | "right";
 type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
 type DirectConnectionIssue = {
   summary: string;
@@ -153,6 +194,7 @@ declare global {
 const DEFAULT_PROJECT_ROOT = "";
 const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
 const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
+const ENABLE_LAYER_STRUCTURE_EDITING = false;
 
 function useMobileUnsupported() {
   const [isMobileUnsupported, setIsMobileUnsupported] = React.useState(() => {
@@ -225,10 +267,13 @@ function App() {
   const [workbenchTab, setWorkbenchTab] = React.useState<WorkbenchTabId>("combos");
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
+  const [firmwareBuildCheck, setFirmwareBuildCheck] = React.useState<FirmwareBuildCheck | null>(null);
   const [uf2Files, setUf2Files] = React.useState<string[]>([]);
   const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
   const [selectedUf2, setSelectedUf2] = React.useState("");
   const [selectedVolume, setSelectedVolume] = React.useState("");
+  const [flashSide, setFlashSide] = React.useState<FlashSide>("left");
+  const [firmwareUf2Targets, setFirmwareUf2Targets] = React.useState<FirmwareUf2Targets>({ unknown: [] });
   const canUseWebUsb = supportsWebStudioConnection("usb");
   const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
   const firmwareRepoLabel = React.useMemo(() => formatFirmwareRepoLabel(firmwareRepoUrl), [firmwareRepoUrl]);
@@ -269,6 +314,9 @@ function App() {
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
   const showDirectEmptyState = isDirectMode && !directKeymap;
+  const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
+  const canDeleteActiveLayer =
+    canEditLayerStructure && Boolean(activeLayer) && layers.length > 1 && activeLayerIndex === layers.length - 1;
   const selectedCombos = React.useMemo(
     () => activeCombos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [activeCombos, selectedKeyIndex],
@@ -290,7 +338,6 @@ function App() {
       ].filter((diff) => diff.lines.length > 0),
     [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
   );
-
   React.useEffect(() => {
     setBindingDraft(selectedBinding);
   }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
@@ -476,6 +523,74 @@ function App() {
       keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, targetDiffs),
     });
     setStatus(`Direct keymap の差分 ${targetDiffs.length} keys を firmware keymap に反映しました`);
+  }
+
+  function createLayer() {
+    if (!canEditLayerStructure || !files) {
+      return;
+    }
+
+    const index = layers.length;
+    const id = nextLayerId(layers);
+    const label = `Layer ${index}`;
+    setFiles({
+      ...files,
+      keymap: addLayer(files.keymap, {
+        id,
+        label,
+        bindings: Array.from({ length: 40 }, () => "&trans"),
+      }),
+    });
+    setActiveLayerIndex(index);
+    setSelectedKeyIndex(0);
+    setSelectedComboId(null);
+    setStatus(`${label} を追加しました`);
+  }
+
+  function duplicateLayer() {
+    if (!canEditLayerStructure || !files || !activeLayer) {
+      return;
+    }
+
+    const id = nextLayerId(layers, `${activeLayer.id}_copy`);
+    const label = `${activeLayer.label} Copy`;
+    setFiles({
+      ...files,
+      keymap: addLayer(files.keymap, {
+        id,
+        label,
+        bindings: activeLayer.bindings,
+      }),
+    });
+    setActiveLayerIndex(layers.length);
+    setSelectedKeyIndex(0);
+    setSelectedComboId(null);
+    setStatus(`${label} を複製しました`);
+  }
+
+  function removeActiveLayer() {
+    if (!canEditLayerStructure || !files || !activeLayer) {
+      return;
+    }
+
+    if (layers.length <= 1) {
+      setStatus("最後の layer は削除できません");
+      return;
+    }
+
+    if (activeLayerIndex !== layers.length - 1) {
+      setStatus("layer 削除は番号参照のずれを避けるため最後の layer のみ対応しています");
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: deleteLayer(files.keymap, activeLayer),
+    });
+    setActiveLayerIndex(Math.max(0, layers.length - 2));
+    setSelectedKeyIndex(0);
+    setSelectedComboId(null);
+    setStatus(`${activeLayer.label} を削除しました`);
   }
 
   async function detectStudioPorts() {
@@ -1089,6 +1204,61 @@ function App() {
     }
   }
 
+  async function checkFirmwareBuildReady(): Promise<FirmwareBuildCheck | null> {
+    try {
+      const result = await invoke<FirmwareBuildCheck>("check_firmware_build_ready", {
+        root: projectRoot,
+        repoUrl: firmwareRepoUrl,
+      });
+      setFirmwareBuildCheck(result);
+      const failed = result.items.filter((item) => !item.ok);
+      setBuildStatus(
+        result.ok
+          ? "Build 前提チェック OK"
+          : `Build 前提チェック NG: ${failed.map((item) => item.label).join(", ")}`,
+      );
+      return result;
+    } catch (error) {
+      setBuildStatus(`Build 前提チェック失敗: ${formatError(error)}`);
+      return null;
+    }
+  }
+
+  async function savePushAndTriggerBuild() {
+    if (!files) {
+      setBuildStatus("保存対象のファイルがありません");
+      return;
+    }
+    if (!files.keymapPath) {
+      setBuildStatus("Save & Build はローカル firmware repository を開いているデスクトップ版で使えます");
+      return;
+    }
+
+    try {
+      const check = await checkFirmwareBuildReady();
+      if (!check?.ok) {
+        return;
+      }
+      const result = await invoke<FirmwareBuildStart>("save_commit_push_and_trigger_build", {
+        root: projectRoot,
+        repoUrl: firmwareRepoUrl,
+        keymap: files.keymap,
+        leftOverlay: files.leftOverlay,
+        rightOverlay: files.rightOverlay,
+      });
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+      setBuildStatus(
+        result.committed
+          ? `保存、commit、push、build 起動が完了しました: ${firmwareRepoLabel}`
+          : `変更なしのため commit は省略し、build workflow を起動しました: ${firmwareRepoLabel}`,
+      );
+    } catch (error) {
+      setBuildStatus(`保存/commit/push/build 失敗: ${formatError(error)}`);
+    }
+  }
+
   async function refreshBuildStatus() {
     try {
       const output = await invoke<string>("latest_github_run", { root: projectRoot, repoUrl: firmwareRepoUrl });
@@ -1101,22 +1271,45 @@ function App() {
   async function downloadArtifacts() {
     try {
       const output = await invoke<string>("download_latest_artifact", { root: projectRoot, repoUrl: firmwareRepoUrl });
-      setBuildStatus(output || "artifact を .kobitokey-studio/artifacts に保存しました");
+      const {
+        bootloaderVolumes: nextVolumes,
+        firmwareUf2Targets: targets,
+      } = await readFlashTargets();
+      setBuildStatus(
+        output ||
+          `最新成功 build の artifact を取得しました。left ${targets.left ? "OK" : "未検出"} / right ${
+            targets.right ? "OK" : "未検出"
+          } / bootloader ${nextVolumes.length} 件${targets.manifestPath ? " / manifest OK" : ""}`,
+      );
     } catch (error) {
       setBuildStatus(`artifact 取得失敗: ${String(error)}`);
     }
   }
 
+  async function readFlashTargets() {
+    const targets = await invoke<FirmwareFlashTargets>("resolve_firmware_flash_targets", { root: projectRoot });
+    const nextFirmwareTargets = firmwareTargetsFromResolved(targets);
+    setUf2Files(targets.uf2Files);
+    setBootloaderVolumes(targets.bootloaderVolumes);
+    setFirmwareUf2Targets(nextFirmwareTargets);
+    setSelectedUf2((current) =>
+      current && targets.uf2Files.includes(current)
+        ? current
+        : targets.leftUf2 ?? targets.rightUf2 ?? targets.uf2Files[0] ?? "",
+    );
+    setSelectedVolume((current) =>
+      current && targets.bootloaderVolumes.includes(current) ? current : targets.bootloaderVolumes[0] ?? "",
+    );
+    return {
+      uf2Files: targets.uf2Files,
+      bootloaderVolumes: targets.bootloaderVolumes,
+      firmwareUf2Targets: nextFirmwareTargets,
+    };
+  }
+
   async function refreshFlashTargets() {
     try {
-      const [nextUf2Files, nextVolumes] = await Promise.all([
-        invoke<string[]>("list_uf2_files", { root: projectRoot }),
-        invoke<string[]>("list_bootloader_volumes"),
-      ]);
-      setUf2Files(nextUf2Files);
-      setBootloaderVolumes(nextVolumes);
-      setSelectedUf2(nextUf2Files[0] ?? "");
-      setSelectedVolume(nextVolumes[0] ?? "");
+      const { uf2Files: nextUf2Files, bootloaderVolumes: nextVolumes } = await readFlashTargets();
       setBuildStatus(`UF2 ${nextUf2Files.length} 件 / bootloader ${nextVolumes.length} 件`);
     } catch (error) {
       setBuildStatus(`UF2/volume 確認失敗: ${String(error)}`);
@@ -1144,6 +1337,29 @@ function App() {
       setBuildStatus(`書き込みコピー完了: ${destination}`);
     } catch (error) {
       setBuildStatus(`UF2 コピー失敗: ${String(error)}`);
+    }
+  }
+
+  async function copyWizardUf2(side: FlashSide) {
+    const uf2Path = firmwareUf2Targets[side];
+    if (!uf2Path) {
+      setBuildStatus(`${sideLabel(side)} 用 UF2 が見つかりません。Artifact 取得を実行してください`);
+      return;
+    }
+
+    const volumePath = selectedVolume || bootloaderVolumes[0] || "";
+    if (!volumePath) {
+      setBuildStatus(`${sideLabel(side)} 側を bootloader に入れてから UF2 / Volume を更新してください`);
+      return;
+    }
+
+    try {
+      const destination = await invoke<string>("copy_uf2_to_volume", { uf2Path, volumePath });
+      const nextSide = side === "left" ? "right" : "left";
+      setFlashSide(nextSide);
+      setBuildStatus(`${sideLabel(side)} 側を書き込みました: ${destination}`);
+    } catch (error) {
+      setBuildStatus(`${sideLabel(side)} 側の UF2 コピー失敗: ${formatError(error)}`);
     }
   }
 
@@ -1297,6 +1513,42 @@ function App() {
       ) : (
       <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
+          {ENABLE_LAYER_STRUCTURE_EDITING ? (
+            <div className="layer-toolbar" role="group" aria-label="Layer controls">
+              <button
+                type="button"
+                onClick={createLayer}
+                disabled={!canEditLayerStructure}
+                title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "末尾に空の layer を追加"}
+                aria-label="Layer を追加"
+              >
+                <Plus size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={duplicateLayer}
+                disabled={!canEditLayerStructure || !activeLayer}
+                title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "選択中の layer を複製"}
+                aria-label="選択中の layer を複製"
+              >
+                <Copy size={15} />
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={removeActiveLayer}
+                disabled={!canDeleteActiveLayer}
+                title={
+                  isDirectMode
+                    ? "Direct Mode では layer 構造を変更できません"
+                    : "番号参照のずれを避けるため、最後の layer だけ削除できます"
+                }
+                aria-label="選択中の layer を削除"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ) : null}
           <div className="layer-list">
             {layers.map((layer, index) => (
               <button
@@ -1385,7 +1637,10 @@ function App() {
               ) : null}
               {workbenchTab === "build" ? (
                 <BuildWorkbench
+                  buildCheck={firmwareBuildCheck}
                   buildStatus={buildStatus}
+                  flashSide={flashSide}
+                  firmwareUf2Targets={firmwareUf2Targets}
                   firmwareRepoLabel={firmwareRepoLabel}
                   firmwareRepoUrl={firmwareRepoUrl}
                   uf2Files={uf2Files}
@@ -1394,11 +1649,15 @@ function App() {
                   selectedVolume={selectedVolume}
                   onSelectUf2={setSelectedUf2}
                   onSelectVolume={setSelectedVolume}
+                  onCheckBuildReady={checkFirmwareBuildReady}
                   onFirmwareRepoUrlChange={setFirmwareRepoUrl}
                   onTriggerBuild={triggerBuild}
+                  onSavePushBuild={savePushAndTriggerBuild}
                   onRefreshBuildStatus={refreshBuildStatus}
                   onDownloadArtifacts={downloadArtifacts}
                   onRefreshFlashTargets={refreshFlashTargets}
+                  onFlashSideChange={setFlashSide}
+                  onFlashWizardCopy={copyWizardUf2}
                   onCopySelectedUf2={copySelectedUf2}
                 />
               ) : null}
@@ -1437,27 +1696,34 @@ function App() {
           ) : (
             <FirmwareInspectorTabs
               binding={bindingDraft}
+              buildCheck={firmwareBuildCheck}
               buildStatus={buildStatus}
               bootloaderVolumes={bootloaderVolumes}
               combo={selectedCombo}
               combos={combos}
+              flashSide={flashSide}
+              firmwareUf2Targets={firmwareUf2Targets}
               firmwareRepoLabel={firmwareRepoLabel}
               firmwareRepoUrl={firmwareRepoUrl}
               keyIndex={selectedKeyIndex}
               onApplyBinding={applyBinding}
               onCopyUf2={copySelectedUf2}
+              onCheckBuildReady={checkFirmwareBuildReady}
               onCreateCombo={createCombo}
               onDeleteCombo={removeCombo}
               onDownloadArtifacts={downloadArtifacts}
               onFirmwareRepoUrlChange={setFirmwareRepoUrl}
               onRefreshBuildStatus={refreshBuildStatus}
               onRefreshFlashTargets={refreshFlashTargets}
+              onFlashSideChange={setFlashSide}
+              onFlashWizardCopy={copyWizardUf2}
               onSaveCombo={saveCombo}
               onSaveTrackball={applyTrackballSettings}
               onSelectCombo={setSelectedComboId}
               onSelectedUf2Change={setSelectedUf2}
               onSelectedVolumeChange={setSelectedVolume}
               onTriggerBuild={triggerBuild}
+              onSavePushBuild={savePushAndTriggerBuild}
               selectedBinding={selectedBinding}
               selectedCombos={selectedCombos}
               selectedUf2={selectedUf2}
@@ -2339,17 +2605,23 @@ function DirectWelcome({
 function FirmwareInspectorTabs({
   binding,
   bootloaderVolumes,
+  buildCheck,
   buildStatus,
+  flashSide,
+  firmwareUf2Targets,
   combo,
   combos,
   firmwareRepoLabel,
   firmwareRepoUrl,
   keyIndex,
   onApplyBinding,
+  onCheckBuildReady,
   onCopyUf2,
   onCreateCombo,
   onDeleteCombo,
   onDownloadArtifacts,
+  onFlashSideChange,
+  onFlashWizardCopy,
   onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
@@ -2358,6 +2630,7 @@ function FirmwareInspectorTabs({
   onSelectCombo,
   onSelectedUf2Change,
   onSelectedVolumeChange,
+  onSavePushBuild,
   onTriggerBuild,
   selectedBinding,
   selectedCombos,
@@ -2368,17 +2641,23 @@ function FirmwareInspectorTabs({
 }: {
   binding: string;
   bootloaderVolumes: string[];
+  buildCheck: FirmwareBuildCheck | null;
   buildStatus: string;
+  flashSide: FlashSide;
+  firmwareUf2Targets: FirmwareUf2Targets;
   combo?: KeymapCombo;
   combos: KeymapCombo[];
   firmwareRepoLabel: string;
   firmwareRepoUrl: string;
   keyIndex: number;
   onApplyBinding: (binding: string) => void;
+  onCheckBuildReady: () => void;
   onCopyUf2: () => void;
   onCreateCombo: () => void;
   onDeleteCombo: (combo: KeymapCombo) => void;
   onDownloadArtifacts: () => void;
+  onFlashSideChange: (side: FlashSide) => void;
+  onFlashWizardCopy: (side: FlashSide) => void;
   onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
@@ -2387,6 +2666,7 @@ function FirmwareInspectorTabs({
   onSelectCombo: (comboId: string) => void;
   onSelectedUf2Change: (value: string) => void;
   onSelectedVolumeChange: (value: string) => void;
+  onSavePushBuild: () => void;
   onTriggerBuild: () => void;
   selectedBinding: string;
   selectedCombos: KeymapCombo[];
@@ -2443,16 +2723,23 @@ function FirmwareInspectorTabs({
       ) : (
         <BuildPanel
           bootloaderVolumes={bootloaderVolumes}
+          buildCheck={buildCheck}
           buildStatus={buildStatus}
+          flashSide={flashSide}
+          firmwareUf2Targets={firmwareUf2Targets}
           firmwareRepoLabel={firmwareRepoLabel}
           firmwareRepoUrl={firmwareRepoUrl}
           onCopyUf2={onCopyUf2}
+          onCheckBuildReady={onCheckBuildReady}
           onDownloadArtifacts={onDownloadArtifacts}
+          onFlashSideChange={onFlashSideChange}
+          onFlashWizardCopy={onFlashWizardCopy}
           onFirmwareRepoUrlChange={onFirmwareRepoUrlChange}
           onRefreshBuildStatus={onRefreshBuildStatus}
           onRefreshFlashTargets={onRefreshFlashTargets}
           onSelectedUf2Change={onSelectedUf2Change}
           onSelectedVolumeChange={onSelectedVolumeChange}
+          onSavePushBuild={onSavePushBuild}
           onTriggerBuild={onTriggerBuild}
           selectedUf2={selectedUf2}
           selectedVolume={selectedVolume}
@@ -2465,32 +2752,46 @@ function FirmwareInspectorTabs({
 
 function BuildPanel({
   bootloaderVolumes,
+  buildCheck,
   buildStatus,
+  flashSide,
+  firmwareUf2Targets,
   firmwareRepoLabel,
   firmwareRepoUrl,
+  onCheckBuildReady,
   onCopyUf2,
   onDownloadArtifacts,
+  onFlashSideChange,
+  onFlashWizardCopy,
   onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
   onSelectedUf2Change,
   onSelectedVolumeChange,
+  onSavePushBuild,
   onTriggerBuild,
   selectedUf2,
   selectedVolume,
   uf2Files,
 }: {
   bootloaderVolumes: string[];
+  buildCheck: FirmwareBuildCheck | null;
   buildStatus: string;
+  flashSide: FlashSide;
+  firmwareUf2Targets: FirmwareUf2Targets;
   firmwareRepoLabel: string;
   firmwareRepoUrl: string;
+  onCheckBuildReady: () => void;
   onCopyUf2: () => void;
   onDownloadArtifacts: () => void;
+  onFlashSideChange: (side: FlashSide) => void;
+  onFlashWizardCopy: (side: FlashSide) => void;
   onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
   onSelectedUf2Change: (value: string) => void;
   onSelectedVolumeChange: (value: string) => void;
+  onSavePushBuild: () => void;
   onTriggerBuild: () => void;
   selectedUf2: string;
   selectedVolume: string;
@@ -2526,16 +2827,54 @@ function BuildPanel({
         <UploadCloud size={17} />
         Build 起動
       </button>
+      <button type="button" onClick={onCheckBuildReady}>
+        <CheckCircle2 size={17} />
+        接続確認
+      </button>
+      <button type="button" className="primary" onClick={onSavePushBuild}>
+        <UploadCloud size={17} />
+        保存してBuild
+      </button>
       <button type="button" onClick={onRefreshBuildStatus}>
         最新 run 確認
       </button>
       <button type="button" onClick={onDownloadArtifacts}>
         Artifact 取得
       </button>
+      <BuildCheckList check={buildCheck} />
       <div className="flash-wizard">
+        <div className="flash-wizard-header">
+          <strong>{sideLabel(flashSide)} 側を書き込み</strong>
+          <span>{formatUf2Name(firmwareUf2Targets[flashSide])}</span>
+        </div>
+        <div className="flash-side-toggle" role="group" aria-label="Flash side">
+          {(["left", "right"] as FlashSide[]).map((side) => (
+            <button
+              type="button"
+              key={side}
+              className={flashSide === side ? "active" : ""}
+              onClick={() => onFlashSideChange(side)}
+            >
+              {sideLabel(side)}
+            </button>
+          ))}
+        </div>
         <button type="button" onClick={onRefreshFlashTargets}>
           UF2 / Volume 更新
         </button>
+        <button
+          type="button"
+          className="primary"
+          disabled={!firmwareUf2Targets[flashSide] || bootloaderVolumes.length === 0}
+          onClick={() => onFlashWizardCopy(flashSide)}
+        >
+          {sideLabel(flashSide)} UF2 をコピー
+        </button>
+        <small>
+          {bootloaderVolumes.length > 0
+            ? `検出中: ${bootloaderVolumes.map((volume) => volume.split("/").pop()).join(", ")}`
+            : `${sideLabel(flashSide)} 側を bootloader に入れてから更新してください`}
+        </small>
         <label>
           UF2
           <select value={selectedUf2} onChange={(event) => onSelectedUf2Change(event.target.value)}>
@@ -3079,32 +3418,46 @@ function TrackballWorkbench({
 
 function BuildWorkbench({
   bootloaderVolumes,
+  buildCheck,
   buildStatus,
+  flashSide,
+  firmwareUf2Targets,
   firmwareRepoLabel,
   firmwareRepoUrl,
+  onCheckBuildReady,
   onCopySelectedUf2,
   onDownloadArtifacts,
+  onFlashSideChange,
+  onFlashWizardCopy,
   onFirmwareRepoUrlChange,
   onRefreshBuildStatus,
   onRefreshFlashTargets,
   onSelectUf2,
   onSelectVolume,
+  onSavePushBuild,
   onTriggerBuild,
   selectedUf2,
   selectedVolume,
   uf2Files,
 }: {
   bootloaderVolumes: string[];
+  buildCheck: FirmwareBuildCheck | null;
   buildStatus: string;
+  flashSide: FlashSide;
+  firmwareUf2Targets: FirmwareUf2Targets;
   firmwareRepoLabel: string;
   firmwareRepoUrl: string;
+  onCheckBuildReady: () => void;
   onCopySelectedUf2: () => void;
   onDownloadArtifacts: () => void;
+  onFlashSideChange: (side: FlashSide) => void;
+  onFlashWizardCopy: (side: FlashSide) => void;
   onFirmwareRepoUrlChange: (value: string) => void;
   onRefreshBuildStatus: () => void;
   onRefreshFlashTargets: () => void;
   onSelectUf2: (value: string) => void;
   onSelectVolume: (value: string) => void;
+  onSavePushBuild: () => void;
   onTriggerBuild: () => void;
   selectedUf2: string;
   selectedVolume: string;
@@ -3137,7 +3490,15 @@ function BuildWorkbench({
         </ol>
         <p className="build-status">{buildStatus}</p>
         <div className="build-actions">
-          <button type="button" className="primary" onClick={onTriggerBuild}>
+          <button type="button" onClick={onCheckBuildReady}>
+            <CheckCircle2 size={16} />
+            接続確認
+          </button>
+          <button type="button" className="primary" onClick={onSavePushBuild}>
+            <UploadCloud size={16} />
+            保存してBuild
+          </button>
+          <button type="button" onClick={onTriggerBuild}>
             <UploadCloud size={16} />
             Build 起動
           </button>
@@ -3148,6 +3509,7 @@ function BuildWorkbench({
             Artifact 取得
           </button>
         </div>
+        <BuildCheckList check={buildCheck} />
       </section>
       <section className="flash-panel">
         <div>
@@ -3155,6 +3517,40 @@ function BuildWorkbench({
           <h2>UF2 → Bootloader</h2>
         </div>
         <FirmwareWriteGuide />
+        <div className="flash-wizard">
+          <div className="flash-wizard-header">
+            <strong>{sideLabel(flashSide)} 側を書き込み</strong>
+            <span>{formatUf2Name(firmwareUf2Targets[flashSide])}</span>
+          </div>
+          <div className="flash-side-toggle" role="group" aria-label="Flash side">
+            {(["left", "right"] as FlashSide[]).map((side) => (
+              <button
+                type="button"
+                key={side}
+                className={flashSide === side ? "active" : ""}
+                onClick={() => onFlashSideChange(side)}
+              >
+                {sideLabel(side)}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
+            UF2 / Volume を更新
+          </button>
+          <button
+            type="button"
+            className="primary wide-action"
+            disabled={!firmwareUf2Targets[flashSide] || bootloaderVolumes.length === 0}
+            onClick={() => onFlashWizardCopy(flashSide)}
+          >
+            {sideLabel(flashSide)} UF2 を bootloader にコピー
+          </button>
+          <small>
+            {bootloaderVolumes.length > 0
+              ? `検出中: ${bootloaderVolumes.map((volume) => volume.split("/").pop()).join(", ")}`
+              : `${sideLabel(flashSide)} 側を bootloader に入れてから更新してください`}
+          </small>
+        </div>
         <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
           UF2 / Volume を更新
         </button>
@@ -3184,6 +3580,24 @@ function BuildWorkbench({
           UF2 を bootloader にコピー
         </button>
       </section>
+    </div>
+  );
+}
+
+function BuildCheckList({ check }: { check: FirmwareBuildCheck | null }) {
+  if (!check) {
+    return null;
+  }
+
+  return (
+    <div className={`build-check-list ${check.ok ? "ok" : "error"}`} aria-label="Build prerequisite checks">
+      {check.items.map((item) => (
+        <div className="build-check-item" key={item.label}>
+          {item.ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+          <span>{item.label}</span>
+          <em>{item.detail}</em>
+        </div>
+      ))}
     </div>
   );
 }
@@ -3797,6 +4211,48 @@ function formatFirmwareRepoLabel(repoUrl: string): string {
     .replace(/^https?:\/\/github\.com\//, "")
     .replace(/^git@github\.com:/, "");
   return value || "ローカル git repository";
+}
+
+function classifyFirmwareUf2Targets(files: string[]): FirmwareUf2Targets {
+  const targets: FirmwareUf2Targets = { unknown: [] };
+
+  for (const file of files) {
+    const name = (file.split("/").pop() ?? file).toLowerCase();
+    if (isLeftUf2Name(name) && !targets.left) {
+      targets.left = file;
+    } else if (isRightUf2Name(name) && !targets.right) {
+      targets.right = file;
+    } else {
+      targets.unknown.push(file);
+    }
+  }
+
+  return targets;
+}
+
+function firmwareTargetsFromResolved(targets: FirmwareFlashTargets): FirmwareUf2Targets {
+  return {
+    left: targets.leftUf2,
+    right: targets.rightUf2,
+    unknown: targets.unknownUf2,
+    manifestPath: targets.manifestPath,
+  };
+}
+
+function isLeftUf2Name(name: string): boolean {
+  return /(^|[_\-.])left([_\-.]|$)/.test(name) || /(^|[_\-.])l([_\-.]|$)/.test(name);
+}
+
+function isRightUf2Name(name: string): boolean {
+  return /(^|[_\-.])right([_\-.]|$)/.test(name) || /(^|[_\-.])r([_\-.]|$)/.test(name);
+}
+
+function sideLabel(side: FlashSide): string {
+  return side === "left" ? "Left" : "Right";
+}
+
+function formatUf2Name(path: string | undefined): string {
+  return path?.split("/").pop() ?? "UF2 未検出";
 }
 
 function formatRunStatus(output: string): string {

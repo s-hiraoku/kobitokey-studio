@@ -1082,6 +1082,33 @@ select:focus-visible {
     linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
 }
 
+.layer-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  gap: 6px;
+  align-items: center;
+}
+
+.layer-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink-muted);
+}
+
+.layer-toolbar button:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.layer-toolbar button svg {
+  flex: 0 0 auto;
+}
+
 .layer-list {
   display: flex;
   flex: 1;
@@ -1881,7 +1908,7 @@ select:focus-visible {
 .workbench-grid .build-panel ol { margin-top: var(--sp-3); }
 .workbench-grid .build-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--sp-2);
 }
 .workbench-grid .build-actions button {
@@ -2766,6 +2793,49 @@ select:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.build-check-list {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-sm);
+  margin: var(--sp-2) 0 var(--sp-3);
+  padding: var(--sp-2);
+  background: rgba(255, 255, 255, 0.48);
+}
+.build-check-list.ok {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+}
+.build-check-list.error {
+  border-color: rgba(168, 58, 43, 0.35);
+  background: #fdf1ed;
+}
+.build-check-item {
+  display: grid;
+  grid-template-columns: 16px minmax(92px, 0.45fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+.build-check-item svg {
+  color: var(--pine-bright);
+}
+.build-check-list.error .build-check-item svg {
+  color: #a83a2b;
+}
+.build-check-item span {
+  color: var(--ink);
+  font-weight: 700;
+}
+.build-check-item em {
+  overflow-wrap: anywhere;
+  font-family: "JetBrains Mono", monospace;
+  font-style: normal;
+  font-size: 10.5px;
+}
+
 .flash-wizard {
   display: grid;
   gap: var(--sp-2);
@@ -2774,6 +2844,37 @@ select:focus-visible {
   padding-top: var(--sp-3);
 }
 .flash-wizard label { margin-top: 0; }
+.flash-wizard-header {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.flash-wizard-header strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.flash-wizard-header span,
+.flash-wizard small {
+  color: var(--ink-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.flash-side-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+.flash-side-toggle button {
+  min-height: 32px;
+  font-size: 12px;
+}
+.flash-side-toggle button.active {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+  color: var(--pine-deep);
+}
 
 /* ----------------------------------------------------------------
    Status bar

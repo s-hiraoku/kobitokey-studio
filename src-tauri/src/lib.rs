@@ -37,6 +37,27 @@ fn read_kobitokey_project(root: String) -> Result<KobitoKeyProject, String> {
     })
 }
 
+fn write_kobitokey_project_files(
+    root: &str,
+    keymap: &str,
+    left_overlay: &str,
+    right_overlay: &str,
+) -> Result<(), String> {
+    let root = PathBuf::from(root);
+    fs::write(root.join("config/KobitoKey.keymap"), keymap).map_err(|error| error.to_string())?;
+    fs::write(
+        root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay"),
+        left_overlay,
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(
+        root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay"),
+        right_overlay,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn trigger_github_build(root: String, repo_url: Option<String>) -> Result<String, String> {
     run_gh(
@@ -44,6 +65,14 @@ fn trigger_github_build(root: String, repo_url: Option<String>) -> Result<String
         &["workflow", "run", "build.yml"],
         repo_url.as_deref(),
     )
+}
+
+#[tauri::command]
+fn check_firmware_build_ready(
+    root: String,
+    repo_url: Option<String>,
+) -> Result<FirmwareBuildCheck, String> {
+    Ok(run_firmware_build_checks(&root, repo_url.as_deref()))
 }
 
 #[tauri::command]
@@ -66,14 +95,7 @@ fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, S
 
 #[tauri::command]
 fn download_latest_artifact(root: String, repo_url: Option<String>) -> Result<String, String> {
-    let run_json = latest_github_run(root.clone(), repo_url.clone())?;
-    let run_id = run_json
-        .split("\"databaseId\":")
-        .nth(1)
-        .and_then(|value| value.split([',', '}']).next())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| "No GitHub Actions run found".to_string())?;
+    let run_id = latest_successful_github_run_id(&root, repo_url.as_deref())?;
     let output_dir = PathBuf::from(&root).join(".kobitokey-studio/artifacts");
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
     run_gh_owned(
@@ -90,15 +112,115 @@ fn download_latest_artifact(root: String, repo_url: Option<String>) -> Result<St
 }
 
 #[tauri::command]
+fn save_commit_push_and_trigger_build(
+    root: String,
+    repo_url: Option<String>,
+    keymap: String,
+    left_overlay: String,
+    right_overlay: String,
+) -> Result<FirmwareBuildStart, String> {
+    write_kobitokey_project_files(&root, &keymap, &left_overlay, &right_overlay)?;
+
+    let tracked_paths = [
+        "config/KobitoKey.keymap",
+        "config/boards/shields/KobitoKey/KobitoKey_left.overlay",
+        "config/boards/shields/KobitoKey/KobitoKey_right.overlay",
+    ];
+    run_git(
+        &root,
+        &[
+            "add",
+            "--",
+            tracked_paths[0],
+            tracked_paths[1],
+            tracked_paths[2],
+        ],
+    )?;
+
+    let committed = has_staged_changes(&root)?;
+    let commit_output = if committed {
+        Some(run_git(
+            &root,
+            &["commit", "-m", "Update KobitoKey firmware config"],
+        )?)
+    } else {
+        None
+    };
+
+    let push_output = if committed {
+        Some(run_git(&root, &["push", "-u", "origin", "HEAD"])?)
+    } else {
+        None
+    };
+
+    let build_output = trigger_github_build(root.clone(), repo_url)?;
+    Ok(FirmwareBuildStart {
+        committed,
+        commit_output,
+        push_output,
+        build_output,
+    })
+}
+
+#[tauri::command]
 fn list_uf2_files(root: String) -> Result<Vec<String>, String> {
     let artifacts_dir = PathBuf::from(root).join(".kobitokey-studio/artifacts");
     let mut files = Vec::new();
     collect_uf2_files(&artifacts_dir, &mut files)?;
+    files.sort();
     Ok(files)
 }
 
 #[tauri::command]
+fn resolve_firmware_flash_targets(root: String) -> Result<FirmwareFlashTargets, String> {
+    let artifacts_dir = PathBuf::from(root).join(".kobitokey-studio/artifacts");
+    let mut uf2_files = Vec::new();
+    collect_uf2_files(&artifacts_dir, &mut uf2_files)?;
+    uf2_files.sort();
+
+    let mut manifests = Vec::new();
+    collect_manifest_files(&artifacts_dir, &mut manifests)?;
+    let mut left_uf2 = None;
+    let mut right_uf2 = None;
+    let mut manifest_path = None;
+
+    for manifest in manifests {
+        if let Some((left, right)) = read_firmware_manifest(&manifest, &uf2_files)? {
+            left_uf2 = left;
+            right_uf2 = right;
+            manifest_path = Some(display_path(&manifest));
+            break;
+        }
+    }
+
+    if left_uf2.is_none() || right_uf2.is_none() {
+        let (left, right) = classify_uf2_files_by_name(&uf2_files);
+        left_uf2 = left_uf2.or(left);
+        right_uf2 = right_uf2.or(right);
+    }
+
+    let unknown_uf2 = uf2_files
+        .iter()
+        .filter(|file| Some(*file) != left_uf2.as_ref() && Some(*file) != right_uf2.as_ref())
+        .cloned()
+        .collect();
+
+    Ok(FirmwareFlashTargets {
+        uf2_files,
+        bootloader_volumes: detect_bootloader_volumes()?,
+        left_uf2,
+        right_uf2,
+        unknown_uf2,
+        manifest_path,
+    })
+}
+
+#[tauri::command]
 fn list_bootloader_volumes() -> Result<Vec<String>, String> {
+    detect_bootloader_volumes()
+}
+
+fn detect_bootloader_volumes() -> Result<Vec<String>, String> {
     let volumes = PathBuf::from("/Volumes");
     let entries = fs::read_dir(volumes).map_err(|error| error.to_string())?;
     let mut candidates = Vec::new();
@@ -438,8 +560,10 @@ fn read_studio_combos(
     }
     let target = resolve_studio_target(&kind, port_path)
         .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
-    with_studio_transport(&target, |transport| read_studio_combos_from_transport(transport))
-        .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
+    with_studio_transport(&target, |transport| {
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
 }
 
 #[tauri::command]
@@ -1222,6 +1346,126 @@ fn collect_uf2_files(dir: &Path, files: &mut Vec<String>) -> Result<(), String> 
     Ok(())
 }
 
+fn collect_manifest_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir).map_err(|error| error.to_string())? {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if path.is_dir() {
+            collect_manifest_files(&path, files)?;
+        } else if path
+            .file_name()
+            .is_some_and(|name| name == "manifest.json" || name == "firmware-manifest.json")
+        {
+            files.push(path);
+        }
+    }
+
+    files.sort();
+    Ok(())
+}
+
+fn read_firmware_manifest(
+    manifest_path: &Path,
+    uf2_files: &[String],
+) -> Result<Option<(Option<String>, Option<String>)>, String> {
+    let contents = fs::read_to_string(manifest_path).map_err(|error| error.to_string())?;
+    let value: serde_json::Value =
+        serde_json::from_str(&contents).map_err(|error| error.to_string())?;
+    let base_dir = manifest_path.parent().unwrap_or_else(|| Path::new(""));
+    let mut left = side_file_from_manifest(&value, "left", base_dir, uf2_files);
+    let mut right = side_file_from_manifest(&value, "right", base_dir, uf2_files);
+
+    if let Some(outputs) = value.get("outputs").and_then(serde_json::Value::as_array) {
+        for output in outputs {
+            let side = output
+                .get("side")
+                .and_then(serde_json::Value::as_str)
+                .map(|side| side.to_ascii_lowercase());
+            let Some(file) = output.get("file").and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            let resolved = resolve_manifest_file(base_dir, file, uf2_files);
+            match side.as_deref() {
+                Some("left") => left = left.or(resolved),
+                Some("right") => right = right.or(resolved),
+                _ => {}
+            }
+        }
+    }
+
+    if left.is_some() || right.is_some() {
+        Ok(Some((left, right)))
+    } else {
+        Ok(None)
+    }
+}
+
+fn side_file_from_manifest(
+    value: &serde_json::Value,
+    side: &str,
+    base_dir: &Path,
+    uf2_files: &[String],
+) -> Option<String> {
+    let side_value = value.get(side)?;
+    if let Some(file) = side_value.as_str() {
+        return resolve_manifest_file(base_dir, file, uf2_files);
+    }
+    side_value
+        .get("file")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|file| resolve_manifest_file(base_dir, file, uf2_files))
+}
+
+fn resolve_manifest_file(base_dir: &Path, file: &str, uf2_files: &[String]) -> Option<String> {
+    let path = base_dir.join(file);
+    if path.exists() {
+        return Some(display_path(&path));
+    }
+
+    uf2_files
+        .iter()
+        .find(|candidate| {
+            candidate == &file
+                || candidate.ends_with(&format!("/{file}"))
+                || Path::new(candidate)
+                    .file_name()
+                    .is_some_and(|name| name == file)
+        })
+        .cloned()
+}
+
+fn classify_uf2_files_by_name(files: &[String]) -> (Option<String>, Option<String>) {
+    let left = files.iter().find(|file| is_left_uf2_name(file)).cloned();
+    let right = files.iter().find(|file| is_right_uf2_name(file)).cloned();
+    (left, right)
+}
+
+fn is_left_uf2_name(path: &str) -> bool {
+    let name = Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(path)
+        .to_ascii_lowercase();
+    side_token_match(&name, "left") || side_token_match(&name, "l")
+}
+
+fn is_right_uf2_name(path: &str) -> bool {
+    let name = Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(path)
+        .to_ascii_lowercase();
+    side_token_match(&name, "right") || side_token_match(&name, "r")
+}
+
+fn side_token_match(name: &str, token: &str) -> bool {
+    name.split(|char: char| !char.is_ascii_alphanumeric())
+        .any(|part| part == token)
+}
+
 fn open_studio_client(port_path: &str) -> Result<StudioClient<SerialTransport>, String> {
     StudioClient::open_serial(port_path).map_err(|error| error.to_string())
 }
@@ -1592,6 +1836,202 @@ fn run_gh_owned(root: &str, args: Vec<String>, repo_url: Option<&str>) -> Result
     }
 }
 
+fn latest_successful_github_run_id(root: &str, repo_url: Option<&str>) -> Result<String, String> {
+    let output = run_gh(
+        root,
+        &[
+            "run",
+            "list",
+            "--workflow",
+            "build.yml",
+            "--limit",
+            "1",
+            "--status",
+            "success",
+            "--json",
+            "databaseId",
+        ],
+        repo_url,
+    )?;
+    parse_first_run_id(&output).ok_or_else(|| "No successful GitHub Actions run found".to_string())
+}
+
+fn parse_first_run_id(output: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(output).ok()?;
+    let run = value.as_array()?.first()?;
+    let id = run.get("databaseId")?;
+    if let Some(number) = id.as_u64() {
+        return Some(number.to_string());
+    }
+    id.as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn run_firmware_build_checks(root: &str, repo_url: Option<&str>) -> FirmwareBuildCheck {
+    let mut items = Vec::new();
+    let root_path = PathBuf::from(root);
+
+    push_check(
+        &mut items,
+        "local repository",
+        root_path.join(".git").exists(),
+        if root_path.join(".git").exists() {
+            "git repository found".to_string()
+        } else {
+            "selected folder is not a git repository".to_string()
+        },
+    );
+    push_required_file_check(&mut items, &root_path, "config/KobitoKey.keymap");
+    push_required_file_check(
+        &mut items,
+        &root_path,
+        "config/boards/shields/KobitoKey/KobitoKey_left.overlay",
+    );
+    push_required_file_check(
+        &mut items,
+        &root_path,
+        "config/boards/shields/KobitoKey/KobitoKey_right.overlay",
+    );
+
+    let origin = run_git(root, &["remote", "get-url", "origin"]);
+    push_check_result(
+        &mut items,
+        "git origin",
+        origin.as_ref().map(|value| value.as_str()),
+    );
+
+    let branch = run_git(root, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    let branch_detail = match branch {
+        Ok(value) if value == "HEAD" => {
+            Err("detached HEAD; checkout a branch before pushing".to_string())
+        }
+        other => other,
+    };
+    push_check_result(
+        &mut items,
+        "git branch",
+        branch_detail.as_ref().map(|value| value.as_str()),
+    );
+
+    let gh = Command::new("gh").arg("--version").output();
+    push_command_check(&mut items, "gh CLI", gh, "gh is available");
+
+    let gh_auth = Command::new("gh").args(["auth", "status"]).output();
+    push_command_check(&mut items, "gh auth", gh_auth, "gh is authenticated");
+
+    let workflow = run_gh(
+        root,
+        &["workflow", "view", "build.yml", "--json", "name,state"],
+        repo_url,
+    );
+    push_check_result(
+        &mut items,
+        "build workflow",
+        workflow.as_ref().map(|value| value.as_str()),
+    );
+
+    FirmwareBuildCheck {
+        ok: items.iter().all(|item| item.ok),
+        items,
+    }
+}
+
+fn push_required_file_check(
+    items: &mut Vec<FirmwareBuildCheckItem>,
+    root: &Path,
+    relative_path: &str,
+) {
+    let exists = root.join(relative_path).exists();
+    push_check(
+        items,
+        relative_path,
+        exists,
+        if exists {
+            "found".to_string()
+        } else {
+            "missing".to_string()
+        },
+    );
+}
+
+fn push_check(items: &mut Vec<FirmwareBuildCheckItem>, label: &str, ok: bool, detail: String) {
+    items.push(FirmwareBuildCheckItem {
+        label: label.to_string(),
+        ok,
+        detail,
+    });
+}
+
+fn push_check_result(
+    items: &mut Vec<FirmwareBuildCheckItem>,
+    label: &str,
+    result: Result<&str, &String>,
+) {
+    match result {
+        Ok(value) => push_check(items, label, true, value.to_string()),
+        Err(error) => push_check(items, label, false, error.to_string()),
+    }
+}
+
+fn push_command_check(
+    items: &mut Vec<FirmwareBuildCheckItem>,
+    label: &str,
+    result: Result<std::process::Output, std::io::Error>,
+    success_detail: &str,
+) {
+    match result {
+        Ok(output) if output.status.success() => {
+            push_check(items, label, true, success_detail.to_string())
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            push_check(
+                items,
+                label,
+                false,
+                if stderr.is_empty() { stdout } else { stderr },
+            );
+        }
+        Err(error) => push_check(items, label, false, error.to_string()),
+    }
+}
+
+fn run_git(root: &str, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if stderr.is_empty() {
+            Err(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(stderr)
+        }
+    }
+}
+
+fn has_staged_changes(root: &str) -> Result<bool, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["diff", "--cached", "--quiet"])
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    match output.status.code() {
+        Some(0) => Ok(false),
+        Some(1) => Ok(true),
+        _ => Err(String::from_utf8_lossy(&output.stderr).trim().to_string()),
+    }
+}
+
 fn gh_args_with_repo(mut args: Vec<String>, repo_url: Option<&str>) -> Result<Vec<String>, String> {
     if let Some(repo) = repo_url.and_then(normalize_github_repo_arg) {
         args.push("-R".to_string());
@@ -1642,6 +2082,41 @@ struct KobitoKeyProject {
     left_overlay: String,
     right_overlay_path: String,
     right_overlay: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FirmwareBuildStart {
+    committed: bool,
+    commit_output: Option<String>,
+    push_output: Option<String>,
+    build_output: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FirmwareBuildCheck {
+    ok: bool,
+    items: Vec<FirmwareBuildCheckItem>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FirmwareBuildCheckItem {
+    label: String,
+    ok: bool,
+    detail: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FirmwareFlashTargets {
+    uf2_files: Vec<String>,
+    bootloader_volumes: Vec<String>,
+    left_uf2: Option<String>,
+    right_uf2: Option<String>,
+    unknown_uf2: Vec<String>,
+    manifest_path: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -1761,9 +2236,12 @@ pub fn run() {
             write_text_file,
             read_kobitokey_project,
             trigger_github_build,
+            check_firmware_build_ready,
+            save_commit_push_and_trigger_build,
             latest_github_run,
             download_latest_artifact,
             list_uf2_files,
+            resolve_firmware_flash_targets,
             list_bootloader_volumes,
             copy_uf2_to_volume,
             list_studio_ports,
@@ -1867,7 +2345,8 @@ mod tests {
         };
 
         let config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
-        let decoded = decode_combo_config(0, &config, &catalog).expect("combo config should decode");
+        let decoded =
+            decode_combo_config(0, &config, &catalog).expect("combo config should decode");
 
         assert_eq!(decoded.binding, "&kp A");
         assert_eq!(decoded.key_positions, vec![0, 3]);
@@ -1888,14 +2367,16 @@ mod tests {
             layer_mask: None,
             slow_release: None,
         };
-        let combo_config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
+        let combo_config =
+            encode_combo_config(&combo, &catalog).expect("combo config should encode");
         let mut combos_payload = Vec::new();
         push_len_field(&mut combos_payload, 1, &combo_config);
         push_varint_field(&mut combos_payload, 2, 12);
         let mut response = Vec::new();
         push_len_field(&mut response, 1, &combos_payload);
 
-        let decoded = decode_get_combos_response(&response, &catalog).expect("combo response should decode");
+        let decoded =
+            decode_get_combos_response(&response, &catalog).expect("combo response should decode");
 
         assert_eq!(decoded.max_combos, 12);
         assert_eq!(decoded.combos.len(), 1);
