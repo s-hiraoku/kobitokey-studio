@@ -466,16 +466,16 @@ function App() {
     setBindingDraft(nextBinding);
   }
 
-  function applyDirectFirmwareDiffs() {
-    if (!files || directFirmwareDiffs.length === 0) {
+  function applyDirectFirmwareDiffs(targetDiffs: DirectFirmwareKeyDiff[] = directFirmwareDiffs) {
+    if (!files || targetDiffs.length === 0) {
       return;
     }
 
     setFiles({
       ...files,
-      keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, directFirmwareDiffs),
+      keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, targetDiffs),
     });
-    setStatus(`Direct keymap の差分 ${directFirmwareDiffs.length} keys を firmware keymap に反映しました`);
+    setStatus(`Direct keymap の差分 ${targetDiffs.length} keys を firmware keymap に反映しました`);
   }
 
   async function detectStudioPorts() {
@@ -1962,7 +1962,7 @@ function DirectSummaryPanel({
   connectionKind: StudioConnectionKind;
   firmwareDiffs: DirectFirmwareKeyDiff[];
   keymap: StudioKeymap | null;
-  onApplyFirmwareDiffs: () => void;
+  onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
   portPath: string;
 }) {
   return (
@@ -2007,7 +2007,7 @@ function DirectFirmwareDiffPanel({
   onApplyFirmwareDiffs,
 }: {
   diffs: DirectFirmwareKeyDiff[];
-  onApplyFirmwareDiffs: () => void;
+  onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
 }) {
   return (
     <section className="direct-firmware-diff-panel">
@@ -2016,7 +2016,12 @@ function DirectFirmwareDiffPanel({
           <h3>Firmware との差分</h3>
           <span>{diffs.length === 0 ? "同期済み" : `${diffs.length} keys`}</span>
         </div>
-        <button type="button" className="primary compact-action" disabled={diffs.length === 0} onClick={onApplyFirmwareDiffs}>
+        <button
+          type="button"
+          className="primary compact-action"
+          disabled={diffs.length === 0}
+          onClick={() => onApplyFirmwareDiffs(diffs)}
+        >
           <UploadCloud size={15} />
           Firmware に反映
         </button>
@@ -2031,12 +2036,18 @@ function DirectFirmwareDiffPanel({
           <div className="direct-firmware-diff-list">
             {diffs.map((diff) => (
               <article key={`${diff.layerIndex}-${diff.keyIndex}`}>
-                <div>
-                  <strong>
-                    Layer {diff.layerIndex} / Key {diff.keyIndex + 1}
-                  </strong>
-                  <span>{diff.layerName}</span>
-                </div>
+                <header>
+                  <div>
+                    <strong>
+                      Layer {diff.layerIndex} / Key {diff.keyIndex + 1}
+                    </strong>
+                    <span>{diff.layerName}</span>
+                  </div>
+                  <button type="button" className="compact-action" onClick={() => onApplyFirmwareDiffs([diff])}>
+                    <UploadCloud size={14} />
+                    反映
+                  </button>
+                </header>
                 <dl>
                   <div>
                     <dt>Firmware</dt>
