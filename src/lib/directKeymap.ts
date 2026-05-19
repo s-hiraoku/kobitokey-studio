@@ -1,4 +1,4 @@
-import { type KeymapCombo, type ParsedKeymap } from "./keymapParser";
+import { parseKeymap, updateLayerBinding, type KeymapCombo, type ParsedKeymap } from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
 const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
@@ -132,6 +132,17 @@ export function diffDirectKeymapAgainstFirmware(
       ];
     });
   });
+}
+
+export function applyDirectFirmwareKeyDiffsToSource(source: string, diffs: DirectFirmwareKeyDiff[]): string {
+  return diffs.reduce((nextSource, diff) => {
+    const layer = parseKeymap(nextSource).layers[diff.layerIndex];
+    if (!layer) {
+      return nextSource;
+    }
+
+    return updateLayerBinding(nextSource, layer, diff.keyIndex, diff.directBinding);
+  }, source);
 }
 
 export function formatStudioBindings(bindings: string[]): string {
