@@ -870,6 +870,22 @@ select:focus-visible {
   line-height: 1.55;
   letter-spacing: -0.002em;
 }
+.runtime-warning small {
+  color: rgba(90, 66, 9, 0.78);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.runtime-actions {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding-left: 18px;
+  color: #5a4209;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .runtime-diagnostics {
   display: flex;

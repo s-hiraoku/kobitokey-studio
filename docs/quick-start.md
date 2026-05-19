@@ -126,6 +126,7 @@ Bluetooth は実験的対応です。ZMK Studio 用として表示されるデ�
 | build に変更が入らない | ローカル保存後に `KobitoKey_QWERTY` 側で commit / push したか |
 | artifact が古い | 最新 run の時刻と artifact 取得先を確認する |
 | Direct Mode で device が出ない | USB data cable、ZMK Studio 対応 firmware、Chrome/Edge、`127.0.0.1` / `localhost` / HTTPS で開いているか。Bluetooth で見つからない場合は USB を使う |
+| USB port を開けない | 他の KobitoKey Studio タブを閉じる、接続済み画面の `切断` を押す、USB を抜き差しする、Chrome を完全終了して再起動する |
 | UF2 volume が出ない | keyboard half が bootloader mode になっているか(デスクトップ版のみ) |
 
 次に詳しく確認する場合は [使い方ガイド](../usage-guide/) の「目的別レシピ」と「トラブルシューティング」を見てください。

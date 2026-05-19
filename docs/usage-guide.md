@@ -606,6 +606,16 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 - ブラウザ版では Chrome/Edge を使い、`127.0.0.1`、`localhost`、または HTTPS から開きます。
 - ブラウザの permission picker で正しい device を選びます。
 
+### USB port を開けない
+
+`Failed to open the serial port` や `in use by another process` が出る場合は、別のタブ、Chrome の前回接続、または他のアプリが KobitoKey の serial port を掴んでいる可能性があります。
+
+- 他の KobitoKey Studio タブを閉じます。
+- 接続済み画面があれば `切断` を押します。
+- USB を抜き差しします。
+- まだ失敗する場合は Chrome を完全終了して再起動します。
+- Chrome のサイト設定から serial port permission を削除し、再度 device を選び直します。
+
 ### Direct 書き込みに失敗する
 
 - device を読み込んでから書き込んでいるか確認します。

@@ -115,6 +115,12 @@ type DirectComboSource = "none" | "device" | "firmware";
 
 type EditorMode = "firmware" | "direct";
 type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
+type DirectConnectionIssue = {
+  summary: string;
+  detail: string;
+  actions: string[];
+  rawMessage: string;
+};
 type DirectKeyWriteFeedback = {
   kind: "idle" | "writing" | "success" | "error";
   message: string;
@@ -195,7 +201,7 @@ function App() {
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = React.useState("");
   const [studioConnectionKind, setStudioConnectionKind] = React.useState<StudioConnectionKind>("usb");
   const [studioConnectionState, setStudioConnectionState] = React.useState<StudioConnectionState>("disconnected");
-  const [studioConnectionError, setStudioConnectionError] = React.useState("");
+  const [studioConnectionError, setStudioConnectionError] = React.useState<DirectConnectionIssue | null>(null);
   const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
   const [directTrackball, setDirectTrackball] = React.useState<DirectTrackballSettings | null>(null);
   const [directCombos, setDirectCombos] = React.useState<DirectCombo[]>([]);
@@ -508,7 +514,7 @@ function App() {
     }
     setStudioConnectionKind(session.kind);
     setStudioConnectionState("connected");
-    setStudioConnectionError("");
+    setStudioConnectionError(null);
     setEditorMode("direct");
     setActiveLayerIndex(0);
     setSelectedKeyIndex(0);
@@ -519,7 +525,7 @@ function App() {
   async function connectStudioDevice(kind: StudioConnectionKind) {
     setStudioConnectionKind(kind);
     setStudioConnectionState("connecting");
-    setStudioConnectionError("");
+    setStudioConnectionError(null);
 
     if (!isDesktopRuntime) {
       try {
@@ -535,10 +541,15 @@ function App() {
         await refreshDirectCombos(kind, "", { silent: true });
         await refreshDirectTrackballSettings(kind, "", { silent: true });
       } catch (error) {
-        const message = `${kind === "usb" ? "Web Serial" : "Web Bluetooth"} 接続失敗: ${String(error)}`;
+        const issue = formatDirectConnectionIssue({
+          kind,
+          runtime: "web",
+          error,
+          prefix: kind === "usb" ? "Web Serial 接続失敗" : "Web Bluetooth 接続失敗",
+        });
         setStudioConnectionState("error");
-        setStudioConnectionError(message);
-        setStatus(message);
+        setStudioConnectionError(issue);
+        setStatus(formatDirectConnectionStatus(issue));
       }
       return;
     }
@@ -551,19 +562,29 @@ function App() {
         portPath = selectedUsbPort?.path || ports.find((port) => port.portKind === "usb")?.path || ports[0]?.path || "";
         setSelectedStudioPort(portPath);
       } catch (error) {
-        const message = `Studio device 検出失敗: ${formatError(error)}`;
+        const issue = formatDirectConnectionIssue({
+          kind,
+          runtime: "desktop",
+          error,
+          prefix: "Studio device 検出失敗",
+        });
         setStudioConnectionState("error");
-        setStudioConnectionError(message);
-        setStatus(message);
+        setStudioConnectionError(issue);
+        setStatus(formatDirectConnectionStatus(issue));
         return;
       }
     }
 
     if (kind === "usb" && !portPath) {
-      const message = "Studio device が見つかりません。USB で接続し、ZMK Studio を有効にした firmware を書き込んでください。";
+      const issue = formatDirectConnectionIssue({
+        kind,
+        runtime: "desktop",
+        error: "Studio device が見つかりません。",
+        prefix: "Direct USB 接続失敗",
+      });
       setStudioConnectionState("error");
-      setStudioConnectionError(message);
-      setStatus(message);
+      setStudioConnectionError(issue);
+      setStatus(formatDirectConnectionStatus(issue));
       return;
     }
 
@@ -597,10 +618,15 @@ function App() {
       await refreshDirectCombos(kind, session.portPath || "", { silent: true });
       await refreshDirectTrackballSettings(kind, session.portPath || "", { silent: true });
     } catch (error) {
-      const message = `Direct ${kind.toUpperCase()} 接続失敗: ${formatError(error)}`;
+      const issue = formatDirectConnectionIssue({
+        kind,
+        runtime: "desktop",
+        error,
+        prefix: `Direct ${kind.toUpperCase()} 接続失敗`,
+      });
       setStudioConnectionState("error");
-      setStudioConnectionError(message);
-      setStatus(message);
+      setStudioConnectionError(issue);
+      setStatus(formatDirectConnectionStatus(issue));
     }
   }
 
@@ -630,7 +656,7 @@ function App() {
     directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
     setStudioConnectionState("disconnected");
-    setStudioConnectionError("");
+    setStudioConnectionError(null);
     setStatus("device を切断しました");
   }
 
@@ -1494,6 +1520,148 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
+function formatDirectConnectionIssue({
+  error,
+  kind,
+  prefix,
+  runtime,
+}: {
+  error: unknown;
+  kind: StudioConnectionKind;
+  prefix: string;
+  runtime: "desktop" | "web";
+}): DirectConnectionIssue {
+  const errorMessage = formatError(error);
+  const rawMessage = `${prefix}: ${errorMessage}`;
+  const normalized = rawMessage.toLowerCase();
+
+  if (kind === "usb" && isUsbPortOpenFailure(normalized)) {
+    return {
+      summary: "USB port を開けませんでした",
+      detail: "別のタブ、Chrome の前回接続、または他のアプリが KobitoKey を使用中の可能性があります。",
+      actions: [
+        "他の KobitoKey Studio タブを閉じる",
+        "接続済み画面があれば「切断」を押す",
+        "USB を抜き差しする",
+        "まだ失敗する場合は Chrome を完全終了して再起動する",
+      ],
+      rawMessage,
+    };
+  }
+
+  if (kind === "usb" && isNoUsbDeviceFailure(normalized)) {
+    return {
+      summary: "USB device が見つかりません",
+      detail: "KobitoKey が data 通信できる USB 接続として見えていません。",
+      actions: [
+        "USB data cable で接続しているか確認する",
+        "KobitoKey に ZMK Studio 対応 firmware が入っているか確認する",
+        runtime === "desktop" ? "device 検出を押して USB デバイス一覧を更新する" : "Chrome / Edge で localhost または HTTPS から開き直す",
+      ],
+      rawMessage,
+    };
+  }
+
+  if (isStudioUnlockFailure(normalized)) {
+    return {
+      summary: "ZMK Studio がロックされています",
+      detail: "USB 接続は開けていますが、キーボード側が Studio 設定の読み取りを許可していません。",
+      actions: [
+        "KobitoKey の Studio Unlock キーを押す",
+        "Unlock 後にもう一度 USB で接続する",
+        "Studio Unlock key がない firmware の場合は Firmware Mode で配置して build / flash する",
+      ],
+      rawMessage,
+    };
+  }
+
+  if (kind === "usb" && normalized.includes("failed to read studio keymap")) {
+    return {
+      summary: "ZMK Studio keymap を読み込めません",
+      detail: "USB 接続は開けていますが、キーボードから keymap を取得できませんでした。",
+      actions: [
+        "KobitoKey に ZMK Studio 対応 firmware が入っているか確認する",
+        "Studio Unlock キーを押してから再接続する",
+        "USB を抜き差ししてもう一度接続する",
+      ],
+      rawMessage,
+    };
+  }
+
+  if (kind === "usb" && normalized.includes("web serial is not available")) {
+    return {
+      summary: "Web Serial が使えません",
+      detail: "ブラウザまたはページの開き方が Web Serial API の条件を満たしていません。",
+      actions: [
+        "PC の Chrome または Edge で開く",
+        "localhost、127.0.0.1、または HTTPS から開く",
+        "ブラウザのサイト設定で serial port permission を許可する",
+      ],
+      rawMessage,
+    };
+  }
+
+  if (kind === "bluetooth") {
+    return {
+      summary: "Bluetooth 接続に失敗しました",
+      detail: "Bluetooth Direct は実験的対応です。ZMK Studio 用 device が見えない場合は USB を使ってください。",
+      actions: [
+        "通常のキーボード接続ではなく ZMK Studio 用 device を選ぶ",
+        "KobitoKey を Bluetooth 接続待ち状態にする",
+        "安定して設定する場合は USB Direct を使う",
+      ],
+      rawMessage,
+    };
+  }
+
+  return {
+    summary: `${kind.toUpperCase()} 接続に失敗しました`,
+    detail: "接続処理が途中で失敗しました。下の詳細を確認して、接続条件を見直してください。",
+    actions: [
+      "USB data cable と接続先 device を確認する",
+      "ZMK Studio 対応 firmware が入っているか確認する",
+      "一度切断してから再接続する",
+    ],
+    rawMessage,
+  };
+}
+
+function formatDirectConnectionStatus(issue: DirectConnectionIssue): string {
+  return `${issue.summary}: ${issue.detail}`;
+}
+
+function isUsbPortOpenFailure(message: string): boolean {
+  return (
+    message.includes("failed to open the serial port") ||
+    message.includes("in use by another process") ||
+    message.includes("resource busy") ||
+    message.includes("permission denied") ||
+    message.includes("access denied") ||
+    message.includes("device or resource busy") ||
+    message.includes("cannot open") ||
+    message.includes("could not open")
+  );
+}
+
+function isNoUsbDeviceFailure(message: string): boolean {
+  return (
+    message.includes("studio device が見つかりません") ||
+    message.includes("usb direct mode requires a serial port path") ||
+    message.includes("usb trackball direct requires a serial port path") ||
+    message.includes("missing_port") ||
+    message.includes("no port selected") ||
+    message.includes("notfounderror")
+  );
+}
+
+function isStudioUnlockFailure(message: string): boolean {
+  return (
+    message.includes("studio unlock") ||
+    message.includes("did not allow reading behaviors") ||
+    message.includes("getbehaviordetails")
+  );
+}
+
 const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
   { value: "key", label: "Key" },
   { value: "layer-tap", label: "Layer Tap" },
@@ -1887,6 +2055,21 @@ function DirectCapabilityStrip({
   );
 }
 
+function DirectConnectionErrorPanel({ issue }: { issue: DirectConnectionIssue }) {
+  return (
+    <div className="runtime-warning">
+      <strong>{issue.summary}</strong>
+      <span>{issue.detail}</span>
+      <ol className="runtime-actions">
+        {issue.actions.map((action) => (
+          <li key={action}>{action}</li>
+        ))}
+      </ol>
+      <small>{issue.rawMessage}</small>
+    </div>
+  );
+}
+
 function DirectWelcome({
   bluetoothDevices,
   canUseWebBluetooth,
@@ -1907,7 +2090,7 @@ function DirectWelcome({
   bluetoothDevices: StudioBluetoothDevice[];
   canUseWebBluetooth: boolean;
   canUseWebUsb: boolean;
-  connectionError: string;
+  connectionError: DirectConnectionIssue | null;
   connectionKind: StudioConnectionKind;
   connectionState: StudioConnectionState;
   isDesktopRuntime: boolean;
@@ -1973,10 +2156,7 @@ function DirectWelcome({
             </div>
           ) : null}
           {connectionState === "error" && connectionError ? (
-            <div className="runtime-warning">
-              <strong>{connectionKind.toUpperCase()} 接続に失敗しました</strong>
-              <span>{connectionError}</span>
-            </div>
+            <DirectConnectionErrorPanel issue={connectionError} />
           ) : null}
           <div className="direct-connect-grid">
             <label className="connect-transport-field">
