@@ -1588,12 +1588,17 @@ select:focus-visible {
   padding: var(--sp-3);
   background: var(--card);
 }
-.direct-firmware-diff-list article > div {
+.direct-firmware-diff-list article > header {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px 10px;
+}
+.direct-firmware-diff-list article > header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 .direct-firmware-diff-list article strong {
   color: var(--ink-strong);
@@ -1606,6 +1611,10 @@ select:focus-visible {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.direct-firmware-diff-list article .compact-action {
+  min-height: 28px;
+  padding-inline: 10px;
 }
 .direct-firmware-diff-list dl {
   display: grid;
