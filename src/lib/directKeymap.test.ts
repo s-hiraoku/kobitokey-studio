@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyDirectFirmwareComboDiffsToSource,
   applyDirectFirmwareKeyDiffsToSource,
   completeStudioBindings,
+  diffDirectCombosAgainstFirmware,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   formatStudioBindings,
@@ -22,6 +24,37 @@ const combos: KeymapCombo[] = [
     blockEnd: 20,
   },
 ];
+
+function comboFixtureSource(): string {
+  return [
+    "/ {",
+    "    keymap {",
+    "        compatible = \"zmk,keymap\";",
+    "        default_layer {",
+    "            bindings = <",
+    completeStudioBindings(["&kp A"]).join("\n"),
+    "            >;",
+    "        };",
+    "    };",
+    "",
+    "    combos {",
+    "        compatible = \"zmk,combos\";",
+    "",
+    "        combo_tab {",
+    "            timeout-ms = <35>;",
+    "            key-positions = <1 2>;",
+    "            bindings = <&kp ENTER>;",
+    "        };",
+    "",
+    "        combo_old {",
+    "            timeout-ms = <70>;",
+    "            key-positions = <3 4>;",
+    "            bindings = <&kp B>;",
+    "        };",
+    "    };",
+    "};",
+  ].join("\n");
+}
 
 describe("direct keymap conversion", () => {
   it("normalizes compact Studio bindings for display", () => {
@@ -173,5 +206,103 @@ describe("direct keymap conversion", () => {
 
     expect(parseKeymap(nextSource).layers[1].bindings[0]).toBe("&kp C");
     expect(diffDirectKeymapAgainstFirmware(directKeymap, parseKeymap(nextSource))).toEqual([]);
+  });
+
+  it("diffs Direct combos against firmware combos by position", () => {
+    const firmwareCombos = parseKeymap(comboFixtureSource()).combos;
+    const directCombos: KeymapCombo[] = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_2",
+        binding: "&kp C",
+        keyPositions: [3, 4],
+        timeoutMs: 70,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_3",
+        binding: "&kp D",
+        keyPositions: [5, 6],
+        timeoutMs: 80,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+
+    expect(diffDirectCombosAgainstFirmware(directCombos, firmwareCombos)).toEqual([
+      {
+        comboIndex: 1,
+        kind: "changed",
+        firmwareCombo: {
+          id: "combo_old",
+          binding: "&kp B",
+          keyPositions: [3, 4],
+          timeoutMs: 70,
+        },
+        directCombo: {
+          id: "direct_combo_2",
+          binding: "&kp C",
+          keyPositions: [3, 4],
+          timeoutMs: 70,
+        },
+      },
+      {
+        comboIndex: 2,
+        kind: "added",
+        firmwareCombo: null,
+        directCombo: {
+          id: "direct_combo_3",
+          binding: "&kp D",
+          keyPositions: [5, 6],
+          timeoutMs: 80,
+        },
+      },
+    ]);
+  });
+
+  it("applies Direct combo diffs back to firmware source", () => {
+    const source = comboFixtureSource();
+    const directCombos: KeymapCombo[] = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_2",
+        binding: "&kp C",
+        keyPositions: [3, 4],
+        timeoutMs: 70,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_3",
+        binding: "&kp D",
+        keyPositions: [5, 6],
+        timeoutMs: 80,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+    const diffs = diffDirectCombosAgainstFirmware(directCombos, parseKeymap(source).combos);
+
+    const nextSource = applyDirectFirmwareComboDiffsToSource(source, diffs);
+
+    const nextCombos = parseKeymap(nextSource).combos;
+    expect(nextCombos.map((combo) => combo.id)).toEqual(["combo_tab", "combo_old", "direct_combo_3"]);
+    expect(nextCombos.map((combo) => combo.binding)).toEqual(["&kp ENTER", "&kp C", "&kp D"]);
+    expect(diffDirectCombosAgainstFirmware(directCombos, nextCombos)).toEqual([]);
   });
 });
