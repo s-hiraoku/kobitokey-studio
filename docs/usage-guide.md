@@ -407,6 +407,8 @@ Direct Mode は、接続中の device へ設定を保存します。左右分割
 
 Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻るわけではありません。長期的に管理したい設定は、あとで Firmware Mode のファイルにも反映しておくと、次回 firmware を作り直したときに差分が消えにくくなります。
 
+Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap の key binding 差分を Direct summary で確認できます。現時点では差分表示のみで、firmware ファイルへ反映する操作は次の実装対象です。
+
 Direct Mode の key / Combo / Trackball 書き込みは、成功時に device へ自動保存します。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
 ### 5.2 USB / Bluetooth で接続する(USB 推奨)

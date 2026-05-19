@@ -1,6 +1,19 @@
 import { type KeymapCombo, type ParsedKeymap } from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
+const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
+  BKSP: "BSPC",
+  CMMA: "COMMA",
+  LCTL: "LCTRL",
+  LGUI: "LCMD",
+  LSFT: "LSHFT",
+  RET: "ENTER",
+  RCTL: "RCTRL",
+  RGUI: "RCMD",
+  RSFT: "RSHFT",
+  SCLN: "SEMI",
+  SPC: "SPACE",
+};
 
 export type StudioKeymap = {
   deviceName: string;
@@ -28,6 +41,14 @@ export type StudioComboSet = {
     slowRelease: boolean;
   }>;
   maxCombos: number;
+};
+
+export type DirectFirmwareKeyDiff = {
+  layerIndex: number;
+  layerName: string;
+  keyIndex: number;
+  firmwareBinding: string;
+  directBinding: string;
 };
 
 export function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet {
@@ -77,6 +98,42 @@ export function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
   return ["/ {", "    keymap {", "        compatible = \"zmk,keymap\";", layers, "    };", "};"].join("\n");
 }
 
+export function diffDirectKeymapAgainstFirmware(
+  directKeymap: StudioKeymap | null,
+  firmwareKeymap: ParsedKeymap,
+): DirectFirmwareKeyDiff[] {
+  if (!directKeymap) {
+    return [];
+  }
+
+  return directKeymap.layers.flatMap((directLayer, layerIndex) => {
+    const firmwareLayer = firmwareKeymap.layers[layerIndex];
+    if (!firmwareLayer) {
+      return [];
+    }
+
+    const directBindings = completeStudioBindings(directLayer.bindings);
+    const firmwareBindings = completeStudioBindings(firmwareLayer.bindings);
+
+    return directBindings.flatMap((directBinding, keyIndex) => {
+      const firmwareBinding = firmwareBindings[keyIndex] ?? "&none";
+      if (normalizeComparableBinding(directBinding) === normalizeComparableBinding(firmwareBinding)) {
+        return [];
+      }
+
+      return [
+        {
+          layerIndex,
+          layerName: directLayer.name || firmwareLayer.label || `Layer ${layerIndex}`,
+          keyIndex,
+          firmwareBinding,
+          directBinding,
+        },
+      ];
+    });
+  });
+}
+
 export function formatStudioBindings(bindings: string[]): string {
   const completeBindings = completeStudioBindings(bindings);
   const maxLength = Math.max(...completeBindings.map((binding) => binding.length), 7);
@@ -88,6 +145,34 @@ export function formatStudioBindings(bindings: string[]): string {
       .join("  ")
       .trimEnd(),
   ).join("\n");
+}
+
+function normalizeComparableBinding(binding: string): string {
+  const parts = normalizeDirectBindingForDisplay(binding).trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+    case "&kt":
+    case "&sk":
+      return normalizeComparableParts(parts, [1]);
+    case "&lt":
+      return normalizeComparableParts(parts, [2]);
+    case "&mt":
+      return normalizeComparableParts(parts, [1, 2]);
+    default:
+      return parts.join(" ");
+  }
+}
+
+function normalizeComparableParts(parts: string[], keycodeIndexes: number[]): string {
+  const keycodeIndexSet = new Set(keycodeIndexes);
+  return parts
+    .map((part, index) => (keycodeIndexSet.has(index) ? normalizeComparableKeycode(part) : part))
+    .join(" ");
+}
+
+function normalizeComparableKeycode(value: string): string {
+  const upperValue = value.toUpperCase();
+  return COMPARABLE_KEYCODE_ALIASES[upperValue] ?? upperValue;
 }
 
 export function completeStudioBindings(bindings: string[]): string[] {

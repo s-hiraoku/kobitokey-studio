@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   completeStudioBindings,
+  diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   formatStudioBindings,
   normalizeDirectBindingForDisplay,
@@ -90,5 +91,49 @@ describe("direct keymap conversion", () => {
     expect(source).toContain('display-name = "Base Layer";');
     expect(source).toContain("&kp A");
     expect(source).toContain("&none");
+  });
+
+  it("diffs Direct key bindings against firmware layers by layer and key position", () => {
+    const diffs = diffDirectKeymapAgainstFirmware(
+      {
+        deviceName: "KobitoKey",
+        serialNumber: "123",
+        lockState: "unlocked",
+        hasUnsavedChanges: false,
+        layers: [
+          { id: 0, name: "Base", bindings: ["&kp RET", "&bt 3 0", "&mt LSFT RET", "&lt 1 LGUI"] },
+          { id: 1, name: "Raise", bindings: ["&kp C"] },
+        ],
+      },
+      {
+        layers: [
+          {
+            id: "default_layer",
+            label: "Default",
+            bindings: completeStudioBindings(["&kp ENTER", "&bt BT_SEL 0", "&mt LSHFT ENTER", "&lt 1 LCMD"]),
+            blockStart: 0,
+            blockEnd: 1,
+          },
+          {
+            id: "raise_layer",
+            label: "Raise",
+            bindings: completeStudioBindings(["&kp D"]),
+            blockStart: 1,
+            blockEnd: 2,
+          },
+        ],
+        combos,
+      },
+    );
+
+    expect(diffs).toEqual([
+      {
+        layerIndex: 1,
+        layerName: "Raise",
+        keyIndex: 0,
+        firmwareBinding: "&kp D",
+        directBinding: "&kp C",
+      },
+    ]);
   });
 });
