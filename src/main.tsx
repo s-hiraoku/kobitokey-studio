@@ -22,6 +22,7 @@ import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from
 import { bindingDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
+  applyDirectFirmwareKeyDiffsToSource,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   studioKeymapToParsedKeymap,
@@ -463,6 +464,18 @@ function App() {
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
     setBindingDraft(nextBinding);
+  }
+
+  function applyDirectFirmwareDiffs() {
+    if (!files || directFirmwareDiffs.length === 0) {
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, directFirmwareDiffs),
+    });
+    setStatus(`Direct keymap の差分 ${directFirmwareDiffs.length} keys を firmware keymap に反映しました`);
   }
 
   async function detectStudioPorts() {
@@ -1346,6 +1359,7 @@ function App() {
               connectionKind={studioConnectionKind}
               firmwareDiffs={directFirmwareDiffs}
               keymap={directKeymap}
+              onApplyFirmwareDiffs={applyDirectFirmwareDiffs}
               portPath={selectedStudioPort}
             />
           ) : (
@@ -1942,11 +1956,13 @@ function DirectSummaryPanel({
   connectionKind,
   firmwareDiffs,
   keymap,
+  onApplyFirmwareDiffs,
   portPath,
 }: {
   connectionKind: StudioConnectionKind;
   firmwareDiffs: DirectFirmwareKeyDiff[];
   keymap: StudioKeymap | null;
+  onApplyFirmwareDiffs: () => void;
   portPath: string;
 }) {
   return (
@@ -1981,24 +1997,36 @@ function DirectSummaryPanel({
       ) : (
         <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
       )}
-      {keymap ? <DirectFirmwareDiffPanel diffs={firmwareDiffs} /> : null}
+      {keymap ? <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} /> : null}
     </section>
   );
 }
 
-function DirectFirmwareDiffPanel({ diffs }: { diffs: DirectFirmwareKeyDiff[] }) {
+function DirectFirmwareDiffPanel({
+  diffs,
+  onApplyFirmwareDiffs,
+}: {
+  diffs: DirectFirmwareKeyDiff[];
+  onApplyFirmwareDiffs: () => void;
+}) {
   return (
     <section className="direct-firmware-diff-panel">
       <div className="panel-heading compact">
-        <h3>Firmware との差分</h3>
-        <span>{diffs.length === 0 ? "同期済み" : `${diffs.length} keys`}</span>
+        <div>
+          <h3>Firmware との差分</h3>
+          <span>{diffs.length === 0 ? "同期済み" : `${diffs.length} keys`}</span>
+        </div>
+        <button type="button" className="primary compact-action" disabled={diffs.length === 0} onClick={onApplyFirmwareDiffs}>
+          <UploadCloud size={15} />
+          Firmware に反映
+        </button>
       </div>
       {diffs.length === 0 ? (
         <p className="diff-empty compact-empty">Direct keymap と firmware keymap の key binding は一致しています。</p>
       ) : (
         <>
           <p className="direct-firmware-note">
-            表示のみです。firmware ファイルへ反映する操作は次の実装対象です。
+            Direct 側の binding を firmware keymap に反映します。保存または書き出しは Firmware モードで実行します。
           </p>
           <div className="direct-firmware-diff-list">
             {diffs.map((diff) => (
