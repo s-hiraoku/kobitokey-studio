@@ -60,9 +60,10 @@ fn write_kobitokey_project_files(
 
 #[tauri::command]
 fn trigger_github_build(root: String, repo_url: Option<String>) -> Result<String, String> {
+    let branch = current_git_branch(&root)?;
     run_gh(
         &root,
-        &["workflow", "run", "build.yml"],
+        &["workflow", "run", "build.yml", "--ref", branch.as_str()],
         repo_url.as_deref(),
     )
 }
@@ -77,6 +78,7 @@ fn check_firmware_build_ready(
 
 #[tauri::command]
 fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, String> {
+    let branch = current_git_branch(&root)?;
     run_gh(
         &root,
         &[
@@ -84,6 +86,8 @@ fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, S
             "list",
             "--workflow",
             "build.yml",
+            "--branch",
+            branch.as_str(),
             "--limit",
             "1",
             "--json",
@@ -95,7 +99,8 @@ fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, S
 
 #[tauri::command]
 fn download_latest_artifact(root: String, repo_url: Option<String>) -> Result<String, String> {
-    let run_id = latest_successful_github_run_id(&root, repo_url.as_deref())?;
+    let head_sha = current_git_head_sha(&root)?;
+    let run_id = latest_successful_github_run_id(&root, repo_url.as_deref(), &head_sha)?;
     let output_dir = PathBuf::from(&root).join(".kobitokey-studio/artifacts");
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
     run_gh_owned(
@@ -137,11 +142,19 @@ fn save_commit_push_and_trigger_build(
         ],
     )?;
 
-    let committed = has_staged_changes(&root)?;
+    let committed = has_staged_changes_for_paths(&root, &tracked_paths)?;
     let commit_output = if committed {
         Some(run_git(
             &root,
-            &["commit", "-m", "Update KobitoKey firmware config"],
+            &[
+                "commit",
+                "-m",
+                "Update KobitoKey firmware config",
+                "--",
+                tracked_paths[0],
+                tracked_paths[1],
+                tracked_paths[2],
+            ],
         )?)
     } else {
         None
@@ -1836,7 +1849,11 @@ fn run_gh_owned(root: &str, args: Vec<String>, repo_url: Option<&str>) -> Result
     }
 }
 
-fn latest_successful_github_run_id(root: &str, repo_url: Option<&str>) -> Result<String, String> {
+fn latest_successful_github_run_id(
+    root: &str,
+    repo_url: Option<&str>,
+    head_sha: &str,
+) -> Result<String, String> {
     let output = run_gh(
         root,
         &[
@@ -1848,12 +1865,16 @@ fn latest_successful_github_run_id(root: &str, repo_url: Option<&str>) -> Result
             "1",
             "--status",
             "success",
+            "--commit",
+            head_sha,
             "--json",
-            "databaseId",
+            "databaseId,headSha",
         ],
         repo_url,
     )?;
-    parse_first_run_id(&output).ok_or_else(|| "No successful GitHub Actions run found".to_string())
+    parse_first_run_id(&output).ok_or_else(|| {
+        format!("No successful GitHub Actions run found for current commit {head_sha}")
+    })
 }
 
 fn parse_first_run_id(output: &str) -> Option<String> {
@@ -1901,6 +1922,7 @@ fn run_firmware_build_checks(root: &str, repo_url: Option<&str>) -> FirmwareBuil
         "git origin",
         origin.as_ref().map(|value| value.as_str()),
     );
+    push_repository_target_check(&mut items, origin.as_deref(), repo_url);
 
     let branch = run_git(root, &["rev-parse", "--abbrev-ref", "HEAD"]);
     let branch_detail = match branch {
@@ -1999,6 +2021,44 @@ fn push_command_check(
     }
 }
 
+fn push_repository_target_check(
+    items: &mut Vec<FirmwareBuildCheckItem>,
+    origin: Result<&str, &String>,
+    repo_url: Option<&str>,
+) {
+    let Some(repo_url) = repo_url.and_then(normalize_github_repo_arg) else {
+        return;
+    };
+    let origin_repo = match origin.ok().and_then(normalize_github_repo_arg) {
+        Some(value) => value,
+        None => return,
+    };
+
+    push_check(
+        items,
+        "repository target",
+        origin_repo == repo_url,
+        if origin_repo == repo_url {
+            format!("origin and build target both use {repo_url}")
+        } else {
+            format!("origin is {origin_repo}, but build target is {repo_url}")
+        },
+    );
+}
+
+fn current_git_branch(root: &str) -> Result<String, String> {
+    let branch = run_git(root, &["rev-parse", "--abbrev-ref", "HEAD"])?;
+    if branch == "HEAD" {
+        Err("detached HEAD; checkout a branch before running the workflow".to_string())
+    } else {
+        Ok(branch)
+    }
+}
+
+fn current_git_head_sha(root: &str) -> Result<String, String> {
+    run_git(root, &["rev-parse", "HEAD"])
+}
+
 fn run_git(root: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .current_dir(root)
@@ -2018,10 +2078,12 @@ fn run_git(root: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
-fn has_staged_changes(root: &str) -> Result<bool, String> {
+fn has_staged_changes_for_paths(root: &str, paths: &[&str]) -> Result<bool, String> {
+    let mut args = vec!["diff", "--cached", "--quiet", "--"];
+    args.extend(paths);
     let output = Command::new("git")
         .current_dir(root)
-        .args(["diff", "--cached", "--quiet"])
+        .args(args)
         .output()
         .map_err(|error| error.to_string())?;
 
@@ -2405,5 +2467,76 @@ mod tests {
         for (input, expected) in cases {
             assert_eq!(normalize_github_repo_arg(input).as_deref(), Some(expected));
         }
+    }
+
+    #[test]
+    fn repository_target_check_detects_origin_mismatch() {
+        let mut items = Vec::new();
+        let origin = Ok("git@github.com:s-hiraoku/KobitoKey_QWERTY.git");
+
+        push_repository_target_check(
+            &mut items,
+            origin,
+            Some("https://github.com/other/KobitoKey_QWERTY"),
+        );
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "repository target");
+        assert!(!items[0].ok);
+        assert!(items[0].detail.contains("s-hiraoku/KobitoKey_QWERTY"));
+        assert!(items[0].detail.contains("other/KobitoKey_QWERTY"));
+    }
+
+    #[test]
+    fn staged_change_check_is_limited_to_studio_managed_paths() {
+        let root = unique_test_dir("kobitokey-staged-change-check");
+        fs::create_dir_all(root.join("config")).expect("test config dir should be created");
+        fs::write(root.join("config/KobitoKey.keymap"), "initial")
+            .expect("keymap fixture should be written");
+        fs::write(root.join("notes.txt"), "initial").expect("notes fixture should be written");
+        run_test_git(&root, &["init"]);
+        run_test_git(&root, &["config", "user.email", "test@example.com"]);
+        run_test_git(&root, &["config", "user.name", "Test User"]);
+        run_test_git(&root, &["add", "."]);
+        run_test_git(&root, &["commit", "-m", "initial"]);
+
+        fs::write(root.join("notes.txt"), "unrelated").expect("notes change should be written");
+        run_test_git(&root, &["add", "notes.txt"]);
+        assert!(!has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
+            .expect("path-limited diff should run"));
+
+        fs::write(root.join("config/KobitoKey.keymap"), "updated")
+            .expect("keymap change should be written");
+        run_test_git(&root, &["add", "config/KobitoKey.keymap"]);
+        assert!(has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
+            .expect("path-limited diff should run"));
+
+        fs::remove_dir_all(root).expect("test repo should be removed");
+    }
+
+    fn unique_test_dir(prefix: &str) -> PathBuf {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!(
+            "{prefix}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos()
+        ));
+        dir
+    }
+
+    fn run_test_git(root: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .current_dir(root)
+            .args(args)
+            .output()
+            .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }
