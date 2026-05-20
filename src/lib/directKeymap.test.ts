@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  applyDirectFirmwareComboDiffsToSource,
   applyDirectFirmwareKeyDiffsToSource,
   completeStudioBindings,
+  diffDirectCombosAgainstFirmware,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
   formatStudioBindings,
@@ -22,6 +25,129 @@ const combos: KeymapCombo[] = [
     blockEnd: 20,
   },
 ];
+
+const desktopDisplayedKeycodes: Record<string, string> = {
+  APOS: "APOSTROPHE",
+  AT: "ATSN",
+  CARET: "CRRT",
+  COLON: "COLN",
+  COMMA: "CMMA",
+  C_MUTE: "M_MUTE",
+  EQUAL: "EQL",
+  GRAVE: "GRAV",
+  LCMD: "LEFT_META",
+  LSHFT: "LSHIFT",
+  LT: "LABT",
+  N0: "NUM_0",
+  N1: "NUM_1",
+  N2: "NUM_2",
+  N3: "NUM_3",
+  N4: "NUM_4",
+  N5: "NUM_5",
+  N6: "NUM_6",
+  N7: "NUM_7",
+  N8: "NUM_8",
+  N9: "NUM_9",
+  RSHFT: "RSHIFT",
+  SLASH: "FSLH",
+  SPACE: "SPC",
+  TILDE: "TILD",
+  UP: "UARW",
+};
+
+const webDisplayedKeycodes: Record<string, string> = {
+  AMPS: "0x02070024",
+  ASTRK: "0x02070025",
+  AT: "0x0207001f",
+  BSPC: "BKSP",
+  CARET: "0x02070023",
+  COLON: "0x02070033",
+  COMMA: "CMMA",
+  DLLR: "0x02070021",
+  DQT: "0x02070034",
+  ENTER: "RET",
+  EXCL: "0x0207001e",
+  HASH: "0x02070020",
+  LBRC: "0x0207002f",
+  LCMD: "LGUI",
+  LPAR: "0x02070026",
+  LSHFT: "LSFT",
+  LT: "0x02070036",
+  PIPE: "0x02070031",
+  PLUS: "0x0207002e",
+  PRCNT: "0x02070022",
+  QMARK: "0x02070038",
+  RBRC: "0x02070030",
+  RPAR: "0x02070027",
+  RSHFT: "RSFT",
+  SPACE: "SPC",
+  TILDE: "0x02070035",
+  UNDER: "0x0207002d",
+};
+
+const studioDisplayedBindings: Record<string, string> = {
+  "&zoom_hold 9": "&unknown 22 9 0",
+  "&to 0": "&trans",
+};
+
+function comboFixtureSource(): string {
+  return [
+    "/ {",
+    "    keymap {",
+    "        compatible = \"zmk,keymap\";",
+    "        default_layer {",
+    "            bindings = <",
+    completeStudioBindings(["&kp A"]).join("\n"),
+    "            >;",
+    "        };",
+    "    };",
+    "",
+    "    combos {",
+    "        compatible = \"zmk,combos\";",
+    "",
+    "        combo_tab {",
+    "            timeout-ms = <35>;",
+    "            key-positions = <1 2>;",
+    "            bindings = <&kp ENTER>;",
+    "        };",
+    "",
+    "        combo_old {",
+    "            timeout-ms = <70>;",
+    "            key-positions = <3 4>;",
+    "            bindings = <&kp B>;",
+    "        };",
+    "    };",
+    "};",
+  ].join("\n");
+}
+
+function asDesktopDisplayedBinding(binding: string): string {
+  return mapComparableBindingKeys(binding, desktopDisplayedKeycodes);
+}
+
+function asWebDisplayedBinding(binding: string): string {
+  return mapComparableBindingKeys(binding, webDisplayedKeycodes);
+}
+
+function mapComparableBindingKeys(binding: string, keycodeMap: Record<string, string>): string {
+  if (studioDisplayedBindings[binding]) {
+    return studioDisplayedBindings[binding];
+  }
+
+  const parts = binding.trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+    case "&kt":
+    case "&sk":
+      return [parts[0], keycodeMap[parts[1]] ?? parts[1]].join(" ");
+    case "&lt":
+      return [parts[0], parts[1], keycodeMap[parts[2]] ?? parts[2]].join(" ");
+    case "&mt":
+      return [parts[0], keycodeMap[parts[1]] ?? parts[1], keycodeMap[parts[2]] ?? parts[2]].join(" ");
+    default:
+      return binding;
+  }
+}
 
 describe("direct keymap conversion", () => {
   it("normalizes compact Studio bindings for display", () => {
@@ -103,7 +229,23 @@ describe("direct keymap conversion", () => {
         lockState: "unlocked",
         hasUnsavedChanges: false,
         layers: [
-          { id: 0, name: "Base", bindings: ["&kp RET", "&bt 3 0", "&mt LSFT RET", "&lt 1 LGUI"] },
+          {
+            id: 0,
+            name: "Base",
+            bindings: [
+              "&kp RET",
+              "&bt 3 0",
+              "&mt LSFT RET",
+              "&lt 1 LGUI",
+              "&kp 0x0207002e",
+              "&kp 0x02070025",
+              "&kp EXCLAMATION",
+              "&kp NUMBER_1",
+              "&kp LEFT_SHIFT",
+              "&trans",
+              "&unknown 22 9 0",
+            ],
+          },
           { id: 1, name: "Raise", bindings: ["&kp C"] },
         ],
       },
@@ -112,7 +254,19 @@ describe("direct keymap conversion", () => {
           {
             id: "default_layer",
             label: "Default",
-            bindings: completeStudioBindings(["&kp ENTER", "&bt BT_SEL 0", "&mt LSHFT ENTER", "&lt 1 LCMD"]),
+            bindings: completeStudioBindings([
+              "&kp ENTER",
+              "&bt BT_SEL 0",
+              "&mt LSHFT ENTER",
+              "&lt 1 LCMD",
+              "&kp PLUS",
+              "&kp ASTRK",
+              "&kp EXCL",
+              "&kp N1",
+              "&kp LSHFT",
+              "&to 0",
+              "&zoom_hold 9",
+            ]),
             blockStart: 0,
             blockEnd: 1,
           },
@@ -137,6 +291,82 @@ describe("direct keymap conversion", () => {
         directBinding: "&kp C",
       },
     ]);
+  });
+
+  it("diffs unknown custom bindings when behavior IDs differ", () => {
+    const diffs = diffDirectKeymapAgainstFirmware(
+      {
+        deviceName: "KobitoKey",
+        serialNumber: "123",
+        lockState: "unlocked",
+        hasUnsavedChanges: false,
+        layers: [
+          {
+            id: 0,
+            name: "Base",
+            bindings: ["&unknown 23 9 0"],
+          },
+        ],
+      },
+      {
+        layers: [
+          {
+            id: "default_layer",
+            label: "Default",
+            bindings: completeStudioBindings(["&zoom_hold 9"]),
+            blockStart: 0,
+            blockEnd: 1,
+          },
+        ],
+        combos,
+      },
+    );
+
+    expect(diffs).toEqual([
+      {
+        layerIndex: 0,
+        layerName: "Base",
+        keyIndex: 0,
+        firmwareBinding: "&zoom_hold 9",
+        directBinding: "&unknown 23 9 0",
+      },
+    ]);
+  });
+
+  it("does not diff fixture keymap aliases returned by the desktop Direct reader", () => {
+    const firmwareSource = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
+    const firmwareKeymap = parseKeymap(firmwareSource);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: firmwareKeymap.layers.map((layer, index) => ({
+        id: index,
+        name: layer.label,
+        bindings: layer.bindings.map(asDesktopDisplayedBinding),
+      })),
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("does not diff fixture keymap aliases returned by the web Direct reader", () => {
+    const firmwareSource = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
+    const firmwareKeymap = parseKeymap(firmwareSource);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: firmwareKeymap.layers.map((layer, index) => ({
+        id: index,
+        name: layer.label,
+        bindings: layer.bindings.map(asWebDisplayedBinding),
+      })),
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
   });
 
   it("applies Direct key diffs back to firmware source", () => {
@@ -173,5 +403,103 @@ describe("direct keymap conversion", () => {
 
     expect(parseKeymap(nextSource).layers[1].bindings[0]).toBe("&kp C");
     expect(diffDirectKeymapAgainstFirmware(directKeymap, parseKeymap(nextSource))).toEqual([]);
+  });
+
+  it("diffs Direct combos against firmware combos by position", () => {
+    const firmwareCombos = parseKeymap(comboFixtureSource()).combos;
+    const directCombos: KeymapCombo[] = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_2",
+        binding: "&kp C",
+        keyPositions: [3, 4],
+        timeoutMs: 70,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_3",
+        binding: "&kp D",
+        keyPositions: [5, 6],
+        timeoutMs: 80,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+
+    expect(diffDirectCombosAgainstFirmware(directCombos, firmwareCombos)).toEqual([
+      {
+        comboIndex: 1,
+        kind: "changed",
+        firmwareCombo: {
+          id: "combo_old",
+          binding: "&kp B",
+          keyPositions: [3, 4],
+          timeoutMs: 70,
+        },
+        directCombo: {
+          id: "direct_combo_2",
+          binding: "&kp C",
+          keyPositions: [3, 4],
+          timeoutMs: 70,
+        },
+      },
+      {
+        comboIndex: 2,
+        kind: "added",
+        firmwareCombo: null,
+        directCombo: {
+          id: "direct_combo_3",
+          binding: "&kp D",
+          keyPositions: [5, 6],
+          timeoutMs: 80,
+        },
+      },
+    ]);
+  });
+
+  it("applies Direct combo diffs back to firmware source", () => {
+    const source = comboFixtureSource();
+    const directCombos: KeymapCombo[] = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_2",
+        binding: "&kp C",
+        keyPositions: [3, 4],
+        timeoutMs: 70,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_3",
+        binding: "&kp D",
+        keyPositions: [5, 6],
+        timeoutMs: 80,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+    const diffs = diffDirectCombosAgainstFirmware(directCombos, parseKeymap(source).combos);
+
+    const nextSource = applyDirectFirmwareComboDiffsToSource(source, diffs);
+
+    const nextCombos = parseKeymap(nextSource).combos;
+    expect(nextCombos.map((combo) => combo.id)).toEqual(["combo_tab", "combo_old", "direct_combo_3"]);
+    expect(nextCombos.map((combo) => combo.binding)).toEqual(["&kp ENTER", "&kp C", "&kp D"]);
+    expect(diffDirectCombosAgainstFirmware(directCombos, nextCombos)).toEqual([]);
   });
 });
