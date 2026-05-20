@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   applyDirectFirmwareComboDiffsToSource,
@@ -24,6 +25,70 @@ const combos: KeymapCombo[] = [
     blockEnd: 20,
   },
 ];
+
+const desktopDisplayedKeycodes: Record<string, string> = {
+  APOS: "APOSTROPHE",
+  AT: "ATSN",
+  CARET: "CRRT",
+  COLON: "COLN",
+  COMMA: "CMMA",
+  C_MUTE: "M_MUTE",
+  EQUAL: "EQL",
+  GRAVE: "GRAV",
+  LCMD: "LEFT_META",
+  LSHFT: "LSHIFT",
+  LT: "LABT",
+  N0: "NUM_0",
+  N1: "NUM_1",
+  N2: "NUM_2",
+  N3: "NUM_3",
+  N4: "NUM_4",
+  N5: "NUM_5",
+  N6: "NUM_6",
+  N7: "NUM_7",
+  N8: "NUM_8",
+  N9: "NUM_9",
+  RSHFT: "RSHIFT",
+  SLASH: "FSLH",
+  SPACE: "SPC",
+  TILDE: "TILD",
+  UP: "UARW",
+};
+
+const webDisplayedKeycodes: Record<string, string> = {
+  AMPS: "0x02070024",
+  ASTRK: "0x02070025",
+  AT: "0x0207001f",
+  BSPC: "BKSP",
+  CARET: "0x02070023",
+  COLON: "0x02070033",
+  COMMA: "CMMA",
+  DLLR: "0x02070021",
+  DQT: "0x02070034",
+  ENTER: "RET",
+  EXCL: "0x0207001e",
+  HASH: "0x02070020",
+  LBRC: "0x0207002f",
+  LCMD: "LGUI",
+  LPAR: "0x02070026",
+  LSHFT: "LSFT",
+  LT: "0x02070036",
+  PIPE: "0x02070031",
+  PLUS: "0x0207002e",
+  PRCNT: "0x02070022",
+  QMARK: "0x02070038",
+  RBRC: "0x02070030",
+  RPAR: "0x02070027",
+  RSHFT: "RSFT",
+  SPACE: "SPC",
+  TILDE: "0x02070035",
+  UNDER: "0x0207002d",
+};
+
+const studioDisplayedBindings: Record<string, string> = {
+  "&zoom_hold 9": "&unknown 22 9 0",
+  "&to 0": "&trans",
+};
 
 function comboFixtureSource(): string {
   return [
@@ -54,6 +119,34 @@ function comboFixtureSource(): string {
     "    };",
     "};",
   ].join("\n");
+}
+
+function asDesktopDisplayedBinding(binding: string): string {
+  return mapComparableBindingKeys(binding, desktopDisplayedKeycodes);
+}
+
+function asWebDisplayedBinding(binding: string): string {
+  return mapComparableBindingKeys(binding, webDisplayedKeycodes);
+}
+
+function mapComparableBindingKeys(binding: string, keycodeMap: Record<string, string>): string {
+  if (studioDisplayedBindings[binding]) {
+    return studioDisplayedBindings[binding];
+  }
+
+  const parts = binding.trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+    case "&kt":
+    case "&sk":
+      return [parts[0], keycodeMap[parts[1]] ?? parts[1]].join(" ");
+    case "&lt":
+      return [parts[0], parts[1], keycodeMap[parts[2]] ?? parts[2]].join(" ");
+    case "&mt":
+      return [parts[0], keycodeMap[parts[1]] ?? parts[1], keycodeMap[parts[2]] ?? parts[2]].join(" ");
+    default:
+      return binding;
+  }
 }
 
 describe("direct keymap conversion", () => {
@@ -136,7 +229,22 @@ describe("direct keymap conversion", () => {
         lockState: "unlocked",
         hasUnsavedChanges: false,
         layers: [
-          { id: 0, name: "Base", bindings: ["&kp RET", "&bt 3 0", "&mt LSFT RET", "&lt 1 LGUI"] },
+          {
+            id: 0,
+            name: "Base",
+            bindings: [
+              "&kp RET",
+              "&bt 3 0",
+              "&mt LSFT RET",
+              "&lt 1 LGUI",
+              "&kp 0x0207002e",
+              "&kp EXCLAMATION",
+              "&kp NUMBER_1",
+              "&kp LEFT_SHIFT",
+              "&trans",
+              "&unknown 22 9 0",
+            ],
+          },
           { id: 1, name: "Raise", bindings: ["&kp C"] },
         ],
       },
@@ -145,7 +253,18 @@ describe("direct keymap conversion", () => {
           {
             id: "default_layer",
             label: "Default",
-            bindings: completeStudioBindings(["&kp ENTER", "&bt BT_SEL 0", "&mt LSHFT ENTER", "&lt 1 LCMD"]),
+            bindings: completeStudioBindings([
+              "&kp ENTER",
+              "&bt BT_SEL 0",
+              "&mt LSHFT ENTER",
+              "&lt 1 LCMD",
+              "&kp PLUS",
+              "&kp EXCL",
+              "&kp N1",
+              "&kp LSHFT",
+              "&to 0",
+              "&zoom_hold 9",
+            ]),
             blockStart: 0,
             blockEnd: 1,
           },
@@ -170,6 +289,42 @@ describe("direct keymap conversion", () => {
         directBinding: "&kp C",
       },
     ]);
+  });
+
+  it("does not diff fixture keymap aliases returned by the desktop Direct reader", () => {
+    const firmwareSource = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
+    const firmwareKeymap = parseKeymap(firmwareSource);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: firmwareKeymap.layers.map((layer, index) => ({
+        id: index,
+        name: layer.label,
+        bindings: layer.bindings.map(asDesktopDisplayedBinding),
+      })),
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("does not diff fixture keymap aliases returned by the web Direct reader", () => {
+    const firmwareSource = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
+    const firmwareKeymap = parseKeymap(firmwareSource);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: firmwareKeymap.layers.map((layer, index) => ({
+        id: index,
+        name: layer.label,
+        bindings: layer.bindings.map(asWebDisplayedBinding),
+      })),
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
   });
 
   it("applies Direct key diffs back to firmware source", () => {

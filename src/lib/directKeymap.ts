@@ -9,18 +9,225 @@ import {
 } from "./keymapParser";
 
 const STUDIO_KEY_COUNT = 40;
+const STANDARD_BEHAVIOR_BINDINGS = new Set([
+  "&bt",
+  "&bootloader",
+  "&caps_word",
+  "&gresc",
+  "&key_repeat",
+  "&kp",
+  "&kt",
+  "&lt",
+  "&mkp",
+  "&mmv",
+  "&mo",
+  "&msc",
+  "&mt",
+  "&none",
+  "&sk",
+  "&sl",
+  "&soft_off",
+  "&studio_unlock",
+  "&sys_reset",
+  "&to",
+  "&tog",
+  "&trans",
+]);
 const COMPARABLE_KEYCODE_ALIASES: Record<string, string> = {
+  "0X00070028": "ENTER",
+  "0X00070029": "ESC",
+  "0X0007002A": "BSPC",
+  "0X0007002B": "TAB",
+  "0X0007002C": "SPACE",
+  "0X0007001E": "N1",
+  "0X0007001F": "N2",
+  "0X00070020": "N3",
+  "0X00070021": "N4",
+  "0X00070022": "N5",
+  "0X00070023": "N6",
+  "0X00070024": "N7",
+  "0X00070025": "N8",
+  "0X00070026": "N9",
+  "0X00070027": "N0",
+  "0X0007002D": "MINUS",
+  "0X0007002E": "EQUAL",
+  "0X0007002F": "LBKT",
+  "0X00070030": "RBKT",
+  "0X00070031": "BSLH",
+  "0X00070033": "SEMI",
+  "0X00070034": "APOS",
+  "0X00070035": "GRAVE",
+  "0X00070036": "COMMA",
+  "0X00070037": "DOT",
+  "0X00070038": "SLASH",
+  "0X00070039": "CAPS",
+  "0X00070046": "PSCRN",
+  "0X00070047": "SCROLLLOCK",
+  "0X00070048": "PAUSE_BREAK",
+  "0X00070049": "INS",
+  "0X0007004A": "HOME",
+  "0X0007004B": "PG_UP",
+  "0X0007004C": "DEL",
+  "0X0007004D": "END",
+  "0X0007004E": "PG_DN",
+  "0X0007004F": "RIGHT",
+  "0X00070050": "LEFT",
+  "0X00070051": "DOWN",
+  "0X00070052": "UP",
+  "0X000700E0": "LCTRL",
+  "0X000700E1": "LSHFT",
+  "0X000700E2": "LALT",
+  "0X000700E3": "LCMD",
+  "0X000700E4": "RCTRL",
+  "0X000700E5": "RSHFT",
+  "0X000700E6": "RALT",
+  "0X000700E7": "RCMD",
+  "0X000C00B5": "C_NEXT",
+  "0X000C00B6": "C_PREV",
+  "0X000C00CD": "C_PLAY_PAUSE",
+  "0X000C00E2": "C_MUTE",
+  "0X000C00E9": "C_VOL_UP",
+  "0X000C00EA": "C_VOL_DN",
+  "0X0207001E": "EXCL",
+  "0X0207001F": "AT",
+  "0X02070020": "HASH",
+  "0X02070021": "DLLR",
+  "0X02070022": "PRCNT",
+  "0X02070023": "CARET",
+  "0X02070024": "AMPS",
+  "0X02070025": "ASTRK",
+  "0X02070026": "LPAR",
+  "0X02070027": "RPAR",
+  "0X0207002D": "UNDER",
+  "0X0207002E": "PLUS",
+  "0X0207002F": "LBRC",
+  "0X02070030": "RBRC",
+  "0X02070031": "PIPE",
+  "0X02070033": "COLON",
+  "0X02070034": "DQT",
+  "0X02070035": "TILDE",
+  "0X02070036": "LT",
+  "0X02070037": "GT",
+  "0X02070038": "QMARK",
+  AMPERSAND: "AMPS",
+  APOSTROPHE: "APOS",
+  ATSN: "AT",
+  ASTERISK: "ASTRK",
+  AT_SIGN: "AT",
   BKSP: "BSPC",
+  BANG: "EXCL",
+  BACKSLASH: "BSLH",
+  BACKSPACE: "BSPC",
+  CAPSLOCK: "CAPS",
+  CLCK: "CAPS",
   CMMA: "COMMA",
+  COLN: "COLON",
+  CRRT: "CARET",
+  DOLLAR: "DLLR",
+  DOUBLE_QUOTES: "DQT",
+  DOWN_ARROW: "DOWN",
+  ESCAPE: "ESC",
+  EQL: "EQUAL",
+  EXCLAMATION: "EXCL",
+  FSLH: "SLASH",
+  GRAV: "GRAVE",
+  GREATER_THAN: "GT",
+  INSERT: "INS",
+  LANGUAGE_1: "LANG1",
+  LANGUAGE_2: "LANG2",
+  LANGUAGE_3: "LANG3",
+  LANGUAGE_4: "LANG4",
+  LANGUAGE_5: "LANG5",
+  LANGUAGE_6: "LANG6",
+  LANGUAGE_7: "LANG7",
+  LANGUAGE_8: "LANG8",
+  LANGUAGE_9: "LANG9",
+  LABT: "LT",
+  LARW: "LEFT",
+  LEFT_ALT: "LALT",
+  LEFT_BRACE: "LBRC",
+  LEFT_BRACKET: "LBKT",
+  LEFT_COMMAND: "LCMD",
+  LEFT_CONTROL: "LCTRL",
+  LEFT_GUI: "LCMD",
+  LEFT_META: "LCMD",
+  LEFT_PARENTHESIS: "LPAR",
+  LEFT_SHIFT: "LSHFT",
+  LEFT_WIN: "LCMD",
+  LESS_THAN: "LT",
   LCTL: "LCTRL",
   LGUI: "LCMD",
+  LMETA: "LCMD",
   LSFT: "LSHFT",
+  LSHIFT: "LSHFT",
+  LWIN: "LCMD",
+  M_NEXT: "C_NEXT",
+  M_MUTE: "C_MUTE",
+  M_PREV: "C_PREV",
+  NUM_0: "N0",
+  NUM_1: "N1",
+  NUM_2: "N2",
+  NUM_3: "N3",
+  NUM_4: "N4",
+  NUM_5: "N5",
+  NUM_6: "N6",
+  NUM_7: "N7",
+  NUM_8: "N8",
+  NUM_9: "N9",
+  NUMBER_0: "N0",
+  NUMBER_1: "N1",
+  NUMBER_2: "N2",
+  NUMBER_3: "N3",
+  NUMBER_4: "N4",
+  NUMBER_5: "N5",
+  NUMBER_6: "N6",
+  NUMBER_7: "N7",
+  NUMBER_8: "N8",
+  NUMBER_9: "N9",
+  PAGE_DOWN: "PG_DN",
+  PAGE_UP: "PG_UP",
+  PERCENT: "PRCNT",
+  PERIOD: "DOT",
+  PLUS_SIGN: "PLUS",
+  POUND: "HASH",
+  PRSC: "PSCRN",
+  PRINTSCREEN: "PSCRN",
+  PRCT: "PRCNT",
+  QUESTION: "QMARK",
+  QUOT: "APOS",
+  RARW: "RIGHT",
+  RIGHT_ALT: "RALT",
+  RIGHT_ARROW: "RIGHT",
+  RIGHT_BRACE: "RBRC",
+  RIGHT_BRACKET: "RBKT",
+  RIGHT_COMMAND: "RCMD",
+  RIGHT_CONTROL: "RCTRL",
+  RIGHT_GUI: "RCMD",
+  RIGHT_META: "RCMD",
+  RIGHT_PARENTHESIS: "RPAR",
+  RIGHT_SHIFT: "RSHFT",
+  RIGHT_WIN: "RCMD",
   RET: "ENTER",
   RCTL: "RCTRL",
   RGUI: "RCMD",
+  RMETA: "RCMD",
   RSFT: "RSHFT",
+  RSHIFT: "RSHFT",
+  RWIN: "RCMD",
   SCLN: "SEMI",
+  SCLK: "SCROLLLOCK",
+  SLCK: "SCROLLLOCK",
+  SEMICOLON: "SEMI",
+  SINGLE_QUOTE: "APOS",
+  SQT: "APOS",
   SPC: "SPACE",
+  TILD: "TILDE",
+  UNDERSCORE: "UNDER",
+  UP_ARROW: "UP",
+  UARW: "UP",
+  C_PREVIOUS: "C_PREV",
+  C_VOLUME_DOWN: "C_VOL_DN",
+  C_VOLUME_UP: "C_VOL_UP",
 };
 
 export type StudioKeymap = {
@@ -139,7 +346,7 @@ export function diffDirectKeymapAgainstFirmware(
 
     return directBindings.flatMap((directBinding, keyIndex) => {
       const firmwareBinding = firmwareBindings[keyIndex] ?? "&none";
-      if (normalizeComparableBinding(directBinding) === normalizeComparableBinding(firmwareBinding)) {
+      if (sameComparableBinding(directBinding, firmwareBinding)) {
         return [];
       }
 
@@ -257,7 +464,7 @@ function comboSnapshot(combo: KeymapCombo): DirectFirmwareComboSnapshot {
 
 function sameComparableCombo(left: DirectFirmwareComboSnapshot, right: DirectFirmwareComboSnapshot): boolean {
   return (
-    normalizeComparableBinding(left.binding) === normalizeComparableBinding(right.binding) &&
+    sameComparableBinding(left.binding, right.binding) &&
     left.keyPositions.join(" ") === right.keyPositions.join(" ") &&
     left.timeoutMs === right.timeoutMs
   );
@@ -276,6 +483,39 @@ function uniqueComboId(baseId: string, existingIds: string[]): string {
   }
 }
 
+function sameComparableBinding(left: string, right: string): boolean {
+  return (
+    normalizeComparableBinding(left) === normalizeComparableBinding(right) ||
+    sameUnknownCustomBinding(left, right) ||
+    sameUnknownCustomBinding(right, left)
+  );
+}
+
+function sameUnknownCustomBinding(unknownBinding: string, customBinding: string): boolean {
+  const unknownParts = normalizeDirectBindingForDisplay(unknownBinding).trim().split(/\s+/);
+  const customParts = normalizeDirectBindingForDisplay(customBinding).trim().split(/\s+/);
+  if (unknownParts[0] !== "&unknown" || !isCustomComparableBinding(customParts[0])) {
+    return false;
+  }
+
+  const unknownParam1 = unknownParts[2] ?? "0";
+  const unknownParam2 = unknownParts[3] ?? "0";
+  if (customParts.length === 1) {
+    return unknownParam1 === "0" && unknownParam2 === "0";
+  }
+  if (customParts.length === 2) {
+    return customParts[1] === unknownParam1 && unknownParam2 === "0";
+  }
+  if (customParts.length === 3) {
+    return customParts[1] === unknownParam1 && customParts[2] === unknownParam2;
+  }
+  return false;
+}
+
+function isCustomComparableBinding(bindingName: string | undefined): boolean {
+  return Boolean(bindingName?.startsWith("&") && !STANDARD_BEHAVIOR_BINDINGS.has(bindingName));
+}
+
 function normalizeComparableBinding(binding: string): string {
   const parts = normalizeDirectBindingForDisplay(binding).trim().split(/\s+/);
   switch (parts[0]) {
@@ -287,6 +527,8 @@ function normalizeComparableBinding(binding: string): string {
       return normalizeComparableParts(parts, [2]);
     case "&mt":
       return normalizeComparableParts(parts, [1, 2]);
+    case "&to":
+      return parts[1] === "0" ? "&trans" : parts.join(" ");
     default:
       return parts.join(" ");
   }
