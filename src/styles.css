@@ -1646,6 +1646,94 @@ select:focus-visible {
   line-height: 1.35;
 }
 
+.binding-chip {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, max-content);
+  align-items: center;
+  gap: 5px 7px;
+  max-width: 100%;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-sm);
+  padding: 5px 7px;
+  background: var(--card);
+  color: var(--ink-strong);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.binding-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+.binding-chip code {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+.binding-chip-badge {
+  border-radius: 3px;
+  padding: 2px 4px;
+  background: var(--paper-2);
+  color: var(--ink-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.binding-chip.transparent,
+.binding-chip.none {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--paper-2) 72%, transparent);
+  color: var(--ink-faint);
+}
+.binding-chip.unknown {
+  border-color: #d7a193;
+  background: #fbe8e2;
+  color: #8a2918;
+}
+.binding-chip.custom {
+  border-color: var(--pine-line);
+  background: var(--pine-wash);
+  color: var(--pine-deep);
+}
+.binding-chip.compact {
+  grid-template-columns: auto minmax(0, 1fr);
+  width: 100%;
+  padding: 4px 6px;
+}
+.binding-chip.compact code { display: none; }
+
+.combo-snapshot {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.combo-snapshot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.combo-snapshot-meta span,
+.combo-snapshot-empty {
+  border-radius: 3px;
+  background: var(--paper-2);
+  padding: 2px 5px;
+  color: var(--ink-muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
 .diff-panel pre {
   height: 196px;
   margin: var(--sp-3) 0 0;
@@ -2376,13 +2464,28 @@ select:focus-visible {
   text-transform: uppercase;
 }
 .choice-strip > span { color: var(--ink-faint); }
-.binding-preview strong {
+.binding-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.binding-summary strong {
   overflow-wrap: anywhere;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--pine-deep);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
+}
+.binding-summary code {
+  overflow: hidden;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .binding-review {
@@ -2410,7 +2513,7 @@ select:focus-visible {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.binding-review strong {
+.binding-review .binding-summary strong {
   overflow-wrap: anywhere;
   color: var(--ink-strong);
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -2418,7 +2521,7 @@ select:focus-visible {
   font-weight: 800;
   letter-spacing: 0;
 }
-.binding-review > div.changed strong {
+.binding-review > div.changed .binding-summary strong {
   color: var(--pine-deep);
 }
 
@@ -2544,7 +2647,7 @@ select:focus-visible {
 
 .combo-row {
   display: grid;
-  grid-template-columns: minmax(64px, auto) 1fr auto;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
   min-height: 32px;
@@ -2572,23 +2675,45 @@ select:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 1px 2px rgba(0, 0, 0, 0.12);
 }
-.combo-row.focused strong { color: var(--on-pine); }
-.combo-row.focused em { color: rgba(246, 241, 222, 0.7); }
+.combo-row.focused .binding-chip strong { color: var(--on-pine); }
+.combo-row.focused > em { color: rgba(246, 241, 222, 0.7); }
+.combo-row.transparent,
+.combo-row.none {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--paper-2) 72%, var(--card));
+}
+.combo-row.unknown {
+  border-color: #d7a193;
+  background: #fbe8e2;
+}
 
-.combo-row span,
-.combo-row strong,
-.combo-row em {
+.combo-row > .combo-row-keys,
+.combo-row > em {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.combo-row strong {
-  color: var(--ink-strong);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  font-weight: 700;
+.combo-row > em { color: var(--ink-faint); font-style: normal; }
+.combo-row .binding-chip {
+  min-width: 0;
+  box-shadow: none;
 }
-.combo-row em { color: var(--ink-faint); font-style: normal; }
+.combo-row.focused .binding-chip {
+  border-color: rgba(246, 241, 222, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-pine);
+}
+.combo-row.focused .binding-chip-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--on-pine-soft);
+}
+.combo-row-keys {
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+.combo-row.focused .combo-row-keys {
+  color: rgba(246, 241, 222, 0.78);
+}
 
 .empty-note {
   margin: 0;

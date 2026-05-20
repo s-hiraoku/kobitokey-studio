@@ -19,7 +19,7 @@ import {
   Usb,
 } from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
-import { bindingDisplay } from "./lib/bindingDisplay";
+import { bindingDisplay, formatBindingForDisplay } from "./lib/bindingDisplay";
 import { summarizeChangedLines } from "./lib/diff";
 import {
   applyDirectFirmwareComboDiffsToSource,
@@ -1713,8 +1713,8 @@ function isStudioUnlockFailure(message: string): boolean {
 
 const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
   { value: "key", label: "Key" },
-  { value: "layer-tap", label: "Layer Tap" },
-  { value: "mod-tap", label: "Mod Tap" },
+  { value: "layer-tap", label: "Tap/Hold Layer" },
+  { value: "mod-tap", label: "Tap/Hold Mod" },
   { value: "momentary", label: "Momentary" },
   { value: "to-layer", label: "To Layer" },
   { value: "mouse", label: "Mouse" },
@@ -2084,14 +2084,8 @@ function DirectFirmwareDiffPanel({
                   </button>
                 </header>
                 <dl>
-                  <div>
-                    <dt>Firmware</dt>
-                    <dd>{diff.firmwareBinding}</dd>
-                  </div>
-                  <div>
-                    <dt>Direct</dt>
-                    <dd>{diff.directBinding}</dd>
-                  </div>
+                  <BindingDiffValue label="Firmware" binding={diff.firmwareBinding} />
+                  <BindingDiffValue label="Direct" binding={diff.directBinding} />
                 </dl>
               </article>
             ))}
@@ -2151,11 +2145,15 @@ function DirectFirmwareComboDiffPanel({
                 <dl>
                   <div>
                     <dt>Firmware</dt>
-                    <dd>{formatComboSnapshot(diff.firmwareCombo)}</dd>
+                    <dd>
+                      <ComboSnapshotView combo={diff.firmwareCombo} />
+                    </dd>
                   </div>
                   <div>
                     <dt>Direct</dt>
-                    <dd>{formatComboSnapshot(diff.directCombo)}</dd>
+                    <dd>
+                      <ComboSnapshotView combo={diff.directCombo} />
+                    </dd>
                   </div>
                 </dl>
               </article>
@@ -2164,6 +2162,17 @@ function DirectFirmwareComboDiffPanel({
         </>
       )}
     </section>
+  );
+}
+
+function BindingDiffValue({ binding, label }: { binding: string; label: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>
+        <BindingChip binding={binding} />
+      </dd>
+    </div>
   );
 }
 
@@ -2178,8 +2187,89 @@ function comboDiffKindLabel(kind: DirectFirmwareComboDiff["kind"]): string {
   }
 }
 
-function formatComboSnapshot(combo: DirectFirmwareComboDiff["directCombo"]): string {
-  return combo ? `${combo.binding} / keys ${combo.keyPositions.join(" ")} / ${combo.timeoutMs}ms` : "-";
+function ComboSnapshotView({ combo }: { combo: DirectFirmwareComboDiff["directCombo"] }) {
+  if (!combo) {
+    return <span className="combo-snapshot-empty">-</span>;
+  }
+  return (
+    <div className="combo-snapshot">
+      <BindingChip binding={combo.binding} />
+      <div className="combo-snapshot-meta">
+        <span>keys {combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
+        <span>{combo.timeoutMs}ms</span>
+      </div>
+    </div>
+  );
+}
+
+type BindingTone = "default" | "transparent" | "none" | "unknown" | "custom";
+
+function BindingChip({ binding, compact = false }: { binding: string; compact?: boolean }) {
+  const display = bindingDisplay(binding);
+  const tone = bindingTone(binding);
+  const label = displayBindingLabel(binding, display.label);
+  return (
+    <span className={`binding-chip ${tone} ${compact ? "compact" : ""}`} title={binding}>
+      {display.badge ? <span className="binding-chip-badge">{display.badge}</span> : null}
+      <strong>{label}</strong>
+      {!compact ? <code>{formatBindingForDisplay(binding)}</code> : null}
+    </span>
+  );
+}
+
+function bindingTone(binding: string): BindingTone {
+  const behavior = binding.trim().split(/\s+/)[0] ?? "";
+  if (behavior === "&trans") {
+    return "transparent";
+  }
+  if (behavior === "&none") {
+    return "none";
+  }
+  if (behavior === "&unknown") {
+    return "unknown";
+  }
+  if (
+    behavior &&
+    ![
+      "&bootloader",
+      "&bt",
+      "&caps_word",
+      "&gresc",
+      "&key_repeat",
+      "&kp",
+      "&kt",
+      "&lt",
+      "&mkp",
+      "&mmv",
+      "&mo",
+      "&msc",
+      "&mt",
+      "&sk",
+      "&sl",
+      "&soft_off",
+      "&studio_unlock",
+      "&sys_reset",
+      "&to",
+      "&tog",
+    ].includes(behavior)
+  ) {
+    return "custom";
+  }
+  return "default";
+}
+
+function displayBindingLabel(binding: string, label: string): string {
+  const behavior = binding.trim().split(/\s+/)[0] ?? "";
+  if (behavior === "&trans") {
+    return "透過";
+  }
+  if (behavior === "&none") {
+    return "未割当";
+  }
+  if (behavior === "&unknown") {
+    return "Unknown";
+  }
+  return label;
 }
 
 function DirectConnectionBar({
@@ -3416,19 +3506,16 @@ function ComboRow({
   isFocused?: boolean;
   onSelect?: (comboId: string) => void;
 }) {
-  const display = bindingDisplay(combo.binding);
+  const tone = bindingTone(combo.binding);
 
   return (
     <button
       type="button"
-      className={`combo-row ${isFocused ? "focused" : ""}`}
+      className={`combo-row ${tone} ${isFocused ? "focused" : ""}`}
       onClick={() => onSelect?.(combo.id)}
     >
-      <span>{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
-      <strong>
-        {display.badge ? `${display.badge} ` : ""}
-        {display.label}
-      </strong>
+      <span className="combo-row-keys">{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
+      <BindingChip binding={combo.binding} compact />
       <em>{combo.timeoutMs}ms</em>
     </button>
   );
@@ -3584,17 +3671,17 @@ function BindingEditor({
         <div className="binding-review" aria-label="Direct key write preview">
           <div>
             <span>Current</span>
-            <strong>{currentBinding}</strong>
+            <BindingSummary binding={currentBinding} />
           </div>
           <div className={currentBinding === builtBinding ? "" : "changed"}>
             <span>Write target</span>
-            <strong>{builtBinding}</strong>
+            <BindingSummary binding={builtBinding} />
           </div>
         </div>
       ) : (
         <div className="binding-preview">
-          <span>Preview</span>
-          <strong>{builtBinding}</strong>
+          <span>Write target</span>
+          <BindingSummary binding={builtBinding} />
         </div>
       )}
 
@@ -3608,9 +3695,9 @@ function BindingEditor({
       <BindingValuePicker form={form} onChange={setForm} />
 
       <details className="advanced-binding">
-        <summary>詳細編集</summary>
+        <summary>ZMK 詳細編集</summary>
         <label>
-          Binding
+          ZMK binding
           <input value={form.raw || builtBinding} onChange={(event) => setForm(parseBindingForm(event.target.value))} />
         </label>
       </details>
@@ -3621,6 +3708,47 @@ function BindingEditor({
       </button>
     </div>
   );
+}
+
+function BindingSummary({ binding }: { binding: string }) {
+  return (
+    <div className="binding-summary">
+      <strong>{bindingIntentSummary(binding)}</strong>
+      <code>ZMK {formatBindingForDisplay(binding)}</code>
+    </div>
+  );
+}
+
+function bindingIntentSummary(binding: string): string {
+  const parts = formatBindingForDisplay(binding).trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+      return `Tap ${bindingKeyLabel(parts.slice(1).join(" "))}`;
+    case "&lt":
+      return `Tap ${bindingKeyLabel(parts.slice(2).join(" "))} / Hold L${parts[1] ?? "?"}`;
+    case "&mt":
+      return `Tap ${bindingKeyLabel(parts.slice(2).join(" "))} / Hold ${bindingKeyLabel(parts[1] ?? "?")}`;
+    case "&mo":
+      return `Hold L${parts[1] ?? "?"}`;
+    case "&to":
+      return `Switch to L${parts[1] ?? "?"}`;
+    case "&mkp":
+      return `Mouse ${parts[1] ?? "button"}`;
+    case "&bt":
+      return `Bluetooth ${parts.slice(1).join(" ")}`;
+    case "&trans":
+      return "Transparent";
+    case "&none":
+      return "Unassigned";
+    default: {
+      const display = bindingDisplay(binding);
+      return display.badge ? `${display.badge} ${display.label}` : display.label;
+    }
+  }
+}
+
+function bindingKeyLabel(key: string): string {
+  return bindingDisplay(`&kp ${key}`).label || key || "?";
 }
 
 function BindingValuePicker({
@@ -3642,32 +3770,32 @@ function BindingValuePicker({
     case "layer-tap":
       return (
         <>
+          <KeyPalette
+            label="Tap"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
           <ChoiceStrip
-            label="Layer"
+            label="Hold layer"
             choices={LAYER_CHOICES}
             selectedValue={form.primary}
             onSelect={(primary) => onChange({ ...form, primary })}
-          />
-          <KeyPalette
-            label="Tap key"
-            selectedValue={form.secondary}
-            onSelect={(secondary) => onChange({ ...form, secondary })}
           />
         </>
       );
     case "mod-tap":
       return (
         <>
+          <KeyPalette
+            label="Tap"
+            selectedValue={form.secondary}
+            onSelect={(secondary) => onChange({ ...form, secondary })}
+          />
           <ChoiceStrip
             label="Hold modifier"
             choices={MODIFIER_CHOICES}
             selectedValue={form.primary}
             onSelect={(primary) => onChange({ ...form, primary })}
-          />
-          <KeyPalette
-            label="Tap key"
-            selectedValue={form.secondary}
-            onSelect={(secondary) => onChange({ ...form, secondary })}
           />
         </>
       );
