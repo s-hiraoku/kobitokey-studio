@@ -2207,7 +2207,7 @@ function DirectFirmwareDiffPanel({
           onClick={() => onApplyFirmwareDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Firmware に反映
+          Firmware keymap に反映
         </button>
       </div>
       {diffs.length === 0 ? (
