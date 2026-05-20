@@ -345,8 +345,7 @@ function App() {
   }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
 
   React.useEffect(() => {
-    directWriteRequestRef.current += 1;
-    setDirectKeyWriteFeedback({ kind: "idle", message: "" });
+    setDirectKeyWriteFeedback((current) => (current.kind === "writing" ? current : { kind: "idle", message: "" }));
   }, [activeLayerIndex, selectedKeyIndex]);
 
   React.useEffect(() => {
@@ -827,6 +826,8 @@ function App() {
       return;
     }
 
+    const writtenDrafts: DirectKeyDraft[] = [];
+
     try {
       for (const [index, draft] of targetDrafts.entries()) {
         const directLayer = nextKeymap.layers[draft.layerIndex];
@@ -844,6 +845,7 @@ function App() {
         );
         nextKeymap = await writeDirectKeyToDevice(directLayer.id, draft.keyIndex, draft.to);
         if (requestId !== directWriteRequestRef.current) return;
+        writtenDrafts.push(draft);
       }
       setDirectKeymap(nextKeymap);
       setDirectKeyDrafts((current) => {
@@ -860,7 +862,21 @@ function App() {
       setStatus(message);
     } catch (error) {
       if (requestId !== directWriteRequestRef.current) return;
-      const message = `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}`;
+      if (writtenDrafts.length > 0) {
+        setDirectKeymap(nextKeymap);
+        setDirectKeyDrafts((current) => {
+          const next = { ...current };
+          for (const draft of writtenDrafts) {
+            delete next[directKeyDraftKey(draft.layerIndex, draft.keyIndex)];
+          }
+          return next;
+        });
+        setBindingDraft(nextKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
+      }
+      const message =
+        writtenDrafts.length > 0
+          ? `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}。${writtenDrafts.length}/${targetDrafts.length} 件は反映済みです`
+          : `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}`;
       setDirectKeyWriteFeedback({ kind: "error", message });
       showToast("error", message);
       setStatus(message);
