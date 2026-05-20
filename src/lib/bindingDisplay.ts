@@ -1,19 +1,50 @@
+import { normalizeKeycodeName } from "./keycodeAliases";
+
 export type BindingDisplay = {
   badge?: string;
   label: string;
 };
 
 const KEY_LABELS: Record<string, string> = {
+  "0X0207001E": "!",
+  "0X0207001F": "@",
+  "0X02070020": "#",
+  "0X02070021": "$",
+  "0X02070022": "%",
+  "0X02070023": "^",
+  "0X02070024": "&",
+  "0X02070025": "*",
+  "0X02070026": "(",
+  "0X02070027": ")",
+  "0X0207002D": "_",
+  "0X0207002E": "+",
+  "0X0207002F": "{",
+  "0X02070030": "}",
+  "0X02070031": "|",
+  "0X02070033": ":",
+  "0X02070034": "\"",
+  "0X02070035": "~",
+  "0X02070036": "<",
+  "0X02070037": ">",
+  "0X02070038": "?",
   SPACE: "SPC",
+  SPC: "SPC",
   ENTER: "ENT",
+  RET: "ENT",
   BSPC: "BSPC",
+  BKSP: "BSPC",
   ESC: "ESC",
   TAB: "TAB",
   LSHFT: "LSFT",
+  LSFT: "LSFT",
   RSHFT: "RSFT",
+  RSFT: "RSFT",
   LCTRL: "LCTL",
+  LCTL: "LCTL",
   RCTRL: "RCTL",
+  RCTL: "RCTL",
   LCMD: "CMD",
+  LGUI: "CMD",
   LALT: "ALT",
   CAPS: "CAPS",
   HOME: "HOME",
@@ -39,15 +70,40 @@ const KEY_LABELS: Record<string, string> = {
   MINUS: "-",
   EQUAL: "=",
   PLUS: "+",
+  EXCL: "!",
+  BANG: "!",
+  AT: "@",
+  ATSN: "@",
+  HASH: "#",
+  DLLR: "$",
+  PRCNT: "%",
+  CARET: "^",
+  CRRT: "^",
+  AMPS: "&",
   ASTRK: "*",
+  STAR: "*",
   LBKT: "[",
   RBKT: "]",
+  LBRC: "{",
+  RBRC: "}",
   LPAR: "(",
   RPAR: ")",
+  UNDER: "_",
+  PIPE: "|",
+  BSLH: "\\",
+  LT: "<",
+  LABT: "<",
+  GT: ">",
+  QMARK: "?",
+  DQT: "\"",
+  COLON: ":",
+  COLN: ":",
+  TILDE: "~",
+  TILD: "~",
 };
 
 export function bindingDisplay(binding: string): BindingDisplay {
-  const parts = binding.trim().split(/\s+/);
+  const parts = formatBindingForDisplay(binding).trim().split(/\s+/);
   const behavior = parts[0] ?? "";
 
   switch (behavior) {
@@ -100,11 +156,56 @@ export function bindingDisplay(binding: string): BindingDisplay {
   }
 }
 
+export function formatBindingForDisplay(binding: string): string {
+  const parts = binding.trim().split(/\s+/);
+  switch (parts[0]) {
+    case "&kp":
+    case "&kt":
+    case "&sk":
+      return formatBindingParts(parts, [1]);
+    case "&lt":
+      return formatBindingParts(parts, [2]);
+    case "&mt":
+      return formatBindingParts(parts, [1, 2]);
+    case "&bt":
+      return `&bt ${formatBtCommand(parts[1])} ${parts[2] ?? "0"}`;
+    default:
+      return binding;
+  }
+}
+
+function formatBindingParts(parts: string[], keycodeIndexes: number[]): string {
+  const keycodeIndexSet = new Set(keycodeIndexes);
+  return parts
+    .map((part, index) => (keycodeIndexSet.has(index) ? normalizeKeycodeName(part) : part))
+    .join(" ");
+}
+
+function formatBtCommand(value?: string): string {
+  switch (value) {
+    case "0":
+      return "BT_CLR";
+    case "1":
+      return "BT_NXT";
+    case "2":
+      return "BT_PRV";
+    case "3":
+      return "BT_SEL";
+    case "4":
+      return "BT_CLR_ALL";
+    case "5":
+      return "BT_DISC";
+    default:
+      return value ?? "BT_SEL";
+  }
+}
+
 function formatKey(value: string): string {
   if (!value) {
     return "";
   }
-  return KEY_LABELS[value] ?? value.replace(/^N([0-9])$/, "$1");
+  const normalizedValue = normalizeKeycodeName(value);
+  return KEY_LABELS[normalizedValue] ?? normalizedValue.replace(/^N(?:UMBER_|UM_)?([0-9])$/, "$1");
 }
 
 function formatMouseMotion(value?: string): string {

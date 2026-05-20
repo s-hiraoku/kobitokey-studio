@@ -5,7 +5,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use zmk_studio_api::transport::{serial::SerialTransport, BleDeviceInfo, PlatformBleTransport};
-use zmk_studio_api::{Behavior, HidUsage, Keycode, StudioClient};
+use zmk_studio_api::{proto::zmk, Behavior, HidUsage, Keycode, StudioClient};
 
 const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = true;
 
@@ -264,7 +264,7 @@ fn read_studio_keymap_from_client<T: Read + Write>(
         .map(|state| format!("{state:?}"))
         .unwrap_or_else(|_| "unknown".to_string());
     let raw_keymap = client.get_keymap().map_err(|error| error.to_string())?;
-    let resolved_layers = client.resolve_keymap().map_err(|error| error.to_string())?;
+    let catalog = load_behavior_catalog_from_client(client)?;
     let has_unsaved_changes = client.check_unsaved_changes().unwrap_or(false);
 
     let layers = raw_keymap
@@ -278,10 +278,11 @@ fn read_studio_keymap_from_client<T: Read + Write>(
             } else {
                 layer.name.clone()
             },
-            bindings: resolved_layers
-                .get(index)
-                .map(|bindings| bindings.iter().map(format_direct_behavior).collect())
-                .unwrap_or_default(),
+            bindings: layer
+                .bindings
+                .iter()
+                .map(|binding| format_raw_behavior_binding(binding, &catalog))
+                .collect(),
         })
         .collect();
 
@@ -438,8 +439,10 @@ fn read_studio_combos(
     }
     let target = resolve_studio_target(&kind, port_path)
         .map_err(|message| StudioConnectionError::new("device_not_found", message))?;
-    with_studio_transport(&target, |transport| read_studio_combos_from_transport(transport))
-        .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
+    with_studio_transport(&target, |transport| {
+        read_studio_combos_from_transport(transport)
+    })
+    .map_err(|message| StudioConnectionError::new("combo_read_failed", message))
 }
 
 #[tauri::command]
@@ -893,37 +896,20 @@ fn decode_behavior_binding(bytes: &[u8], catalog: &BehaviorCatalog) -> Result<St
     let behavior_id = find_varint_field(bytes, 1).unwrap_or(0) as i32;
     let param1 = find_varint_field(bytes, 2).unwrap_or(0) as u32;
     let param2 = find_varint_field(bytes, 3).unwrap_or(0) as u32;
-    Ok(
-        match catalog.role_by_id.get(&behavior_id).map(String::as_str) {
-            Some("key") => format!("&kp {}", HidUsage::from_encoded(param1)),
-            Some("key-toggle") => format!("&kt {}", HidUsage::from_encoded(param1)),
-            Some("layer-tap") => format!("&lt {param1} {}", HidUsage::from_encoded(param2)),
-            Some("mod-tap") => format!(
-                "&mt {} {}",
-                HidUsage::from_encoded(param1),
-                HidUsage::from_encoded(param2)
-            ),
-            Some("sticky-key") => format!("&sk {}", HidUsage::from_encoded(param1)),
-            Some("sticky-layer") => format!("&sl {param1}"),
-            Some("momentary") => format!("&mo {param1}"),
-            Some("toggle-layer") => format!("&tog {param1}"),
-            Some("to-layer") => format!("&to {param1}"),
-            Some("bluetooth") => format!("&bt {param1} {param2}"),
-            Some("mouse-key") => format!("&mkp {param1}"),
-            Some("mouse-move") => format!("&mmv {param1}"),
-            Some("mouse-scroll") => format!("&msc {param1}"),
-            Some("caps-word") => "&caps_word".to_string(),
-            Some("key-repeat") => "&key_repeat".to_string(),
-            Some("reset") => "&sys_reset".to_string(),
-            Some("bootloader") => "&bootloader".to_string(),
-            Some("soft-off") => "&soft_off".to_string(),
-            Some("studio-unlock") => "&studio_unlock".to_string(),
-            Some("grave-escape") => "&gresc".to_string(),
-            Some("transparent") => "&trans".to_string(),
-            Some("none") => "&none".to_string(),
-            _ => format!("&unknown {behavior_id} {param1} {param2}"),
-        },
-    )
+    if let Some(binding) = catalog
+        .role_by_id
+        .get(&behavior_id)
+        .map(String::as_str)
+        .and_then(|role| format_known_behavior_binding(role, param1, param2))
+    {
+        return Ok(binding);
+    }
+
+    Ok(catalog
+        .custom_name_by_id
+        .get(&behavior_id)
+        .map(|name| format_custom_behavior_binding(name, param1, param2))
+        .unwrap_or_else(|| format!("&unknown {behavior_id} {param1} {param2}")))
 }
 
 fn decode_set_combo_response(combo_response: &[u8]) -> Result<(), String> {
@@ -1323,6 +1309,7 @@ fn resolve_studio_target(kind: &str, port_path: Option<String>) -> Result<Studio
 struct BehaviorCatalog {
     role_by_id: HashMap<i32, String>,
     id_by_role: HashMap<String, i32>,
+    custom_name_by_id: HashMap<i32, String>,
 }
 
 impl BehaviorCatalog {
@@ -1349,6 +1336,7 @@ fn load_behavior_catalog_from_client<T: Read + Write>(
         .map_err(|error| error.to_string())?;
     let mut role_by_id = HashMap::new();
     let mut id_by_role = HashMap::new();
+    let mut custom_name_by_id = HashMap::new();
 
     for behavior_id in behavior_ids {
         let details = client
@@ -1359,12 +1347,15 @@ fn load_behavior_catalog_from_client<T: Read + Write>(
             id_by_role
                 .entry(role.to_string())
                 .or_insert(behavior_id as i32);
+        } else if let Some(name) = custom_behavior_name_from_display_name(&details.display_name) {
+            custom_name_by_id.insert(behavior_id as i32, name);
         }
     }
 
     Ok(BehaviorCatalog {
         role_by_id,
         id_by_role,
+        custom_name_by_id,
     })
 }
 
@@ -1387,6 +1378,10 @@ fn role_from_behavior_display_name(display_name: &str) -> Option<&'static str> {
         "toggle layer" => Some("toggle-layer"),
         "to layer" => Some("to-layer"),
         "bluetooth" => Some("bluetooth"),
+        "external power" | "externalpower" | "ext_power" => Some("external-power"),
+        "output selection" | "outputselection" | "outputs" => Some("output-selection"),
+        "backlight" => Some("backlight"),
+        "underglow" | "rgb underglow" | "rgb_underglow" => Some("underglow"),
         "mouse key press" => Some("mouse-key"),
         "mouse move" | "mouse_move" => Some("mouse-move"),
         "mouse scroll" | "mouse_scroll" => Some("mouse-scroll"),
@@ -1401,6 +1396,182 @@ fn role_from_behavior_display_name(display_name: &str) -> Option<&'static str> {
         "none" => Some("none"),
         _ => None,
     }
+}
+
+fn custom_behavior_name_from_display_name(display_name: &str) -> Option<String> {
+    let name = display_name
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+
+    if name
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
+fn format_custom_behavior_binding(name: &str, param1: u32, param2: u32) -> String {
+    if param2 != 0 {
+        format!("&{name} {param1} {param2}")
+    } else if param1 != 0 {
+        format!("&{name} {param1}")
+    } else {
+        format!("&{name}")
+    }
+}
+
+fn command_name(value: u32, names: &[(u32, &'static str)]) -> Option<&'static str> {
+    names
+        .iter()
+        .find_map(|(candidate, name)| (*candidate == value).then_some(*name))
+}
+
+fn format_command_behavior_binding(
+    behavior: &str,
+    command: u32,
+    value: u32,
+    command_names: &[(u32, &'static str)],
+    value_commands: &[u32],
+) -> String {
+    let command_value = command;
+    let command = command_name(command_value, command_names)
+        .map(str::to_string)
+        .unwrap_or_else(|| command_value.to_string());
+
+    if value == 0 && !value_commands.contains(&command_value) {
+        format!("{behavior} {command}")
+    } else {
+        format!("{behavior} {command} {value}")
+    }
+}
+
+fn format_known_behavior_binding(role: &str, param1: u32, param2: u32) -> Option<String> {
+    Some(match role {
+        "key" => format!("&kp {}", HidUsage::from_encoded(param1)),
+        "key-toggle" => format!("&kt {}", HidUsage::from_encoded(param1)),
+        "layer-tap" => format!("&lt {param1} {}", HidUsage::from_encoded(param2)),
+        "mod-tap" => format!(
+            "&mt {} {}",
+            HidUsage::from_encoded(param1),
+            HidUsage::from_encoded(param2)
+        ),
+        "sticky-key" => format!("&sk {}", HidUsage::from_encoded(param1)),
+        "sticky-layer" => format!("&sl {param1}"),
+        "momentary" => format!("&mo {param1}"),
+        "toggle-layer" => format!("&tog {param1}"),
+        "to-layer" => format!("&to {param1}"),
+        "bluetooth" => format!("&bt {param1} {param2}"),
+        "external-power" => format_command_behavior_binding(
+            "&ext_power",
+            param1,
+            param2,
+            &[(0, "EP_OFF"), (1, "EP_ON"), (2, "EP_TOG")],
+            &[],
+        ),
+        "output-selection" => format_command_behavior_binding(
+            "&out",
+            param1,
+            param2,
+            &[
+                (0, "OUT_TOG"),
+                (1, "OUT_USB"),
+                (2, "OUT_BLE"),
+                (3, "OUT_NONE"),
+            ],
+            &[],
+        ),
+        "backlight" => format_command_behavior_binding(
+            "&bl",
+            param1,
+            param2,
+            &[
+                (0, "BL_ON"),
+                (1, "BL_OFF"),
+                (2, "BL_TOG"),
+                (3, "BL_INC"),
+                (4, "BL_DEC"),
+                (5, "BL_CYCLE"),
+                (6, "BL_SET"),
+            ],
+            &[6],
+        ),
+        "underglow" => format_command_behavior_binding(
+            "&rgb_ug",
+            param1,
+            param2,
+            &[
+                (0, "RGB_TOG"),
+                (1, "RGB_ON"),
+                (2, "RGB_OFF"),
+                (3, "RGB_HUI"),
+                (4, "RGB_HUD"),
+                (5, "RGB_SAI"),
+                (6, "RGB_SAD"),
+                (7, "RGB_BRI"),
+                (8, "RGB_BRD"),
+                (9, "RGB_SPI"),
+                (10, "RGB_SPD"),
+                (11, "RGB_EFF"),
+                (12, "RGB_EFR"),
+            ],
+            &[],
+        ),
+        "mouse-key" => format!("&mkp {param1}"),
+        "mouse-move" => format!("&mmv {param1}"),
+        "mouse-scroll" => format!("&msc {param1}"),
+        "caps-word" => "&caps_word".to_string(),
+        "key-repeat" => "&key_repeat".to_string(),
+        "reset" => "&sys_reset".to_string(),
+        "bootloader" => "&bootloader".to_string(),
+        "soft-off" => "&soft_off".to_string(),
+        "studio-unlock" => "&studio_unlock".to_string(),
+        "grave-escape" => "&gresc".to_string(),
+        "transparent" => "&trans".to_string(),
+        "none" => "&none".to_string(),
+        _ => return None,
+    })
+}
+
+fn format_raw_behavior_binding(
+    binding: &zmk::keymap::BehaviorBinding,
+    catalog: &BehaviorCatalog,
+) -> String {
+    if let Some(binding) = catalog
+        .role_by_id
+        .get(&binding.behavior_id)
+        .map(String::as_str)
+        .and_then(|role| format_known_behavior_binding(role, binding.param1, binding.param2))
+    {
+        return binding;
+    }
+
+    catalog
+        .custom_name_by_id
+        .get(&binding.behavior_id)
+        .map(|name| format_custom_behavior_binding(name, binding.param1, binding.param2))
+        .unwrap_or_else(|| {
+            format!(
+                "&unknown {} {} {}",
+                binding.behavior_id, binding.param1, binding.param2
+            )
+        })
 }
 
 fn is_likely_studio_port(port: &serialport::SerialPortInfo) -> bool {
@@ -1420,42 +1591,6 @@ fn is_likely_studio_port(port: &serialport::SerialPortInfo) -> bool {
                     || value.contains("kobito")
             }),
         _ => false,
-    }
-}
-
-fn format_direct_behavior(behavior: &Behavior) -> String {
-    match behavior {
-        Behavior::KeyPress(key) => format!("&kp {key}"),
-        Behavior::KeyToggle(key) => format!("&kt {key}"),
-        Behavior::LayerTap { layer_id, tap } => format!("&lt {layer_id} {tap}"),
-        Behavior::ModTap { hold, tap } => format!("&mt {hold} {tap}"),
-        Behavior::StickyKey(key) => format!("&sk {key}"),
-        Behavior::StickyLayer { layer_id } => format!("&sl {layer_id}"),
-        Behavior::MomentaryLayer { layer_id } => format!("&mo {layer_id}"),
-        Behavior::ToggleLayer { layer_id } => format!("&tog {layer_id}"),
-        Behavior::ToLayer { layer_id } => format!("&to {layer_id}"),
-        Behavior::Bluetooth { command, value } => format!("&bt {command} {value}"),
-        Behavior::ExternalPower { value } => format!("&ext_power {value}"),
-        Behavior::OutputSelection { value } => format!("&out {value}"),
-        Behavior::Backlight { command, value } => format!("&bl {command} {value}"),
-        Behavior::Underglow { command, value } => format!("&rgb_ug {command} {value}"),
-        Behavior::MouseKeyPress { value } => format!("&mkp {value}"),
-        Behavior::MouseMove { value } => format!("&mmv {value}"),
-        Behavior::MouseScroll { value } => format!("&msc {value}"),
-        Behavior::CapsWord => "&caps_word".to_string(),
-        Behavior::KeyRepeat => "&key_repeat".to_string(),
-        Behavior::Reset => "&sys_reset".to_string(),
-        Behavior::Bootloader => "&bootloader".to_string(),
-        Behavior::SoftOff => "&soft_off".to_string(),
-        Behavior::StudioUnlock => "&studio_unlock".to_string(),
-        Behavior::GraveEscape => "&gresc".to_string(),
-        Behavior::Transparent => "&trans".to_string(),
-        Behavior::None => "&none".to_string(),
-        Behavior::Unknown {
-            behavior_id,
-            param1,
-            param2,
-        } => format!("&unknown {behavior_id} {param1} {param2}"),
     }
 }
 
@@ -1792,12 +1927,25 @@ mod tests {
                 (1, "key".to_string()),
                 (2, "bluetooth".to_string()),
                 (3, "momentary".to_string()),
+                (4, "transparent".to_string()),
+                (5, "layer-tap".to_string()),
+                (6, "external-power".to_string()),
+                (7, "output-selection".to_string()),
+                (8, "backlight".to_string()),
+                (9, "underglow".to_string()),
             ]),
             id_by_role: std::collections::HashMap::from([
                 ("key".to_string(), 1),
                 ("bluetooth".to_string(), 2),
                 ("momentary".to_string(), 3),
+                ("transparent".to_string(), 4),
+                ("layer-tap".to_string(), 5),
+                ("external-power".to_string(), 6),
+                ("output-selection".to_string(), 7),
+                ("backlight".to_string(), 8),
+                ("underglow".to_string(), 9),
             ]),
+            custom_name_by_id: std::collections::HashMap::from([(22, "zoom_hold".to_string())]),
         }
     }
 
@@ -1855,6 +2003,75 @@ mod tests {
     }
 
     #[test]
+    fn raw_behavior_binding_formats_unresolved_layer_entries() {
+        let catalog = test_behavior_catalog();
+        let transparent = zmk::keymap::BehaviorBinding {
+            behavior_id: 4,
+            param1: 0,
+            param2: 0,
+        };
+        let layer_tap = zmk::keymap::BehaviorBinding {
+            behavior_id: 5,
+            param1: 2,
+            param2: Keycode::from_name("SPC").unwrap().to_hid_usage(),
+        };
+        let custom_macro = zmk::keymap::BehaviorBinding {
+            behavior_id: 22,
+            param1: 9,
+            param2: 0,
+        };
+        let external_power = zmk::keymap::BehaviorBinding {
+            behavior_id: 6,
+            param1: 1,
+            param2: 0,
+        };
+        let output_selection = zmk::keymap::BehaviorBinding {
+            behavior_id: 7,
+            param1: 2,
+            param2: 0,
+        };
+        let backlight = zmk::keymap::BehaviorBinding {
+            behavior_id: 8,
+            param1: 6,
+            param2: 80,
+        };
+        let underglow = zmk::keymap::BehaviorBinding {
+            behavior_id: 9,
+            param1: 3,
+            param2: 0,
+        };
+
+        assert_eq!(
+            format_raw_behavior_binding(&transparent, &catalog),
+            "&trans"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&layer_tap, &catalog),
+            "&lt 2 SPC"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&custom_macro, &catalog),
+            "&zoom_hold 9"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&external_power, &catalog),
+            "&ext_power EP_ON"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&output_selection, &catalog),
+            "&out OUT_BLE"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&backlight, &catalog),
+            "&bl BL_SET 80"
+        );
+        assert_eq!(
+            format_raw_behavior_binding(&underglow, &catalog),
+            "&rgb_ug RGB_HUI"
+        );
+    }
+
+    #[test]
     fn combo_config_round_trips_common_fields() {
         let catalog = test_behavior_catalog();
         let combo = StudioComboInput {
@@ -1867,7 +2084,8 @@ mod tests {
         };
 
         let config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
-        let decoded = decode_combo_config(0, &config, &catalog).expect("combo config should decode");
+        let decoded =
+            decode_combo_config(0, &config, &catalog).expect("combo config should decode");
 
         assert_eq!(decoded.binding, "&kp A");
         assert_eq!(decoded.key_positions, vec![0, 3]);
@@ -1888,14 +2106,16 @@ mod tests {
             layer_mask: None,
             slow_release: None,
         };
-        let combo_config = encode_combo_config(&combo, &catalog).expect("combo config should encode");
+        let combo_config =
+            encode_combo_config(&combo, &catalog).expect("combo config should encode");
         let mut combos_payload = Vec::new();
         push_len_field(&mut combos_payload, 1, &combo_config);
         push_varint_field(&mut combos_payload, 2, 12);
         let mut response = Vec::new();
         push_len_field(&mut response, 1, &combos_payload);
 
-        let decoded = decode_get_combos_response(&response, &catalog).expect("combo response should decode");
+        let decoded =
+            decode_get_combos_response(&response, &catalog).expect("combo response should decode");
 
         assert_eq!(decoded.max_combos, 12);
         assert_eq!(decoded.combos.len(), 1);
