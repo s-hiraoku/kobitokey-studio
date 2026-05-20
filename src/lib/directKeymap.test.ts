@@ -293,6 +293,46 @@ describe("direct keymap conversion", () => {
     ]);
   });
 
+  it("diffs unknown custom bindings when behavior IDs differ", () => {
+    const diffs = diffDirectKeymapAgainstFirmware(
+      {
+        deviceName: "KobitoKey",
+        serialNumber: "123",
+        lockState: "unlocked",
+        hasUnsavedChanges: false,
+        layers: [
+          {
+            id: 0,
+            name: "Base",
+            bindings: ["&unknown 23 9 0"],
+          },
+        ],
+      },
+      {
+        layers: [
+          {
+            id: "default_layer",
+            label: "Default",
+            bindings: completeStudioBindings(["&zoom_hold 9"]),
+            blockStart: 0,
+            blockEnd: 1,
+          },
+        ],
+        combos,
+      },
+    );
+
+    expect(diffs).toEqual([
+      {
+        layerIndex: 0,
+        layerName: "Base",
+        keyIndex: 0,
+        firmwareBinding: "&zoom_hold 9",
+        directBinding: "&unknown 23 9 0",
+      },
+    ]);
+  });
+
   it("does not diff fixture keymap aliases returned by the desktop Direct reader", () => {
     const firmwareSource = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
     const firmwareKeymap = parseKeymap(firmwareSource);

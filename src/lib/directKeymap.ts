@@ -11,9 +11,11 @@ import { normalizeKeycodeName } from "./keycodeAliases";
 
 const STUDIO_KEY_COUNT = 40;
 const STANDARD_BEHAVIOR_BINDINGS = new Set([
+  "&bl",
   "&bt",
   "&bootloader",
   "&caps_word",
+  "&ext_power",
   "&gresc",
   "&key_repeat",
   "&kp",
@@ -25,6 +27,8 @@ const STANDARD_BEHAVIOR_BINDINGS = new Set([
   "&msc",
   "&mt",
   "&none",
+  "&out",
+  "&rgb_ug",
   "&sk",
   "&sl",
   "&soft_off",
@@ -34,6 +38,10 @@ const STANDARD_BEHAVIOR_BINDINGS = new Set([
   "&tog",
   "&trans",
 ]);
+
+const CUSTOM_BEHAVIOR_IDS: Record<string, string> = {
+  "&zoom_hold": "22",
+};
 export type StudioKeymap = {
   deviceName: string;
   serialNumber: string;
@@ -299,6 +307,11 @@ function sameUnknownCustomBinding(unknownBinding: string, customBinding: string)
   const unknownParts = normalizeDirectBindingForDisplay(unknownBinding).trim().split(/\s+/);
   const customParts = normalizeDirectBindingForDisplay(customBinding).trim().split(/\s+/);
   if (unknownParts[0] !== "&unknown" || !isCustomComparableBinding(customParts[0])) {
+    return false;
+  }
+
+  const unknownBehaviorId = unknownParts[1];
+  if (CUSTOM_BEHAVIOR_IDS[customParts[0]] !== unknownBehaviorId) {
     return false;
   }
 
