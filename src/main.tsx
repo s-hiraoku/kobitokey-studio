@@ -15,6 +15,8 @@ import {
   Save,
   SlidersHorizontal,
   Smartphone,
+  Trash2,
+  Undo2,
   UploadCloud,
   Usb,
 } from "lucide-react";
@@ -132,6 +134,18 @@ type DirectKeyWriteFeedback = {
   message: string;
   binding?: string;
 };
+type ToastKind = "info" | "writing" | "success" | "error";
+type ToastMessage = {
+  id: number;
+  kind: ToastKind;
+  message: string;
+};
+type DirectKeyDraft = {
+  layerIndex: number;
+  keyIndex: number;
+  from: string;
+  to: string;
+};
 type StudioConnectionSession = {
   kind: StudioConnectionKind;
   label: string;
@@ -209,6 +223,7 @@ function App() {
   const [studioConnectionState, setStudioConnectionState] = React.useState<StudioConnectionState>("disconnected");
   const [studioConnectionError, setStudioConnectionError] = React.useState<DirectConnectionIssue | null>(null);
   const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
+  const [directKeyDrafts, setDirectKeyDrafts] = React.useState<Record<string, DirectKeyDraft>>({});
   const [directTrackball, setDirectTrackball] = React.useState<DirectTrackballSettings | null>(null);
   const [directCombos, setDirectCombos] = React.useState<DirectCombo[]>([]);
   const [directComboSource, setDirectComboSource] = React.useState<DirectComboSource>("none");
@@ -218,6 +233,7 @@ function App() {
     kind: "idle",
     message: "",
   });
+  const [toast, setToast] = React.useState<ToastMessage | null>(null);
   const directWriteRequestRef = React.useRef(0);
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
@@ -255,9 +271,20 @@ function App() {
     [files?.keymap],
   );
   const firmwareParsedKeymap = React.useMemo(() => parseKeymap(activeKeymapSource), [activeKeymapSource]);
+  const directDraftKeymap = React.useMemo(
+    () => (directKeymap ? applyDirectKeyDraftsToKeymap(directKeymap, directKeyDrafts) : null),
+    [directKeyDrafts, directKeymap],
+  );
+  const directKeyDraftList = React.useMemo(
+    () =>
+      Object.values(directKeyDrafts).sort(
+        (left, right) => left.layerIndex - right.layerIndex || left.keyIndex - right.keyIndex,
+      ),
+    [directKeyDrafts],
+  );
   const directParsedKeymap = React.useMemo(
-    () => (directKeymap ? studioKeymapToParsedKeymap(directKeymap, directCombos) : firmwareParsedKeymap),
-    [directCombos, directKeymap, firmwareParsedKeymap],
+    () => (directDraftKeymap ? studioKeymapToParsedKeymap(directDraftKeymap, directCombos) : firmwareParsedKeymap),
+    [directCombos, directDraftKeymap, firmwareParsedKeymap],
   );
   const parsedKeymap = isDirectMode ? directParsedKeymap : firmwareParsedKeymap;
   const layers = parsedKeymap.layers;
@@ -278,6 +305,18 @@ function App() {
   );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
+  const selectedDeviceBinding =
+    isDirectMode ? directKeymap?.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? selectedBinding : selectedBinding;
+  const selectedDirectKeyDraft = directKeyDrafts[directKeyDraftKey(activeLayerIndex, selectedKeyIndex)];
+  const activeLayerDraftKeyIndexes = React.useMemo(
+    () =>
+      new Set(
+        directKeyDraftList
+          .filter((draft) => draft.layerIndex === activeLayerIndex)
+          .map((draft) => draft.keyIndex),
+      ),
+    [activeLayerIndex, directKeyDraftList],
+  );
   const showDirectEmptyState = isDirectMode && !directKeymap;
   const selectedCombos = React.useMemo(
     () => activeCombos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
@@ -309,6 +348,20 @@ function App() {
     directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
   }, [activeLayerIndex, selectedKeyIndex]);
+
+  React.useEffect(() => {
+    if (!toast || toast.kind === "writing") {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setToast((current) => (current?.id === toast.id ? null : current));
+    }, toast.kind === "error" ? 5200 : 3200);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  function showToast(kind: ToastKind, message: string) {
+    setToast({ id: Date.now(), kind, message });
+  }
 
   async function loadFixture() {
     const [keymap, leftOverlay, rightOverlay] = await Promise.all([
@@ -461,7 +514,7 @@ function App() {
 
   async function applyBinding(nextBinding: string) {
     if (isDirectMode) {
-      await writeDirectBinding(nextBinding);
+      stageDirectBinding(nextBinding);
       return;
     }
 
@@ -474,6 +527,41 @@ function App() {
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
     setBindingDraft(nextBinding);
+  }
+
+  function stageDirectBinding(nextBinding: string) {
+    if (!directKeymap) {
+      const message = "Direct Mode で device を読み込んでから編集してください";
+      showToast("error", message);
+      setStatus(message);
+      return;
+    }
+
+    const from = directKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "";
+    const draftKey = directKeyDraftKey(activeLayerIndex, selectedKeyIndex);
+    const trimmedBinding = nextBinding.trim();
+    setBindingDraft(trimmedBinding);
+    setDirectKeyDrafts((current) => {
+      const next = { ...current };
+      if (trimmedBinding === from) {
+        delete next[draftKey];
+      } else {
+        next[draftKey] = {
+          layerIndex: activeLayerIndex,
+          keyIndex: selectedKeyIndex,
+          from,
+          to: trimmedBinding,
+        };
+      }
+      return next;
+    });
+    const message =
+      trimmedBinding === from
+        ? `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の下書きを取り消しました`
+        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を下書きに反映しました`;
+    setDirectKeyWriteFeedback({ kind: "idle", message });
+    showToast(trimmedBinding === from ? "info" : "success", message);
+    setStatus(message);
   }
 
   function applyDirectFirmwareDiffs(targetDiffs: DirectFirmwareKeyDiff[] = directFirmwareDiffs) {
@@ -543,6 +631,7 @@ function App() {
 
   function applyStudioConnection(session: StudioConnectionSession) {
     setDirectKeymap(session.keymap);
+    setDirectKeyDrafts({});
     setDirectTrackball(null);
     setDirectCombos([]);
     setDirectComboSource("none");
@@ -690,6 +779,7 @@ function App() {
       }
     }
     setDirectKeymap(null);
+    setDirectKeyDrafts({});
     setDirectTrackball(null);
     setDirectCombos([]);
     setDirectComboSource("none");
@@ -701,90 +791,112 @@ function App() {
     setStatus("device を切断しました");
   }
 
-  async function writeDirectBinding(nextBinding: string) {
-    const requestId = ++directWriteRequestRef.current;
-    if (!isDesktopRuntime) {
-      if (!supportsWebStudioConnection(studioConnectionKind)) {
-        const message = "このブラウザは現在の Direct 接続方式に対応していません。";
-        setDirectKeyWriteFeedback({ kind: "error", message });
-        setStatus(message);
-        return;
-      }
-      if (!directKeymap) {
-        const message = "Direct Mode で device を読み込んでから書き込んでください";
-        setDirectKeyWriteFeedback({ kind: "error", message });
-        setStatus(message);
-        return;
-      }
-      const directLayer = directKeymap.layers[activeLayerIndex];
-      if (!directLayer) {
-        const message = "Direct Mode の layer が選択されていません";
-        setDirectKeyWriteFeedback({ kind: "error", message });
-        setStatus(message);
-        return;
-      }
-      try {
-        setDirectKeyWriteFeedback({
-          kind: "writing",
-          message: `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み中です`,
-          binding: nextBinding,
-        });
-        const nextKeymap = await writeWebStudioKey(directLayer.id, selectedKeyIndex, nextBinding);
-        if (requestId !== directWriteRequestRef.current) return;
-        setDirectKeymap(nextKeymap);
-        setBindingDraft(nextBinding);
-        const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
-        setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
-        setStatus(message);
-      } catch (error) {
-        if (requestId !== directWriteRequestRef.current) return;
-        const message = `Web Direct 書き込み失敗: ${formatError(error)}`;
-        setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
-        setStatus(message);
-      }
-      return;
-    }
-
-    if (!directKeymap || !selectedStudioPort) {
-      const message = "Direct Mode で接続中の device がありません";
-      setDirectKeyWriteFeedback({ kind: "error", message });
+  async function writeDirectKeyDrafts(targetDrafts: DirectKeyDraft[] = directKeyDraftList) {
+    if (targetDrafts.length === 0) {
+      const message = "未書き込みの key 変更はありません";
+      showToast("info", message);
       setStatus(message);
       return;
     }
 
-    const directLayer = directKeymap.layers[activeLayerIndex];
-    if (!directLayer) {
-      const message = "Direct Mode の layer が選択されていません";
+    const requestId = ++directWriteRequestRef.current;
+    let nextKeymap = directKeymap;
+    if (!nextKeymap) {
+      const message = "Direct Mode で device を読み込んでから書き込んでください";
       setDirectKeyWriteFeedback({ kind: "error", message });
+      showToast("error", message);
+      setStatus(message);
+      return;
+    }
+
+    if (!isDesktopRuntime) {
+      if (!supportsWebStudioConnection(studioConnectionKind)) {
+        const message = "このブラウザは現在の Direct 接続方式に対応していません。";
+        setDirectKeyWriteFeedback({ kind: "error", message });
+        showToast("error", message);
+        setStatus(message);
+        return;
+      }
+    }
+
+    if (isDesktopRuntime && !selectedStudioPort) {
+      const message = "Direct Mode で接続中の device がありません";
+      setDirectKeyWriteFeedback({ kind: "error", message });
+      showToast("error", message);
       setStatus(message);
       return;
     }
 
     try {
-      setDirectKeyWriteFeedback({
-        kind: "writing",
-        message: `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み中です`,
-        binding: nextBinding,
-      });
-      const nextKeymap = await invoke<StudioKeymap>("write_studio_key", {
-        kind: studioConnectionKind,
-        portPath: selectedStudioPort,
-        layerId: directLayer.id,
-        keyPosition: selectedKeyIndex,
-        binding: nextBinding,
-      });
-      if (requestId !== directWriteRequestRef.current) return;
+      for (const [index, draft] of targetDrafts.entries()) {
+        const directLayer = nextKeymap.layers[draft.layerIndex];
+        if (!directLayer) {
+          throw new Error(`Layer ${draft.layerIndex} が見つかりません`);
+        }
+        setDirectKeyWriteFeedback({
+          kind: "writing",
+          message: `${index + 1}/${targetDrafts.length}: Layer ${draft.layerIndex} / Key ${draft.keyIndex + 1} を書き込み中です`,
+          binding: draft.to,
+        });
+        showToast(
+          "writing",
+          `${index + 1}/${targetDrafts.length}: Layer ${draft.layerIndex} / Key ${draft.keyIndex + 1} を書き込み中です`,
+        );
+        nextKeymap = await writeDirectKeyToDevice(directLayer.id, draft.keyIndex, draft.to);
+        if (requestId !== directWriteRequestRef.current) return;
+      }
       setDirectKeymap(nextKeymap);
-      setBindingDraft(nextBinding);
-      const message = `Key ${selectedKeyIndex + 1} を実機へ書き込みました`;
-      setDirectKeyWriteFeedback({ kind: "success", message, binding: nextBinding });
+      setDirectKeyDrafts((current) => {
+        const next = { ...current };
+        for (const draft of targetDrafts) {
+          delete next[directKeyDraftKey(draft.layerIndex, draft.keyIndex)];
+        }
+        return next;
+      });
+      setBindingDraft(nextKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
+      const message = `Key 変更 ${targetDrafts.length} 件を実機へ書き込みました`;
+      setDirectKeyWriteFeedback({ kind: "success", message });
+      showToast("success", message);
       setStatus(message);
     } catch (error) {
       if (requestId !== directWriteRequestRef.current) return;
-      const message = `Direct 書き込み失敗: ${formatError(error)}`;
-      setDirectKeyWriteFeedback({ kind: "error", message, binding: nextBinding });
+      const message = `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}`;
+      setDirectKeyWriteFeedback({ kind: "error", message });
+      showToast("error", message);
       setStatus(message);
     }
+  }
+
+  async function writeDirectKeyToDevice(layerId: number, keyPosition: number, binding: string): Promise<StudioKeymap> {
+    if (!isDesktopRuntime) {
+      return writeWebStudioKey(layerId, keyPosition, binding);
+    }
+
+    return invoke<StudioKeymap>("write_studio_key", {
+      kind: studioConnectionKind,
+      portPath: selectedStudioPort,
+      layerId,
+      keyPosition,
+      binding,
+    });
+  }
+
+  function discardDirectKeyDrafts(targetDrafts: DirectKeyDraft[] = directKeyDraftList) {
+    if (targetDrafts.length === 0) {
+      return;
+    }
+    setDirectKeyDrafts((current) => {
+      const next = { ...current };
+      for (const draft of targetDrafts) {
+        delete next[directKeyDraftKey(draft.layerIndex, draft.keyIndex)];
+      }
+      return next;
+    });
+    setBindingDraft(directKeymap?.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
+    const message = `Key 変更 ${targetDrafts.length} 件を破棄しました`;
+    setDirectKeyWriteFeedback({ kind: "idle", message });
+    showToast("info", message);
+    setStatus(message);
   }
 
   async function refreshDirectTrackballSettings(
@@ -1298,6 +1410,8 @@ function App() {
         </div>
       </header>
 
+      <ToastViewport toast={toast} onDismiss={() => setToast(null)} />
+
       {showDirectEmptyState ? (
         <DirectWelcome
           canUseWebBluetooth={canUseWebBluetooth}
@@ -1369,12 +1483,26 @@ function App() {
 
           <KeyboardGrid
             combos={activeCombos}
+            draftKeyIndexes={isDirectMode ? activeLayerDraftKeyIndexes : undefined}
             layer={activeLayer}
             selectedComboId={selectedComboId}
             selectedKeyIndex={selectedKeyIndex}
             onComboSelect={setSelectedComboId}
             onSelect={setSelectedKeyIndex}
           />
+
+          {isDirectMode ? (
+            <DirectPendingChangesBar
+              canWrite={studioConnectionState === "connected"}
+              changes={directKeyDraftList}
+              isWriting={directKeyWriteFeedback.kind === "writing"}
+              onDiscardAll={() => discardDirectKeyDrafts()}
+              onDiscardSelected={() => selectedDirectKeyDraft && discardDirectKeyDrafts([selectedDirectKeyDraft])}
+              onWriteAll={() => writeDirectKeyDrafts()}
+              onWriteSelected={() => selectedDirectKeyDraft && writeDirectKeyDrafts([selectedDirectKeyDraft])}
+              selectedDraft={selectedDirectKeyDraft}
+            />
+          ) : null}
 
           {isDirectMode ? (
             <DirectSummaryPanel
@@ -1451,10 +1579,10 @@ function App() {
               onSelectCombo={setSelectedComboId}
               selectedCombo={selectedCombo}
               selectedCombos={selectedCombos}
-              selectedBinding={selectedBinding}
+              selectedBinding={selectedDeviceBinding}
               trackball={directTrackball}
               canWriteCombos={isDesktopRuntime}
-              canWriteKey={studioConnectionState === "connected"}
+              canEditKey={Boolean(directKeymap)}
               canWriteTrackball={isDesktopRuntime}
               keyWriteFeedback={directKeyWriteFeedback}
             />
@@ -1724,6 +1852,7 @@ const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
 
 function KeyboardGrid({
   combos,
+  draftKeyIndexes,
   layer,
   selectedComboId,
   selectedKeyIndex,
@@ -1731,6 +1860,7 @@ function KeyboardGrid({
   onSelect,
 }: {
   combos: KeymapCombo[];
+  draftKeyIndexes?: Set<number>;
   layer?: KeymapLayer;
   selectedComboId: string | null;
   selectedKeyIndex: number;
@@ -1784,6 +1914,7 @@ function KeyboardGrid({
             key={`${key.side}-${key.index}`}
             binding={layer?.bindings[key.index] ?? ""}
             index={key.index}
+            isDraft={draftKeyIndexes?.has(key.index) ?? false}
             isSelected={key.index === selectedKeyIndex}
             kind={key.kind}
             left={key.x}
@@ -1804,6 +1935,7 @@ function PhysicalKeyButton({
   binding,
   height,
   index,
+  isDraft,
   isSelected,
   kind,
   left,
@@ -1816,6 +1948,7 @@ function PhysicalKeyButton({
   binding: string;
   height: number;
   index: number;
+  isDraft: boolean;
   isSelected: boolean;
   kind: string;
   left: number;
@@ -1831,7 +1964,7 @@ function PhysicalKeyButton({
     <button
       type="button"
       key={`${side}-${index}`}
-      className={`physical-key ${side} ${kind} ${isSelected ? "selected" : ""}`}
+      className={`physical-key ${side} ${kind} ${isDraft ? "draft" : ""} ${isSelected ? "selected" : ""}`}
       style={{
         left,
         top,
@@ -2272,6 +2405,35 @@ function displayBindingLabel(binding: string, label: string): string {
   return label;
 }
 
+function ToastViewport({ onDismiss, toast }: { onDismiss: () => void; toast: ToastMessage | null }) {
+  if (!toast) {
+    return null;
+  }
+
+  const icon =
+    toast.kind === "writing" ? (
+      <Loader2 size={16} />
+    ) : toast.kind === "success" ? (
+      <CheckCircle2 size={16} />
+    ) : toast.kind === "error" ? (
+      <AlertTriangle size={16} />
+    ) : (
+      <SlidersHorizontal size={16} />
+    );
+
+  return (
+    <div className="toast-viewport" role="status" aria-live={toast.kind === "error" ? "assertive" : "polite"}>
+      <div className={`app-toast ${toast.kind}`}>
+        {icon}
+        <span>{toast.message}</span>
+        <button type="button" onClick={onDismiss} aria-label="通知を閉じる">
+          x
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DirectConnectionBar({
   comboSource,
   connectionKind,
@@ -2309,6 +2471,100 @@ function DirectConnectionBar({
         isDesktopRuntime={isDesktopRuntime}
         trackballAvailable={trackballAvailable}
       />
+    </div>
+  );
+}
+
+function DirectPendingChangesBar({
+  canWrite,
+  changes,
+  isWriting,
+  onDiscardAll,
+  onDiscardSelected,
+  onWriteAll,
+  onWriteSelected,
+  selectedDraft,
+}: {
+  canWrite: boolean;
+  changes: DirectKeyDraft[];
+  isWriting: boolean;
+  onDiscardAll: () => void;
+  onDiscardSelected: () => void;
+  onWriteAll: () => void;
+  onWriteSelected: () => void;
+  selectedDraft?: DirectKeyDraft;
+}) {
+  const hasChanges = changes.length > 0;
+  const writeDisabled = !canWrite || !hasChanges || isWriting;
+
+  return (
+    <div className={`direct-pending-bar ${hasChanges ? "has-changes" : ""}`}>
+      <div>
+        <span>{hasChanges ? `未書き込み ${changes.length} keys` : "未書き込み変更なし"}</span>
+        <strong>
+          {selectedDraft
+            ? `選択中: Layer ${selectedDraft.layerIndex} / Key ${selectedDraft.keyIndex + 1}`
+            : hasChanges
+              ? "色付きのキーが下書き変更です"
+              : "キー編集は下書きに反映され、まとめて書き込めます"}
+        </strong>
+        {hasChanges ? (
+          <small>
+            {changes
+              .slice(0, 3)
+              .map((change) => `L${change.layerIndex}/K${change.keyIndex + 1}: ${formatBindingForDisplay(change.to)}`)
+              .join(" · ")}
+            {changes.length > 3 ? ` · +${changes.length - 3}` : ""}
+          </small>
+        ) : null}
+      </div>
+      <div className="direct-pending-actions">
+        <div className="direct-pending-group" role="group" aria-label="下書きを破棄">
+          <button
+            type="button"
+            className="danger-ghost"
+            disabled={!selectedDraft || isWriting}
+            onClick={onDiscardSelected}
+            title="選択中のキーの下書きを破棄します"
+          >
+            <Undo2 size={14} />
+            選択を破棄
+          </button>
+          <button
+            type="button"
+            className="danger-ghost"
+            disabled={!hasChanges || isWriting}
+            onClick={onDiscardAll}
+            title="すべての下書きを破棄します"
+          >
+            <Trash2 size={14} />
+            すべて破棄
+          </button>
+        </div>
+        <span className="direct-pending-divider" aria-hidden="true" />
+        <div className="direct-pending-group" role="group" aria-label="キーボードへ書き込み">
+          <button
+            type="button"
+            className="primary-ghost"
+            disabled={!selectedDraft || !canWrite || isWriting}
+            onClick={onWriteSelected}
+            title="選択中のキーの下書きをキーボードへ書き込みます"
+          >
+            <Save size={14} />
+            選択を書き込み
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={writeDisabled}
+            onClick={onWriteAll}
+            title="すべての下書きをキーボードへ書き込みます"
+          >
+            {isWriting ? <Loader2 size={15} /> : <Save size={15} />}
+            すべて書き込み
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2421,7 +2677,7 @@ function DirectWelcome({
           <h2>キーボードを接続</h2>
           <p>
             USB 推奨です。Bluetooth も使えますが、ZMK Studio 用のデバイスが表示される場合のみ接続できます。読み込んだ後は、
-            キーを選んでその場で binding を書き込めます。
+            複数の key を下書きで調整してから、まとめて実機へ書き込めます。
           </p>
         </div>
         <ol className="direct-connect-steps">
@@ -2435,7 +2691,7 @@ function DirectWelcome({
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config から実機へ書き込みます。</span>
+            <span>読み込み後に key を選び、右側の Key Config で下書きに反映してからまとめて書き込みます。</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -2774,7 +3030,7 @@ function BuildPanel({
 function DirectInspectorTabs({
   binding,
   canWriteCombos,
-  canWriteKey,
+  canEditKey,
   canWriteTrackball,
   combos,
   comboSource,
@@ -2798,7 +3054,7 @@ function DirectInspectorTabs({
 }: {
   binding: string;
   canWriteCombos: boolean;
-  canWriteKey: boolean;
+  canEditKey: boolean;
   canWriteTrackball: boolean;
   combos: KeymapCombo[];
   comboSource: DirectComboSource;
@@ -2850,14 +3106,13 @@ function DirectInspectorTabs({
               <p className="eyebrow">Key {keyIndex + 1}</p>
               <h2>{selectedBinding}</h2>
             </div>
-            <DirectKeyWriteStatus feedback={keyWriteFeedback} />
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "実機へ書き込み"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "下書きに反映"}
             binding={binding}
             currentBinding={selectedBinding}
-            disabled={!canWriteKey || keyWriteFeedback.kind === "writing"}
-            disabledReason={!canWriteKey ? "KobitoKey に接続すると書き込めます。" : undefined}
+            disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
+            disabledReason={!canEditKey ? "KobitoKey に接続すると編集できます。" : undefined}
             onApply={onApply}
           />
         </div>
@@ -2889,28 +3144,6 @@ function DirectInspectorTabs({
         <DirectTimingPanel />
       )}
     </section>
-  );
-}
-
-function DirectKeyWriteStatus({ feedback }: { feedback: DirectKeyWriteFeedback }) {
-  if (feedback.kind === "idle") {
-    return <span className="direct-write-state idle">未書き込み</span>;
-  }
-
-  const icon =
-    feedback.kind === "writing" ? (
-      <Loader2 size={14} />
-    ) : feedback.kind === "success" ? (
-      <CheckCircle2 size={14} />
-    ) : (
-      <AlertTriangle size={14} />
-    );
-
-  return (
-    <div className={`direct-write-state ${feedback.kind}`}>
-      {icon}
-      <span>{feedback.message}</span>
-    </div>
   );
 }
 
@@ -3997,6 +4230,31 @@ function parseDisplayKeyPositions(value: string): number[] {
     .filter((number) => Number.isFinite(number) && number >= 1 && number <= 40)
     .map((number) => number - 1);
   return [...new Set(positions)];
+}
+
+function directKeyDraftKey(layerIndex: number, keyIndex: number): string {
+  return `${layerIndex}:${keyIndex}`;
+}
+
+function applyDirectKeyDraftsToKeymap(keymap: StudioKeymap, drafts: Record<string, DirectKeyDraft>): StudioKeymap {
+  const draftList = Object.values(drafts);
+  if (draftList.length === 0) {
+    return keymap;
+  }
+
+  const layers = keymap.layers.map((layer, layerIndex) => {
+    const layerDrafts = draftList.filter((draft) => draft.layerIndex === layerIndex);
+    if (layerDrafts.length === 0) {
+      return layer;
+    }
+    const bindings = [...layer.bindings];
+    for (const draft of layerDrafts) {
+      bindings[draft.keyIndex] = draft.to;
+    }
+    return { ...layer, bindings };
+  });
+
+  return { ...keymap, layers };
 }
 
 function toggleDisplayKeyPosition(currentPositions: number[], position: number): string {
