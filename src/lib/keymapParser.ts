@@ -27,6 +27,12 @@ export type KeymapComboInput = {
   timeoutMs: number;
 };
 
+export type KeymapLayerInput = {
+  id: string;
+  label: string;
+  bindings: string[];
+};
+
 const KEY_COUNT = 40;
 const LAYER_PATTERN =
   /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
@@ -168,6 +174,34 @@ export function updateLayerBinding(
   return source.slice(0, layer.blockStart) + nextBlock + source.slice(layer.blockEnd);
 }
 
+export function addLayer(source: string, input: KeymapLayerInput): string {
+  const keymapBlock = extractKeymapBody(source);
+  const insertAt = keymapBlock.bodyStart + keymapBlock.body.length;
+  return `${source.slice(0, insertAt).trimEnd()}\n\n${indent(formatLayerBlock(input), 8)}\n${source.slice(insertAt)}`;
+}
+
+export function deleteLayer(source: string, layer: KeymapLayer): string {
+  return source.slice(0, layer.blockStart).replace(/\s*$/, "\n") + source.slice(layer.blockEnd);
+}
+
+export function nextLayerId(layers: KeymapLayer[], base = `layer${layers.length}`): string {
+  const existingIds = new Set(layers.map((layer) => layer.id));
+  const normalizedBase = sanitizeNodeId(base) || `layer${layers.length}`;
+
+  if (!existingIds.has(normalizedBase)) {
+    return normalizedBase;
+  }
+
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const candidate = `${normalizedBase}_${suffix}`;
+    if (!existingIds.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return `${normalizedBase}_${Date.now()}`;
+}
+
 export function updateCombo(source: string, combo: KeymapCombo, input: KeymapComboInput): string {
   const nextBlock = formatComboBlock(input);
   return source.slice(0, combo.blockStart) + nextBlock + source.slice(combo.blockEnd);
@@ -211,6 +245,18 @@ function formatComboBlock(input: KeymapComboInput): string {
     `    key-positions = <${input.keyPositions.join(" ")}>;`,
     `    bindings = <${input.binding}>;`,
     `};`,
+  ].join("\n");
+}
+
+function formatLayerBlock(input: KeymapLayerInput): string {
+  const bindings = Array.from({ length: KEY_COUNT }, (_, index) => input.bindings[index] ?? "&trans");
+  return [
+    `${sanitizeNodeId(input.id) || "layer"} {`,
+    `    label = "${escapeDtsString(input.label)}";`,
+    "    bindings = <",
+    formatBindings(bindings),
+    "    >;",
+    "};",
   ].join("\n");
 }
 
@@ -275,6 +321,19 @@ function defaultLayerLabel(id: string, index: number): string {
 function normalizeBinding(binding: string): string {
   const normalized = binding.trim().replace(/\s+/g, " ");
   return normalized.startsWith("&") ? normalized : `&kp ${normalized}`;
+}
+
+function sanitizeNodeId(value: string): string {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return /^[a-z_]/.test(sanitized) ? sanitized : `layer_${sanitized}`;
+}
+
+function escapeDtsString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function escapeRegExp(value: string): string {

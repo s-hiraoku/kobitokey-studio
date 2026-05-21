@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   addCombo,
+  addLayer,
   deleteCombo,
+  deleteLayer,
   formatBindings,
+  nextLayerId,
   parseKeymap,
   tokenizeBindings,
   updateCombo,
@@ -98,6 +101,41 @@ describe("keymap updates", () => {
     expect(reparsed.layers[0].bindings[0]).toBe("&kp A");
     expect(reparsed.layers[0].bindings.slice(1)).toEqual(fortyBindings.slice(1));
     expect(reparsed.combos[0].binding).toBe("&kp TAB");
+  });
+
+  it("adds and deletes complete layer blocks", () => {
+    const source = sampleKeymap();
+    const parsed = parseKeymap(source);
+    const id = nextLayerId(parsed.layers);
+    const added = addLayer(source, {
+      id,
+      label: "Layer 2",
+      bindings: Array.from({ length: 40 }, () => "&trans"),
+    });
+
+    const reparsed = parseKeymap(added);
+    expect(reparsed.layers.map((layer) => layer.id)).toEqual(["default_layer", "fn_layer", id]);
+    expect(reparsed.layers[2].label).toBe("Layer 2");
+    expect(reparsed.layers[2].bindings).toEqual(Array.from({ length: 40 }, () => "&trans"));
+    expect(reparsed.combos[0].binding).toBe("&kp TAB");
+
+    const deleted = deleteLayer(added, reparsed.layers[2]);
+    expect(parseKeymap(deleted).layers.map((layer) => layer.id)).toEqual(["default_layer", "fn_layer"]);
+  });
+
+  it("duplicates a layer by adding a block with copied bindings", () => {
+    const source = sampleKeymap();
+    const parsed = parseKeymap(source);
+    const added = addLayer(source, {
+      id: nextLayerId(parsed.layers, `${parsed.layers[0].id}_copy`),
+      label: `${parsed.layers[0].label} Copy`,
+      bindings: parsed.layers[0].bindings,
+    });
+
+    const duplicate = parseKeymap(added).layers[2];
+    expect(duplicate.id).toBe("default_layer_copy");
+    expect(duplicate.label).toBe("Base Copy");
+    expect(duplicate.bindings).toEqual(parsed.layers[0].bindings);
   });
 
   it("updates, adds, and deletes combo blocks", () => {

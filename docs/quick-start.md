@@ -66,6 +66,8 @@ npm run tauri dev
 9. `保存` を押します(ハンドルがあればフォルダに直接上書き、ない場合はダウンロード)。
 10. GitHub Actions ビルドを起動するときは `Build & Flash` タブを開き、`Firmware repository URL` を入力した状態で `Build 起動` を押します。
 
+layer 追加・複製・削除は Firmware Mode のフロー確立後に解放予定です。内部実装では末尾追加、選択中 layer の複製、最後の layer の削除だけを扱う設計にしていますが、現在のリリース UI ではまだ非表示です。
+
 よく使う binding 例:
 
 | やりたいこと | binding |
@@ -82,13 +84,16 @@ npm run tauri dev
 
 ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
-1. `KobitoKey_QWERTY` 側で変更を commit / push します。
-2. KobitoKey Studio の `GitHub Actions` または `Build` panel を開きます。
-3. build を起動します。
-4. build 成功後、artifact を取得します。
-5. `UF2 / Volume 更新` を押します。
-6. left 用 UF2 を左側 bootloader volume にコピーします。
-7. right 用 UF2 を右側 bootloader volume にコピーします。
+1. KobitoKey Studio の `GitHub Actions` または `Build` panel を開きます。
+2. 初回は `接続確認` を押し、git / gh / workflow が OK になっていることを確認します。
+3. `保存してBuild` を押します。
+4. build 成功後、`Artifact 取得` を押します。
+5. Studio が manifest または UF2 ファイル名から left / right を分類したことを確認します。
+6. `Left` を選び、左側を bootloader mode に入れて `UF2 / Volume 更新` を押します。
+7. `Left UF2 を bootloader にコピー` を押します。
+8. `Right` を選び、右側も同じようにコピーします。
+
+`保存してBuild` は、Studio が扱う keymap / overlay だけを commit / push してから GitHub Actions を起動します。すでに GitHub 上の内容で再 build したい場合は `Build 起動` だけを使います。
 
 `gh` CLI を使うため、初回は次を済ませてください。
 
@@ -96,7 +101,7 @@ npm run tauri dev
 gh auth login
 ```
 
-left / right の UF2 を取り違えないように、コピー前の確認 dialog でファイル名と volume を必ず確認します。
+artifact に `manifest.json` または `firmware-manifest.json` がある場合、Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` が含まれる前提です。分類できない場合は手動の UF2 / Bootloader 選択で確認しながらコピーします。
 
 ## 4. Direct Mode でキーをすぐ書き込む
 

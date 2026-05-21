@@ -240,6 +240,8 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 
 ローカルフォルダは keymap / overlay の読み書きに使います。Firmware repository URL は `Build & Flash` タブにあり、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
 
+layer 追加・複製・削除は Firmware Mode 向けに実装準備中です。リリース UI ではまだ非表示です。解放時は、`+` で末尾に空の layer を追加し、copy で選択中 layer を末尾に複製し、trash は layer 番号参照のずれを避けるため最後の layer だけ削除できる設計にします。Direct Mode では実機の layer 構造変更は行いません。
+
 ### 3.2 キー binding を編集する
 
 1. 左側の layer 一覧から編集したい layer を選びます。
@@ -344,24 +346,31 @@ Tauri デスクトップ版では、読み込んだ `KobitoKey_QWERTY` のファ
 
 ### 4.1 保存後に GitHub Actions build を起動する
 
-1. Firmware Mode で変更を保存します。
-2. 必要に応じて `KobitoKey_QWERTY` 側で commit / push します。
-3. `Build` または `GitHub Actions` panel を開きます。
-4. `build 起動` を押します。
+1. Firmware Mode で変更します。
+2. `Build` または `GitHub Actions` panel を開きます。
+3. 初回または設定変更後は `接続確認` を押します。
+4. すべて OK になったら `保存してBuild` を押します。
 5. `status 更新` で最新 run の状態を確認します。
 
 KobitoKey Studio は `gh workflow run build.yml` と `gh run list` を使って GitHub Actions を操作します。`gh auth login` 済みで、対象リポジトリの workflow を実行できる必要があります。
 
-build を起動する前に、`KobitoKey_QWERTY` 側で保存済みの変更を commit / push しているか確認してください。GitHub Actions は GitHub 上の repository 内容から firmware を作るため、ローカルに保存しただけの変更は build に含まれません。
+`接続確認` は、選択中フォルダが git repository か、必要な keymap / overlay があるか、`origin` と branch があるか、`gh` CLI と GitHub 認証が使えるか、`build.yml` workflow が見えるかを確認します。
+
+`保存してBuild` は、Studio が扱う `config/KobitoKey.keymap`、left overlay、right overlay だけを保存し、その 3 ファイルだけを `git add` して commit / push してから build workflow を起動します。repository 内の他の変更は勝手に stage しません。
+
+`Build 起動` は、すでに GitHub へ push 済みの状態で workflow だけを再実行したい場合の操作です。GitHub Actions は GitHub 上の repository 内容から firmware を作るため、ローカルに保存しただけの変更は build に含まれません。
 
 Firmware repository URL を設定している場合、KobitoKey Studio は `gh -R owner/repo` 相当で対象 repository を明示して GitHub Actions を操作します。ローカルフォルダと GitHub repository が別の場合は、push 先と URL が一致しているか確認してください。
+
+推奨構成は、ユーザーごとの firmware repository を template から作成し、build logic は reusable workflow 側に寄せる形です。ユーザー repository には keymap / overlay と薄い `build.yml` だけを置くと、Studio からの自動 commit / push と相性がよくなります。
 
 ### 4.2 artifact を取得する
 
 1. GitHub Actions の build が成功したことを確認します。
-2. `artifact 取得` を押します。
-3. artifact は `KobitoKey_QWERTY/.kobitokey-studio/artifacts/` に保存されます。
-4. `UF2 / Volume 更新` を押して、取得済み UF2 と bootloader volume を再スキャンします。
+2. `Artifact 取得` を押します。
+3. Studio は最新の成功 run から artifact を取得します。
+4. artifact は `KobitoKey_QWERTY/.kobitokey-studio/artifacts/` に保存されます。
+5. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。
 
 左右それぞれの UF2 が生成されていることを確認してください。ファイル名で left / right を取り違えないようにします。
 
@@ -371,17 +380,15 @@ artifact を取得したら、古い UF2 と混ざっていないか確認しま
 
 KobitoKey の firmware は左右別々に書き込みます。
 
-1. 左側を USB で接続します。
-2. 左側を bootloader mode に入れます。
+1. Flash panel で `Left` を選びます。
+2. 左側を USB で接続し、bootloader mode に入れます。
 3. `UF2 / Volume 更新` を押します。
-4. left 用 UF2 と左側の bootloader volume を選びます。
-5. `UF2 をコピー` を押します。
-6. コピー先確認 dialog で、UF2 と volume が正しいことを確認します。
-7. 右側へ USB を差し替えます。
-8. 右側を bootloader mode に入れます。
-9. right 用 UF2 と右側の bootloader volume を選び、同じようにコピーします。
+4. `Left UF2 を bootloader にコピー` を押します。
+5. 右側へ USB を差し替えます。
+6. 右側を bootloader mode に入れます。
+7. `Right UF2 を bootloader にコピー` を押します。
 
-左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。それでも left UF2 と right UF2 の対応は必ず確認してください。
+左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合は、下の手動 UF2 / Bootloader 選択で確認しながらコピーしてください。
 
 ### 4.4 書き込み前の安全確認
 
