@@ -1447,7 +1447,11 @@ function App() {
         : targets.leftUf2 ?? targets.rightUf2 ?? targets.uf2Files[0] ?? "",
     );
     setSelectedVolume((current) =>
-      current && targets.bootloaderVolumes.includes(current) ? current : targets.bootloaderVolumes[0] ?? "",
+      current && targets.bootloaderVolumes.includes(current)
+        ? current
+        : targets.bootloaderVolumes.length === 1
+          ? targets.bootloaderVolumes[0]
+          : "",
     );
     return {
       uf2Files: targets.uf2Files,
@@ -1496,9 +1500,20 @@ function App() {
       return;
     }
 
-    const volumePath = selectedVolume || bootloaderVolumes[0] || "";
+    const volumePath = bootloaderVolumes.length === 1 ? bootloaderVolumes[0] : selectedVolume;
     if (!volumePath) {
-      setBuildStatus(`${sideLabel(side)} 側を bootloader に入れてから UF2 / Volume を更新してください`);
+      setBuildStatus(
+        bootloaderVolumes.length > 1
+          ? `複数の bootloader volume が見つかりました。${sideLabel(side)} 側の Bootloader を選択してください`
+          : `${sideLabel(side)} 側を bootloader に入れてから UF2 / Volume を更新してください`,
+      );
+      return;
+    }
+
+    const fileName = uf2Path.split("/").pop() ?? uf2Path;
+    const volumeName = volumePath.split("/").pop() ?? volumePath;
+    const confirmed = window.confirm(`${sideLabel(side)}: ${fileName} を ${volumeName} にコピーします。左右を確認してください。`);
+    if (!confirmed) {
       return;
     }
 
@@ -3341,7 +3356,11 @@ function BuildPanel({
         <button
           type="button"
           className="primary"
-          disabled={!firmwareUf2Targets[flashSide] || bootloaderVolumes.length === 0}
+          disabled={
+            !firmwareUf2Targets[flashSide] ||
+            bootloaderVolumes.length === 0 ||
+            (bootloaderVolumes.length > 1 && !selectedVolume)
+          }
           onClick={() => onFlashWizardCopy(flashSide)}
         >
           {sideLabel(flashSide)} UF2 をコピー
@@ -3993,7 +4012,11 @@ function BuildWorkbench({
           <button
             type="button"
             className="primary wide-action"
-            disabled={!firmwareUf2Targets[flashSide] || bootloaderVolumes.length === 0}
+            disabled={
+              !firmwareUf2Targets[flashSide] ||
+              bootloaderVolumes.length === 0 ||
+              (bootloaderVolumes.length > 1 && !selectedVolume)
+            }
             onClick={() => onFlashWizardCopy(flashSide)}
           >
             {sideLabel(flashSide)} UF2 を bootloader にコピー

@@ -101,8 +101,7 @@ fn latest_github_run(root: String, repo_url: Option<String>) -> Result<String, S
 fn download_latest_artifact(root: String, repo_url: Option<String>) -> Result<String, String> {
     let head_sha = current_git_head_sha(&root)?;
     let run_id = latest_successful_github_run_id(&root, repo_url.as_deref(), &head_sha)?;
-    let output_dir = PathBuf::from(&root).join(".kobitokey-studio/artifacts");
-    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+    let output_dir = prepare_artifact_output_dir(&root)?;
     run_gh_owned(
         &root,
         vec![
@@ -160,11 +159,7 @@ fn save_commit_push_and_trigger_build(
         None
     };
 
-    let push_output = if committed {
-        Some(run_git(&root, &["push", "-u", "origin", "HEAD"])?)
-    } else {
-        None
-    };
+    let push_output = Some(run_git(&root, &["push", "-u", "origin", "HEAD"])?);
 
     let build_output = trigger_github_build(root.clone(), repo_url)?;
     Ok(FirmwareBuildStart {
@@ -2227,6 +2222,15 @@ fn has_staged_changes_for_paths(root: &str, paths: &[&str]) -> Result<bool, Stri
     }
 }
 
+fn prepare_artifact_output_dir(root: &str) -> Result<PathBuf, String> {
+    let output_dir = PathBuf::from(root).join(".kobitokey-studio/artifacts");
+    if output_dir.exists() {
+        fs::remove_dir_all(&output_dir).map_err(|error| error.to_string())?;
+    }
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+    Ok(output_dir)
+}
+
 fn gh_args_with_repo(mut args: Vec<String>, repo_url: Option<&str>) -> Result<Vec<String>, String> {
     if let Some(repo) = repo_url.and_then(normalize_github_repo_arg) {
         args.push("-R".to_string());
@@ -2727,6 +2731,22 @@ mod tests {
             .expect("path-limited diff should run"));
 
         fs::remove_dir_all(root).expect("test repo should be removed");
+    }
+
+    #[test]
+    fn artifact_output_dir_is_cleared_before_download() {
+        let root = unique_test_dir("kobitokey-artifact-output");
+        let stale_dir = root.join(".kobitokey-studio/artifacts/old-run");
+        fs::create_dir_all(&stale_dir).expect("stale artifact dir should be created");
+        fs::write(stale_dir.join("left.uf2"), "old").expect("stale artifact should be written");
+
+        let output_dir = prepare_artifact_output_dir(&display_path(&root))
+            .expect("artifact output dir should be prepared");
+
+        assert!(output_dir.exists());
+        assert!(!output_dir.join("old-run/left.uf2").exists());
+
+        fs::remove_dir_all(root).expect("test artifact dir should be removed");
     }
 
     fn unique_test_dir(prefix: &str) -> PathBuf {
