@@ -46,11 +46,10 @@ For end-user steps, start with the published docs:
 - Trigger GitHub Actions builds through the Tauri backend
 - Download build artifacts and guide UF2 copying to bootloader volumes
 
-Direct Mode supports key binding writes in both browser and desktop builds.
-Combo and Trackball are reference-only in Direct Mode because the current
-KobitoKey firmware does not expose runtime Studio RPCs for those settings.
-Browser Direct Mode uses Web Serial / Web Bluetooth and requires Chrome or Edge
-from localhost or HTTPS.
+Direct Mode currently supports key binding writes in both browser and desktop
+builds. Direct Combo and Trackball writes are desktop-only; browser Direct Mode
+shows read-only fallback data or unsupported states when the Web client package
+does not expose the required RPC.
 
 ## Stack
 

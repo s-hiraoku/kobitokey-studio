@@ -17,7 +17,7 @@ permalink: /quick-start/
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | ❌ 初版では無効化(`Firmware` トグルが disabled) |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 利用可 |
 
-初版リリースのブラウザ版は **Direct Mode 専用** です。キーの Direct 書き込みを Chrome / Edge から利用できます。Combo と Trackball は Direct Mode では参照のみです。
+初版リリースのブラウザ版は **Direct Mode 専用** です。Combo の書き込みと Trackball 設定はデスクトップ版でのみ利用できます。
 
 スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
 
@@ -26,8 +26,7 @@ permalink: /quick-start/
 | 目的 | 選ぶもの |
 | --- | --- |
 | キーを 1 個だけ実機へすぐ書き込みたい | `Direct Mode`(ブラウザ / デスクトップ) |
-| Combo を書き込みたい | `Firmware Mode`(デスクトップ版のみ) |
-| Trackball を調整したい | `Firmware Mode`(デスクトップ版のみ)。Direct Mode では参照のみ |
+| Combo を書き込みたい、Trackball を調整したい | `Direct Mode`(デスクトップ版のみ) |
 | keymap / overlay ファイルを編集して GitHub Actions build まで進めたい | `Firmware Mode`(デスクトップ版のみ) |
 
 迷ったら、まずはブラウザの Direct Mode で 1 キーを書き換えてみてください。
