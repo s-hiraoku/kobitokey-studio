@@ -42,6 +42,7 @@ const STANDARD_BEHAVIOR_BINDINGS = new Set([
 const CUSTOM_BEHAVIOR_IDS: Record<string, string> = {
   "&zoom_hold": "22",
 };
+const CUSTOM_LAYER_TAP_BEHAVIORS = new Set(["&lt_left_thumb", "&lt_right_thumb"]);
 export type StudioKeymap = {
   deviceName: string;
   serialNumber: string;
@@ -335,6 +336,9 @@ function isCustomComparableBinding(bindingName: string | undefined): boolean {
 
 function normalizeComparableBinding(binding: string): string {
   const parts = normalizeDirectBindingForDisplay(binding).trim().split(/\s+/);
+  if (CUSTOM_LAYER_TAP_BEHAVIORS.has(parts[0])) {
+    return normalizeComparableParts(["&lt", parts[1], parts[2]], [2]);
+  }
   switch (parts[0]) {
     case "&kp":
     case "&kt":
@@ -359,7 +363,19 @@ function normalizeComparableParts(parts: string[], keycodeIndexes: number[]): st
 }
 
 function normalizeComparableKeycode(value: string): string {
-  return normalizeKeycodeName(value);
+  const decimalHidUsage = parseDecimalHidUsage(value);
+  return normalizeKeycodeName(decimalHidUsage ?? value);
+}
+
+function parseDecimalHidUsage(value: string): string | undefined {
+  if (!/^\d+$/.test(value)) {
+    return undefined;
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) {
+    return undefined;
+  }
+  return `0x${number.toString(16).padStart(8, "0")}`;
 }
 
 export function completeStudioBindings(bindings: string[]): string[] {

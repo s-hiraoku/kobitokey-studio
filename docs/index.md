@@ -20,7 +20,8 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 | --- | --- | --- |
 | すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右 UF2 を書き込み |
 | キーを少しだけ素早く変えたい | Direct Mode | USB 推奨。Bluetooth は見つかる場合のみ → 実機へ書き込み |
-| Combo やトラックボールも実機へ直接保存したい | Direct Mode + Tauri版 | Tauri デスクトップ版で読み込み → 保存 |
+| Combo を変更したい | Firmware Mode | `KobitoKey.keymap` を編集 → build + flash |
+| トラックボールを変更したい | Firmware Mode | 左右 overlay を編集 → build + flash。Direct Mode では参照のみ |
 
 迷ったら `Firmware Mode` を使ってください。ファイルに残るため見直しやすく、Direct Mode 未対応の設定も扱えます。
 
@@ -76,8 +77,8 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 | トラックボール設定をファイルとして編集する | Firmware Mode | 左右 overlay ファイル |
 | ファームウェアをビルドして UF2 を焼く | Firmware Mode | 左右の bootloader volume |
 | 実機へキー binding を即時保存する | Direct Mode | ZMK Studio 対応 device |
-| 実機の Combo を直接編集する | Direct Mode + Tauri | ZMK Studio 対応 device |
-| 実機のトラックボール感度を直接編集する | Direct Mode + Tauri | ZMK Studio 対応 device |
+| Combo を確認する | Direct Mode | Firmware keymap を参照表示 |
+| トラックボール感度を確認する | Direct Mode | Firmware overlay を参照表示 |
 
 ## 作業の全体像
 
