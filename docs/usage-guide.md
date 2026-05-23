@@ -626,7 +626,7 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 
 ### Trackball が Direct Mode で保存できない
 
-firmware に Trackball RPC が含まれていない可能性があります。デスクトップ版の Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。
+firmware に Trackball RPC が含まれていません。デスクトップ版の Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。
 
 ### GitHub Actions build が起動できない
 
