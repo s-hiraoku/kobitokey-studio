@@ -80,7 +80,11 @@ import {
   connectWebStudioDevice,
   disconnectWebStudioDevice,
   DirectTrackballSettings,
+  addWebStudioCombo,
   readWebTrackballSettings,
+  readWebStudioCombos,
+  removeWebStudioCombo,
+  setWebStudioCombo,
   StudioConnectionKind,
   supportsWebStudioConnection,
   writeWebStudioKey,
@@ -266,8 +270,11 @@ function App() {
   const [directKeymap, setDirectKeymap] = React.useState<StudioKeymap | null>(null);
   const [directKeyDrafts, setDirectKeyDrafts] = React.useState<Record<string, DirectKeyDraft>>({});
   const [directTrackball, setDirectTrackball] = React.useState<DirectTrackballSettings | null>(null);
+  const [directTrackballError, setDirectTrackballError] = React.useState("");
   const [directCombos, setDirectCombos] = React.useState<DirectCombo[]>([]);
+  const [directComboDrafts, setDirectComboDrafts] = React.useState<Record<string, DirectCombo>>({});
   const [directComboSource, setDirectComboSource] = React.useState<DirectComboSource>("none");
+  const [directComboError, setDirectComboError] = React.useState("");
   const [directMaxCombos, setDirectMaxCombos] = React.useState(0);
   const [bindingDraft, setBindingDraft] = React.useState("");
   const [directKeyWriteFeedback, setDirectKeyWriteFeedback] = React.useState<DirectKeyWriteFeedback>({
@@ -327,14 +334,22 @@ function App() {
     [directKeyDrafts],
   );
   const directParsedKeymap = React.useMemo(
-    () => (directDraftKeymap ? studioKeymapToParsedKeymap(directDraftKeymap, directCombos) : firmwareParsedKeymap),
-    [directCombos, directDraftKeymap, firmwareParsedKeymap],
+    () =>
+      directDraftKeymap
+        ? studioKeymapToParsedKeymap(
+            directDraftKeymap,
+            directComboSource === "device"
+              ? applyDirectComboDrafts(directCombos, directComboDrafts)
+              : firmwareParsedKeymap.combos,
+          )
+        : firmwareParsedKeymap,
+    [directComboDrafts, directComboSource, directCombos, directDraftKeymap, firmwareParsedKeymap],
   );
   const parsedKeymap = isDirectMode ? directParsedKeymap : firmwareParsedKeymap;
   const layers = parsedKeymap.layers;
   const combos = parsedKeymap.combos;
   const activeCombos = combos;
-  const displayedDirectComboSource: DirectComboSource = directKeymap ? directComboSource : "firmware";
+  const displayedDirectComboSource: DirectComboSource = directComboSource === "device" ? "device" : "firmware";
   const displayedDirectMaxCombos = directKeymap ? directMaxCombos : activeCombos.length;
   const directFirmwareDiffs = React.useMemo(
     () => diffDirectKeymapAgainstFirmware(directKeymap, firmwareParsedKeymap),
@@ -370,8 +385,8 @@ function App() {
     [activeCombos, selectedKeyIndex],
   );
   const selectedCombo = React.useMemo(
-    () => activeCombos.find((combo) => combo.id === selectedComboId) ?? selectedCombos[0] ?? activeCombos[0],
-    [activeCombos, selectedComboId, selectedCombos],
+    () => activeCombos.find((combo) => combo.id === selectedComboId),
+    [activeCombos, selectedComboId],
   );
   const trackball = React.useMemo(
     () => parseTrackballSettings(files?.leftOverlay ?? "", files?.rightOverlay ?? ""),
@@ -746,8 +761,11 @@ function App() {
     setDirectKeymap(session.keymap);
     setDirectKeyDrafts({});
     setDirectTrackball(null);
+    setDirectTrackballError("");
     setDirectCombos([]);
+    setDirectComboDrafts({});
     setDirectComboSource("none");
+    setDirectComboError("");
     setDirectMaxCombos(0);
     directWriteRequestRef.current += 1;
     setDirectKeyWriteFeedback({ kind: "idle", message: "" });
@@ -781,8 +799,6 @@ function App() {
           lockState: session.keymap.lockState,
           keymap: session.keymap,
         });
-        await refreshDirectCombos(kind, "", { silent: true });
-        await refreshDirectTrackballSettings(kind, "", { silent: true });
       } catch (error) {
         const issue = formatDirectConnectionIssue({
           kind,
@@ -858,8 +874,6 @@ function App() {
         lockState: session.keymap.lockState,
         keymap: session.keymap,
       });
-      await refreshDirectCombos(kind, session.portPath || "", { silent: true });
-      await refreshDirectTrackballSettings(kind, session.portPath || "", { silent: true });
     } catch (error) {
       const issue = formatDirectConnectionIssue({
         kind,
@@ -894,6 +908,7 @@ function App() {
     setDirectKeymap(null);
     setDirectKeyDrafts({});
     setDirectTrackball(null);
+    setDirectTrackballError("");
     setDirectCombos([]);
     setDirectComboSource("none");
     setDirectMaxCombos(0);
@@ -1042,6 +1057,7 @@ function App() {
     }
 
     try {
+      setDirectTrackballError("");
       const settings = isDesktopRuntime
         ? await invoke<DirectTrackballSettings>("read_studio_trackball_settings", {
             kind,
@@ -1053,8 +1069,11 @@ function App() {
         setStatus(`Trackball 設定を ${kind.toUpperCase()} から読み込みました`);
       }
     } catch (error) {
+      const errorMessage = formatError(error);
+      setDirectTrackballError(errorMessage);
+      setDirectTrackball(null);
       if (!options.silent) {
-        setStatus(`Trackball 読み込み失敗: ${formatError(error)}`);
+        setStatus(`Trackball 読み込み失敗: ${errorMessage}`);
       }
     }
   }
@@ -1074,9 +1093,12 @@ function App() {
           })
         : await writeWebTrackballSettings(settings);
       setDirectTrackball(nextSettings);
+      setDirectTrackballError("");
       setStatus("Trackball 設定を実機へ保存し、再読み込みしました");
     } catch (error) {
-      setStatus(`Trackball 保存失敗: ${formatError(error)}`);
+      const errorMessage = formatError(error);
+      setDirectTrackballError(errorMessage);
+      setStatus(`Trackball 保存失敗: ${errorMessage}`);
     }
   }
 
@@ -1092,34 +1114,31 @@ function App() {
       return;
     }
 
-    if (!isDesktopRuntime) {
-      const fallbackApplied = applyFirmwareComboFallback();
-      if (!options.silent) {
-        setStatus(
-          fallbackApplied
-            ? "Web Direct では Combo RPC が未公開のため、Firmware keymap の Combo を読み取り専用で表示しています。"
-            : "Web Direct では Combo RPC が未公開です。Combo 編集は Tauri デスクトップアプリで利用してください。",
-        );
-      }
-      return;
+    setDirectComboError("");
+    if (!options.silent) {
+      setStatus("Combo を実機から読み込み中...");
     }
 
     try {
-      const comboSet = await invoke<StudioComboSet>("read_studio_combos", {
-        kind,
-        portPath: portPath || null,
-      });
+      const comboSet = isDesktopRuntime
+        ? await invoke<StudioComboSet>("read_studio_combos", {
+            kind,
+            portPath: portPath || null,
+          })
+        : await readWebStudioCombos();
       applyDirectComboSet(comboSet, "device");
       if (!options.silent) {
         setStatus(`Combo ${comboSet.combos.length} 件を実機から読み込みました`);
       }
     } catch (error) {
+      const errorMessage = formatError(error);
+      setDirectComboError(errorMessage);
       const fallbackApplied = applyFirmwareComboFallback();
       if (!options.silent) {
         setStatus(
           fallbackApplied
-            ? `Direct Combo 読み込み失敗: ${formatError(error)}。Firmware keymap の Combo を表示しています。`
-            : `Combo 読み込み失敗: ${formatError(error)}`,
+            ? `Direct Combo 読み込み失敗: ${errorMessage}。Firmware keymap の Combo を表示しています。`
+            : `Combo 読み込み失敗: ${errorMessage}`,
         );
       }
     }
@@ -1165,6 +1184,52 @@ function App() {
     });
   }
 
+  function stageDirectCombo(combo: KeymapCombo, input: ComboFormValue, options: { silent?: boolean } = {}) {
+    const keyPositions = parseDisplayKeyPositions(input.keyPositions);
+    if (keyPositions.length < 2) {
+      if (!options.silent) {
+        setStatus("combo には2つ以上のキーが必要です");
+      }
+      return;
+    }
+
+    const directCombo = directCombos.find((candidate) => candidate.id === combo.id);
+    if (!directCombo) {
+      if (!options.silent) {
+        setStatus("Direct Combo の対象が見つかりません");
+      }
+      return;
+    }
+
+    const nextCombo: DirectCombo = {
+      ...directCombo,
+      binding: input.binding,
+      keyPositions,
+      timeoutMs: input.timeoutMs,
+    };
+    setDirectComboDrafts((current) => {
+      if (sameDirectComboDraft(directCombo, nextCombo)) {
+        if (!current[combo.id]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[combo.id];
+        return next;
+      }
+      if (current[combo.id] && sameDirectComboDraft(current[combo.id], nextCombo)) {
+        return current;
+      }
+      return {
+        ...current,
+        [combo.id]: nextCombo,
+      };
+    });
+    setSelectedComboId(combo.id);
+    if (!options.silent) {
+      setStatus(`${combo.id} の編集内容を表示に反映しました`);
+    }
+  }
+
   async function removeDirectCombo(combo: KeymapCombo) {
     const directCombo = directCombos.find((candidate) => candidate.id === combo.id);
     if (!directCombo) {
@@ -1178,12 +1243,8 @@ function App() {
   }
 
   async function writeDirectComboCommand(command: string, payload: Record<string, unknown>) {
-    if (!directKeymap || !selectedStudioPort) {
+    if (!directKeymap || (isDesktopRuntime && !selectedStudioPort)) {
       setStatus("Direct Mode で接続中の device がありません");
-      return;
-    }
-    if (!isDesktopRuntime) {
-      setStatus("Direct Combo は現在 Tauri デスクトップアプリで利用してください。");
       return;
     }
     if (directComboSource === "firmware") {
@@ -1192,16 +1253,34 @@ function App() {
     }
 
     try {
-      const comboSet = await invoke<StudioComboSet>(command, {
-        kind: studioConnectionKind,
-        portPath: selectedStudioPort || null,
-        ...payload,
-      });
+      const comboSet = isDesktopRuntime
+        ? await invoke<StudioComboSet>(command, {
+            kind: studioConnectionKind,
+            portPath: selectedStudioPort || null,
+            ...payload,
+          })
+        : await writeWebDirectComboCommand(command, payload);
       applyDirectComboSet(comboSet, "device");
+      setDirectComboError("");
       setStatus("Combo を実機へ保存し、再読み込みしました");
     } catch (error) {
-      setStatus(`Direct Combo 書き込み失敗: ${formatError(error)}`);
+      const errorMessage = formatError(error);
+      setDirectComboError(errorMessage);
+      setStatus(`Direct Combo 書き込み失敗: ${errorMessage}`);
     }
+  }
+
+  async function writeWebDirectComboCommand(command: string, payload: Record<string, unknown>): Promise<StudioComboSet> {
+    if (command === "add_studio_combo") {
+      return addWebStudioCombo(payload.combo as Parameters<typeof addWebStudioCombo>[0]);
+    }
+    if (command === "set_studio_combo") {
+      return setWebStudioCombo(payload.index as number, payload.combo as Parameters<typeof setWebStudioCombo>[1]);
+    }
+    if (command === "remove_studio_combo") {
+      return removeWebStudioCombo(payload.index as number);
+    }
+    throw new Error(`Unsupported Web Direct Combo command: ${command}`);
   }
 
   function applyDirectComboSet(comboSet: StudioComboSet, source: DirectComboSource) {
@@ -1218,9 +1297,13 @@ function App() {
       blockEnd: combo.index,
     }));
     setDirectCombos(nextCombos);
+    setDirectComboDrafts({});
     setDirectComboSource(source);
+    if (source === "device") {
+      setDirectComboError("");
+    }
     setDirectMaxCombos(comboSet.maxCombos);
-    setSelectedComboId((current) => current && nextCombos.some((combo) => combo.id === current) ? current : nextCombos[0]?.id ?? null);
+    setSelectedComboId((current) => current && nextCombos.some((combo) => combo.id === current) ? current : null);
   }
 
   function applyFirmwareComboFallback(): boolean {
@@ -1742,7 +1825,6 @@ function App() {
               isDesktopRuntime={isDesktopRuntime}
               keymap={directKeymap}
               portPath={selectedStudioPort}
-              trackballAvailable={directTrackball !== null}
             />
           ) : null}
           <div className="panel-heading">
@@ -1854,25 +1936,25 @@ function App() {
               binding={bindingDraft}
               combos={activeCombos}
               comboSource={displayedDirectComboSource}
+              comboError={directComboError}
               connectionState={studioConnectionState}
               maxCombos={displayedDirectMaxCombos}
+              canOpenFirmwareMode={isDesktopRuntime}
               keyIndex={selectedKeyIndex}
               onApply={applyBinding}
               onCreateCombo={createDirectCombo}
               onDeleteCombo={removeDirectCombo}
               onFirmwareMode={() => setEditorMode("firmware")}
+              onPreviewCombo={stageDirectCombo}
               onRefreshCombos={() => refreshDirectCombos()}
-              onRefreshTrackball={() => refreshDirectTrackballSettings()}
               onSaveCombo={saveDirectCombo}
-              onSaveTrackball={saveDirectTrackballSettings}
               onSelectCombo={setSelectedComboId}
               selectedCombo={selectedCombo}
               selectedCombos={selectedCombos}
               selectedBinding={selectedDeviceBinding}
-              trackball={directTrackball}
-              canWriteCombos={isDesktopRuntime}
+              firmwareTrackball={trackball}
+              canWriteCombos={Boolean(directKeymap)}
               canEditKey={Boolean(directKeymap)}
-              canWriteTrackball={isDesktopRuntime}
               keyWriteFeedback={directKeyWriteFeedback}
             />
           ) : (
@@ -2164,64 +2246,66 @@ function KeyboardGrid({
   onSelect: (index: number) => void;
 }) {
   return (
-    <div className="keyboard-viewport">
-      <div
-        className="keyboard-layout"
-        style={
-          {
-            "--layout-width": `${LAYOUT_WIDTH}px`,
-            "--layout-height": `${LAYOUT_HEIGHT}px`,
-          } as React.CSSProperties
-        }
-      >
-        <svg className="base-outline matrix-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
-          <path d={matrixBasePath} />
-          <path d={matrixBasePath} transform={rightMirrorTransform} />
-        </svg>
-        <svg className="base-outline thumb-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
-          <path d={trackballBasePath} />
-          <path d={thumbBasePath} />
-          <path d={trackballBasePath} transform={rightMirrorTransform} />
-          <path d={thumbBasePath} transform={rightMirrorTransform} />
-        </svg>
-        {trackballs.map((trackball) => (
-          <div
-            key={trackball.side}
-            className={`trackball ${trackball.side}`}
-            style={{
-              left: trackball.x,
-              top: trackball.y,
-              transform: `rotate(${trackball.rotation}deg)`,
-            }}
-          >
-            <i className="track-button" />
-            <i className="track-led led-a" />
-            <span />
-          </div>
-        ))}
-        <ComboOverlay
-          combos={combos}
-          selectedComboId={selectedComboId}
-          selectedKeyIndex={selectedKeyIndex}
-          onSelect={onComboSelect}
-        />
-        {kobitoKeyPhysicalLayout.map((key) => (
-          <PhysicalKeyButton
-            key={`${key.side}-${key.index}`}
-            binding={layer?.bindings[key.index] ?? ""}
-            index={key.index}
-            isDraft={draftKeyIndexes?.has(key.index) ?? false}
-            isSelected={key.index === selectedKeyIndex}
-            kind={key.kind}
-            left={key.x}
-            rotation={key.rotation ?? 0}
-            side={key.side}
-            top={key.y}
-            width={key.width ?? KEY_UNIT}
-            height={key.height ?? KEY_UNIT}
-            onSelect={onSelect}
+    <div
+      className="keyboard-viewport"
+      style={
+        {
+          "--layout-width": `${LAYOUT_WIDTH}px`,
+          "--layout-height": `${LAYOUT_HEIGHT}px`,
+        } as React.CSSProperties
+      }
+    >
+      <div className="keyboard-scroll-content">
+        <div className="keyboard-layout">
+          <svg className="base-outline matrix-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
+            <path d={matrixBasePath} />
+            <path d={matrixBasePath} transform={rightMirrorTransform} />
+          </svg>
+          <svg className="base-outline thumb-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
+            <path d={trackballBasePath} />
+            <path d={thumbBasePath} />
+            <path d={trackballBasePath} transform={rightMirrorTransform} />
+            <path d={thumbBasePath} transform={rightMirrorTransform} />
+          </svg>
+          {trackballs.map((trackball) => (
+            <div
+              key={trackball.side}
+              className={`trackball ${trackball.side}`}
+              style={{
+                left: trackball.x,
+                top: trackball.y,
+                transform: `rotate(${trackball.rotation}deg)`,
+              }}
+            >
+              <i className="track-button" />
+              <i className="track-led led-a" />
+              <span />
+            </div>
+          ))}
+          <ComboOverlay
+            combos={combos}
+            selectedComboId={selectedComboId}
+            selectedKeyIndex={selectedKeyIndex}
+            onSelect={onComboSelect}
           />
-        ))}
+          {kobitoKeyPhysicalLayout.map((key) => (
+            <PhysicalKeyButton
+              key={`${key.side}-${key.index}`}
+              binding={layer?.bindings[key.index] ?? ""}
+              index={key.index}
+              isDraft={draftKeyIndexes?.has(key.index) ?? false}
+              isSelected={key.index === selectedKeyIndex}
+              kind={key.kind}
+              left={key.x}
+              rotation={key.rotation ?? 0}
+              side={key.side}
+              top={key.y}
+              width={key.width ?? KEY_UNIT}
+              height={key.height ?? KEY_UNIT}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2737,7 +2821,6 @@ function DirectConnectionBar({
   isDesktopRuntime,
   keymap,
   portPath,
-  trackballAvailable,
 }: {
   comboSource: DirectComboSource;
   connectionKind: StudioConnectionKind;
@@ -2745,7 +2828,6 @@ function DirectConnectionBar({
   isDesktopRuntime: boolean;
   keymap: StudioKeymap | null;
   portPath: string;
-  trackballAvailable: boolean;
 }) {
   return (
     <div className="direct-connection-bar">
@@ -2765,7 +2847,6 @@ function DirectConnectionBar({
         compact
         comboSource={comboSource}
         isDesktopRuntime={isDesktopRuntime}
-        trackballAvailable={trackballAvailable}
       />
     </div>
   );
@@ -2870,26 +2951,18 @@ function DirectCapabilityStrip({
   comboSource,
   isDesktopRuntime,
   keyWritable = true,
-  trackballAvailable,
 }: {
   compact?: boolean;
   comboSource?: DirectComboSource;
   isDesktopRuntime: boolean;
   keyWritable?: boolean;
-  trackballAvailable?: boolean;
 }) {
-  const comboState = !isDesktopRuntime
-    ? { className: "read", label: "読取のみ" }
-    : comboSource === undefined || comboSource === "device"
+  const comboState = comboSource === undefined || comboSource === "device"
       ? { className: "ok", label: "書込可" }
       : comboSource === "firmware"
         ? { className: "read", label: "参照中" }
         : { className: "pending", label: "確認中" };
-  const trackballState = !isDesktopRuntime
-    ? { className: "none", label: "未対応" }
-    : trackballAvailable === undefined || trackballAvailable
-      ? { className: "ok", label: "書込可" }
-      : { className: "pending", label: "確認中" };
+  const trackballState = { className: "read", label: "未対応" };
 
   return (
     <ul className={`direct-capability-strip ${compact ? "compact" : ""}`} aria-label="この環境でできること">
@@ -3085,7 +3158,7 @@ function DirectWelcome({
         />
         {!isDesktopRuntime ? (
           <p className="direct-capability-note">
-            コンボの書き込みとトラックボール設定はデスクトップ版でのみ可能です。
+            ブラウザ版では key の Direct 書き込みを試せます。Combo と Trackball は参照のみです。USB 接続を推奨します。
           </p>
         ) : null}
       </div>
@@ -3197,7 +3270,12 @@ function FirmwareInspectorTabs({
         </section>
       ) : activeTab === "combo" ? (
         <div className="firmware-tab-stack">
-          <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelectCombo} />
+          <ComboPanel
+            combos={combos}
+            selectedComboId={combo?.id ?? null}
+            selectedCombos={selectedCombos}
+            onSelect={onSelectCombo}
+          />
           <ComboEditor
             combo={combo}
             onCreate={onCreateCombo}
@@ -3402,9 +3480,10 @@ function BuildPanel({
 
 function DirectInspectorTabs({
   binding,
+  canOpenFirmwareMode,
   canWriteCombos,
   canEditKey,
-  canWriteTrackball,
+  comboError,
   combos,
   comboSource,
   connectionState,
@@ -3415,20 +3494,20 @@ function DirectInspectorTabs({
   onCreateCombo,
   onDeleteCombo,
   onFirmwareMode,
+  onPreviewCombo,
   onRefreshCombos,
-  onRefreshTrackball,
   onSaveCombo,
-  onSaveTrackball,
   onSelectCombo,
   selectedCombo,
   selectedCombos,
   selectedBinding,
-  trackball,
+  firmwareTrackball,
 }: {
   binding: string;
+  canOpenFirmwareMode: boolean;
   canWriteCombos: boolean;
   canEditKey: boolean;
-  canWriteTrackball: boolean;
+  comboError: string;
   combos: KeymapCombo[];
   comboSource: DirectComboSource;
   connectionState: StudioConnectionState;
@@ -3439,15 +3518,14 @@ function DirectInspectorTabs({
   onCreateCombo: () => void;
   onDeleteCombo: (combo: KeymapCombo) => void;
   onFirmwareMode: () => void;
+  onPreviewCombo: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
   onRefreshCombos: () => void;
-  onRefreshTrackball: () => void;
   onSaveCombo: (combo: KeymapCombo, input: ComboFormValue) => void;
-  onSaveTrackball: (settings: DirectTrackballSettings) => void;
   onSelectCombo: (comboId: string) => void;
   selectedCombo?: KeymapCombo;
   selectedCombos: KeymapCombo[];
   selectedBinding: string;
-  trackball: DirectTrackballSettings | null;
+  firmwareTrackball: TrackballSettings;
 }) {
   const [activeTab, setActiveTab] = React.useState<"key" | "combo" | "trackball" | "timing">("key");
   const tabLabels: Array<{ id: "key" | "combo" | "trackball" | "timing"; icon: React.ReactNode; label: string }> = [
@@ -3456,6 +3534,9 @@ function DirectInspectorTabs({
     { id: "trackball", icon: <MousePointer size={13} />, label: "Trackball" },
     { id: "timing", icon: <Clock size={13} />, label: "Timing" },
   ];
+  const activateTab = (tabId: "key" | "combo" | "trackball" | "timing") => {
+    setActiveTab(tabId);
+  };
 
   return (
     <section className="direct-inspector">
@@ -3465,7 +3546,7 @@ function DirectInspectorTabs({
             type="button"
             key={tab.id}
             className={activeTab === tab.id ? "active" : ""}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => activateTab(tab.id)}
           >
             {tab.icon}
             {tab.label}
@@ -3491,13 +3572,16 @@ function DirectInspectorTabs({
         </div>
       ) : activeTab === "combo" ? (
         <DirectComboPanel
+          canOpenFirmwareMode={canOpenFirmwareMode}
           canWrite={canWriteCombos}
+          comboError=""
           combos={combos}
           connectionState={connectionState}
           comboSource={comboSource}
           maxCombos={maxCombos}
           onCreate={onCreateCombo}
           onDelete={onDeleteCombo}
+          onPreview={onPreviewCombo}
           onRefresh={onRefreshCombos}
           onSave={onSaveCombo}
           onSelect={onSelectCombo}
@@ -3506,12 +3590,9 @@ function DirectInspectorTabs({
         />
       ) : activeTab === "trackball" ? (
         <DirectTrackballPanel
-          canWrite={canWriteTrackball}
-          connectionState={connectionState}
+          canOpenFirmwareMode={canOpenFirmwareMode}
           onFirmwareMode={onFirmwareMode}
-          onRefresh={onRefreshTrackball}
-          onSave={onSaveTrackball}
-          settings={trackball}
+          firmwareSettings={firmwareTrackball}
         />
       ) : (
         <DirectTimingPanel />
@@ -3521,117 +3602,88 @@ function DirectInspectorTabs({
 }
 
 function DirectTrackballPanel({
-  canWrite,
-  connectionState,
+  canOpenFirmwareMode,
   onFirmwareMode,
-  onRefresh,
-  onSave,
-  settings,
+  firmwareSettings,
 }: {
-  canWrite: boolean;
-  connectionState: StudioConnectionState;
+  canOpenFirmwareMode: boolean;
   onFirmwareMode: () => void;
-  onRefresh: () => void;
-  onSave: (settings: DirectTrackballSettings) => void;
-  settings: DirectTrackballSettings | null;
+  firmwareSettings: TrackballSettings;
 }) {
-  const [form, setForm] = React.useState<DirectTrackballSettings>(() => settings ?? defaultDirectTrackballSettings());
-  const connected = connectionState === "connected";
-  const canSave = connected && canWrite && settings !== null;
-
-  React.useEffect(() => {
-    if (settings) {
-      setForm(settings);
-    }
-  }, [settings]);
-
-  function updateScale(kind: "cursor" | "scroll", value: number) {
-    const scale = numberToScale(value);
-    setForm((current) => ({
-      ...current,
-      [`${kind}Numerator`]: scale.numerator,
-      [`${kind}Denominator`]: scale.denominator,
-    }));
-  }
-
   return (
     <div className="direct-settings-panel direct-trackball-panel">
       <div className="direct-settings-heading">
         <div>
-          <strong>Trackball Direct Write</strong>
-          <p>CPI と cursor / scroll 感度を USB または Bluetooth 経由で実機へ保存します。</p>
+          <strong>Trackball Reference</strong>
+          <p>Direct Mode では Trackball 設定を実機へ書き込まず、firmware overlay の値を参照表示します。</p>
         </div>
-        <button type="button" onClick={onRefresh} disabled={!connected || !canWrite}>
-          <RefreshCw size={15} />
-          読み込み
-        </button>
       </div>
 
-      <label className="direct-number-field">
-        <span>CPI</span>
-        <input
-          disabled={!canWrite || settings === null}
-          type="number"
-          min={100}
-          max={3200}
-          step={50}
-          value={form.cpi}
-          onChange={(event) => setForm({ ...form, cpi: Number(event.target.value) })}
-        />
-      </label>
-
-      <ScaleSlider
-        disabled={!canWrite || settings === null}
-        label="Cursor sensitivity"
-        value={scaleToNumber(form.cursorNumerator, form.cursorDenominator)}
-        onChange={(value) => updateScale("cursor", value)}
-      />
-      <ScaleSlider
-        disabled={!canWrite || settings === null}
-        label="Scroll sensitivity"
-        value={scaleToNumber(form.scrollNumerator, form.scrollDenominator)}
-        onChange={(value) => updateScale("scroll", value)}
-      />
-
-      <div className="timing-actions">
-        <button type="button" disabled={!canSave} onClick={() => onSave(form)}>
-          デバイスに保存
-        </button>
-        <button type="button" onClick={() => setForm(settings ?? defaultDirectTrackballSettings())}>
-          リセット
-        </button>
+      <div className="trackball-reference-summary" aria-label="Trackball Direct Mode status">
+        <div>
+          <span>Direct write</span>
+          <strong>未対応</strong>
+        </div>
+        <div>
+          <span>表示元</span>
+          <strong>Firmware overlay</strong>
+        </div>
+        <div>
+          <span>反映方法</span>
+          <strong>build + flash</strong>
+        </div>
       </div>
-      {!connected ? <p className="empty-note">接続パネルから USB または Bluetooth で接続すると保存できます。</p> : null}
-      {connected && !canWrite ? <p className="empty-note">Web Direct では Trackball RPC が未公開です。Tauri デスクトップアプリでは実機へ保存できます。</p> : null}
-      {connected && canWrite && settings === null ? <p className="empty-note">まず読み込みを実行してください。RPC が firmware にない場合は Firmware Mode で編集します。</p> : null}
-      <button type="button" className="wide-action" onClick={onFirmwareMode}>
-        Firmware Mode の詳細設定を開く
-      </button>
+
+      <div className="combo-write-warning">
+        <strong>Trackball は Direct Mode 未対応です</strong>
+        <span>現在の KobitoKey firmware は Trackball 設定を Studio RPC で runtime 保存できないため、この画面では参照のみ行います。</span>
+        <small>
+          {canOpenFirmwareMode
+            ? "変更する場合は Firmware Mode で左右 overlay を編集し、firmware を build + flash してください。"
+            : "変更する場合はデスクトップ版の Firmware Mode で左右 overlay を編集し、firmware を build + flash してください。"}
+        </small>
+      </div>
+
+      <div className="trackball-reference-mode">
+        <TrackballPanel settings={firmwareSettings} />
+      </div>
+
+      {canOpenFirmwareMode ? (
+        <button type="button" className="wide-action" onClick={onFirmwareMode}>
+          Firmware Mode で Trackball を編集
+        </button>
+      ) : null}
     </div>
   );
 }
 
 function DirectComboPanel({
+  canOpenFirmwareMode,
   canWrite,
+  comboError,
   combos,
   connectionState,
   comboSource,
   maxCombos,
   onCreate,
   onDelete,
+  onPreview,
   onRefresh,
   onSave,
   onSelect,
   selectedCombo,
   selectedCombos,
 }: {
+  canOpenFirmwareMode: boolean;
   canWrite: boolean;
+  comboError: string;
   combos: KeymapCombo[];
   connectionState: StudioConnectionState;
   comboSource: DirectComboSource;
   maxCombos: number;
   onCreate: () => void;
   onDelete: (combo: KeymapCombo) => void;
+  onPreview: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
   onRefresh: () => void;
   onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
   onSelect: (comboId: string) => void;
@@ -3640,41 +3692,82 @@ function DirectComboPanel({
 }) {
   const connected = connectionState === "connected";
   const firmwareFallback = comboSource === "firmware";
-  const comboWritable = connected && canWrite && comboSource === "device";
+  const comboWritable = false;
   return (
     <div className="direct-combo-panel">
       <div className="direct-settings-panel">
         <div className="direct-settings-heading">
           <div>
-            <strong>Combo Direct Write</strong>
+            <strong>Combo Reference</strong>
             <p>
-              実機の Combo を読み込み、追加・更新・削除します。保存後は device から再読み込みして画面と同期します。
+              Direct Mode では firmware keymap の Combo を参照表示します。Combo の変更は
+              {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で編集し、build + flash で反映します。
             </p>
           </div>
-          <button type="button" onClick={onRefresh} disabled={!connected}>
-            <RefreshCw size={15} />
-            読み込み
-          </button>
         </div>
         <div className="direct-combo-meter">
           <span>{combos.length} combos</span>
-          <span>{firmwareFallback ? "Firmware keymap" : maxCombos > 0 ? `max ${maxCombos}` : "max unknown"}</span>
+          <span>Firmware keymap</span>
         </div>
-        {!connected ? <p className="empty-note">接続パネルから USB または Bluetooth で接続すると編集できます。</p> : null}
-        {connected && !canWrite ? <p className="empty-note">Web Direct では Combo RPC が未公開です。Firmware keymap の内容を読み取り専用で確認できます。</p> : null}
-        {firmwareFallback ? <p className="empty-note">Direct Combo RPC が読めないため、Firmware keymap の Combo を表示しています。</p> : null}
-        {connected && canWrite && comboSource === "none" ? <p className="empty-note">Combo RPC の読み込みに成功していません。読み込みを実行してください。</p> : null}
+        {!connected ? (
+          <div className="combo-write-warning">
+            <strong>Combo は参照のみです</strong>
+            <span>
+              Direct Mode では Combo を実機へ書き込めません。
+              {canOpenFirmwareMode ? "Firmware Mode" : "デスクトップ版の Firmware Mode"} で編集してください。
+            </span>
+          </div>
+        ) : null}
+        {connected ? (
+          <div className="combo-write-warning">
+            <strong>Combo は参照のみです</strong>
+            <span>現在の実機 firmware では Direct Combo RPC が使えないため、Direct Mode での Combo 読み書きは見送っています。</span>
+            <small>
+              Combo を変更する場合は
+              {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で keymap を編集し、firmware を build + flash してください。
+            </small>
+          </div>
+        ) : null}
       </div>
-      <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
-      <ComboEditor
-        combo={selectedCombo}
-        readOnly={!comboWritable}
-        onCreate={onCreate}
-        onDelete={onDelete}
-        onSave={onSave}
+      <ComboPanel
+        combos={combos}
+        selectedComboId={selectedCombo?.id ?? null}
+        selectedCombos={selectedCombos}
         onSelect={onSelect}
       />
+      <ComboReferencePanel combo={selectedCombo} />
     </div>
+  );
+}
+
+function ComboReferencePanel({ combo }: { combo?: KeymapCombo }) {
+  return (
+    <section className="combo-reference-panel">
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">Combo Detail</p>
+          <h2>{combo?.id ?? "未選択"}</h2>
+        </div>
+      </div>
+      {combo ? (
+        <div className="combo-editor-summary" aria-label="Combo detail">
+          <div>
+            <span>Keys</span>
+            <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
+          </div>
+          <div>
+            <span>Binding</span>
+            <strong>{combo.binding}</strong>
+          </div>
+          <div>
+            <span>Timeout</span>
+            <strong>{combo.timeoutMs} ms</strong>
+          </div>
+        </div>
+      ) : (
+        <p className="empty-note">Combo を選択すると内容を確認できます。</p>
+      )}
+    </section>
   );
 }
 
@@ -3725,50 +3818,35 @@ function ScaleSlider({
 }
 
 function DirectTimingPanel() {
-  const tappingTerm = 200;
-  const presets = [150, 175, 200, 250, 300];
-
   return (
     <div className="direct-settings-panel timing-panel">
       <div className="direct-settings-heading">
         <div>
-          <strong>長押し判定時間</strong>
-          <p>
-            キーを押してからホールド（レイヤー切替・修飾キー）と判定するまでの時間を設定します。短いほど反応が速く、
-            長いほどタップが安定します。
-          </p>
+          <strong>Timing Reference</strong>
+          <p>Direct Mode では tapping term などの timing 設定を実機へ書き込めません。</p>
         </div>
-        <span className="coming-soon-badge">Coming soon</span>
+        <span className="coming-soon-badge">未対応</span>
       </div>
-      <p className="empty-note">Timing Direct RPC は次の実装対象です。現在は保存せず、予定している操作UIだけを表示しています。</p>
-      <div className="timing-field">
+
+      <div className="trackball-reference-summary" aria-label="Timing Direct Mode status">
         <div>
-          <span>Tapping Term</span>
-          <strong>{tappingTerm}ms</strong>
+          <span>Direct write</span>
+          <strong>未対応</strong>
         </div>
-        <input type="range" min={100} max={400} step={10} value={tappingTerm} disabled readOnly />
-        <div className="timing-range-labels">
-          <span>100ms（速い）</span>
-          <span>400ms（遅い）</span>
-        </div>
-      </div>
-      <div className="timing-presets">
-        <span>プリセット</span>
         <div>
-          {presets.map((preset) => (
-            <button type="button" key={preset} className={preset === tappingTerm ? "active" : ""} disabled>
-              {preset}ms
-            </button>
-          ))}
+          <span>表示元</span>
+          <strong>なし</strong>
+        </div>
+        <div>
+          <span>反映方法</span>
+          <strong>build + flash</strong>
         </div>
       </div>
-      <div className="timing-actions">
-        <button type="button" disabled>
-          デバイスに保存
-        </button>
-        <button type="button" disabled>
-          リセット
-        </button>
+
+      <div className="combo-write-warning">
+        <strong>Timing は Direct Mode 未対応です</strong>
+        <span>現在の KobitoKey firmware は tapping term や hold-tap timing を Studio RPC で runtime 保存できません。</span>
+        <small>変更する場合は firmware 設定ファイルを編集し、firmware を build + flash してください。</small>
       </div>
     </div>
   );
@@ -3861,7 +3939,12 @@ function ComboWorkbench({
 }) {
   return (
     <div className="workbench-grid combo-workbench">
-      <ComboPanel combos={combos} selectedCombos={selectedCombos} onSelect={onSelect} />
+      <ComboPanel
+        combos={combos}
+        selectedComboId={selectedCombo?.id ?? null}
+        selectedCombos={selectedCombos}
+        onSelect={onSelect}
+      />
       <ComboEditor
         combo={selectedCombo}
         onCreate={onCreate}
@@ -4149,14 +4232,18 @@ function classifyDiffLine(line: string): "add" | "del" | "elide" | "ctx" {
 function ComboPanel({
   combos,
   onSelect,
+  selectedComboId,
   selectedCombos,
 }: {
   combos: KeymapCombo[];
   onSelect?: (comboId: string) => void;
+  selectedComboId: string | null;
   selectedCombos: KeymapCombo[];
 }) {
+  const relatedComboIds = React.useMemo(() => new Set(selectedCombos.map((combo) => combo.id)), [selectedCombos]);
+
   return (
-    <section>
+    <section className="combo-panel">
       <div className="section-title-row">
         <div>
           <p className="eyebrow">Combos</p>
@@ -4164,19 +4251,25 @@ function ComboPanel({
         </div>
         <span className="section-count">{combos.length}</span>
       </div>
-      <div className="combo-focus-list">
-        {selectedCombos.length === 0 ? (
-          <p className="empty-note">選択キーの combo はありません</p>
-        ) : (
-          selectedCombos.map((combo) => (
-            <ComboRow combo={combo} key={combo.id} isFocused onSelect={onSelect} />
-          ))
-        )}
+      <div className="combo-list-summary" aria-label="Combo list summary">
+        <span>全 {combos.length}</span>
+        <span>選択キー {selectedCombos.length}</span>
+        <span>編集中 {selectedComboId ? "1" : "0"}</span>
       </div>
       <div className="combo-list">
-        {combos.map((combo) => (
-          <ComboRow combo={combo} key={combo.id} onSelect={onSelect} />
-        ))}
+        {combos.length === 0 ? (
+          <p className="empty-note">combo がありません</p>
+        ) : (
+          combos.map((combo) => (
+            <ComboRow
+              combo={combo}
+              key={combo.id}
+              isRelated={relatedComboIds.has(combo.id)}
+              isSelected={combo.id === selectedComboId}
+              onSelect={onSelect}
+            />
+          ))
+        )}
       </div>
     </section>
   );
@@ -4184,11 +4277,13 @@ function ComboPanel({
 
 function ComboRow({
   combo,
-  isFocused = false,
+  isRelated = false,
+  isSelected = false,
   onSelect,
 }: {
   combo: KeymapCombo;
-  isFocused?: boolean;
+  isRelated?: boolean;
+  isSelected?: boolean;
   onSelect?: (comboId: string) => void;
 }) {
   const tone = bindingTone(combo.binding);
@@ -4196,11 +4291,16 @@ function ComboRow({
   return (
     <button
       type="button"
-      className={`combo-row ${tone} ${isFocused ? "focused" : ""}`}
+      aria-pressed={isSelected}
+      className={`combo-row ${tone} ${isRelated ? "related" : ""} ${isSelected ? "selected" : ""}`}
       onClick={() => onSelect?.(combo.id)}
     >
       <span className="combo-row-keys">{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
       <BindingChip binding={combo.binding} compact />
+      <span className="combo-row-flags">
+        {isSelected ? <span>編集中</span> : null}
+        {isRelated ? <span>選択キー</span> : null}
+      </span>
       <em>{combo.timeoutMs}ms</em>
     </button>
   );
@@ -4210,22 +4310,31 @@ function ComboEditor({
   combo,
   onCreate,
   onDelete,
+  onPreview,
   onSave,
   onSelect,
   readOnly = false,
+  saveLabel = "更新",
 }: {
   combo?: KeymapCombo;
   onCreate: () => void;
   onDelete: (combo: KeymapCombo) => void;
+  onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
   onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
   onSelect: (comboId: string) => void;
   readOnly?: boolean;
+  saveLabel?: string;
 }) {
   const [form, setForm] = React.useState<ComboFormValue>({
     binding: "",
     keyPositions: "",
     timeoutMs: 50,
   });
+  const onPreviewRef = React.useRef(onPreview);
+
+  React.useEffect(() => {
+    onPreviewRef.current = onPreview;
+  }, [onPreview]);
 
   React.useEffect(() => {
     if (!combo) {
@@ -4239,32 +4348,67 @@ function ComboEditor({
     });
   }, [combo]);
 
+  React.useEffect(() => {
+    if (!combo || !onPreviewRef.current) {
+      return;
+    }
+    onPreviewRef.current(combo, form, { silent: true });
+  }, [combo, form]);
+
   return (
-    <section>
+    <section className="trackball-parameters">
       <div className="section-title-row">
         <div>
           <p className="eyebrow">Combo Edit</p>
-          <h2>{combo?.id ?? "新規 combo"}</h2>
+          <h2>{combo?.id ?? "未選択"}</h2>
         </div>
-        <button type="button" className="primary" onClick={onCreate} disabled={readOnly}>
+        <button
+          type="button"
+          className="primary"
+          onClick={onCreate}
+          disabled={readOnly}
+          title={readOnly ? "実機 Combo RPC の読み込み成功後に追加できます" : undefined}
+        >
           追加
         </button>
       </div>
       {combo ? (
         <div className="combo-editor">
+          <div className="combo-editor-summary" aria-label="Combo edit target">
+            <div>
+              <span>Keys</span>
+              <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
+            </div>
+            <div>
+              <span>Binding</span>
+              <BindingChip binding={combo.binding} compact />
+            </div>
+            <div>
+              <span>Timeout</span>
+              <strong>{combo.timeoutMs}ms</strong>
+            </div>
+          </div>
           <ComboKeyPicker
             value={form.keyPositions}
             onFocus={() => onSelect(combo.id)}
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo binding に反映"
+            actionLabel="Binding を入力欄に反映"
+            applyOnChange={Boolean(onPreview)}
             binding={form.binding}
+            currentBinding={combo.binding}
             onApply={(binding) => {
               onSelect(combo.id);
               setForm({ ...form, binding });
             }}
           />
+          <div className="binding-review combo-binding-target" aria-label="Combo binding update target">
+            <div className={combo.binding === form.binding ? "" : "changed"}>
+              <span>Update target</span>
+              <BindingSummary binding={form.binding} />
+            </div>
+          </div>
           <label>
             Timeout
             <input
@@ -4277,7 +4421,7 @@ function ComboEditor({
           </label>
           <div className="combo-editor-actions">
             <button type="button" className="primary" onClick={() => onSave(combo, form)} disabled={readOnly}>
-              更新
+              {saveLabel}
             </button>
             <button type="button" className="danger" onClick={() => onDelete(combo)} disabled={readOnly}>
               削除
@@ -4285,17 +4429,19 @@ function ComboEditor({
           </div>
         </div>
       ) : (
-        <p className="empty-note">combo がありません</p>
+        <p className="empty-note">編集対象が未選択です</p>
       )}
     </section>
   );
 }
 
 function ComboKeyPicker({
+  disabled = false,
   onChange,
   onFocus,
   value,
 }: {
+  disabled?: boolean;
   onChange: (value: string) => void;
   onFocus: () => void;
   value: string;
@@ -4315,6 +4461,7 @@ function ComboKeyPicker({
             type="button"
             key={index}
             className={selectedSet.has(index) ? "selected" : ""}
+            disabled={disabled}
             onClick={() => {
               onFocus();
               onChange(toggleDisplayKeyPosition(selectedPositions, index));
@@ -4330,6 +4477,7 @@ function ComboKeyPicker({
 
 function BindingEditor({
   actionLabel,
+  applyOnChange = false,
   binding,
   currentBinding,
   disabled = false,
@@ -4337,6 +4485,7 @@ function BindingEditor({
   onApply,
 }: {
   actionLabel: string;
+  applyOnChange?: boolean;
   binding: string;
   currentBinding?: string;
   disabled?: boolean;
@@ -4345,10 +4494,21 @@ function BindingEditor({
 }) {
   const [form, setForm] = React.useState<BindingForm>(() => parseBindingForm(binding));
   const builtBinding = React.useMemo(() => buildBindingFromForm(form), [form]);
+  const onApplyRef = React.useRef(onApply);
+
+  React.useEffect(() => {
+    onApplyRef.current = onApply;
+  }, [onApply]);
 
   React.useEffect(() => {
     setForm(parseBindingForm(binding));
   }, [binding]);
+
+  React.useEffect(() => {
+    if (applyOnChange) {
+      void onApplyRef.current(builtBinding);
+    }
+  }, [applyOnChange, builtBinding]);
 
   return (
     <div className="binding-editor">
@@ -4388,9 +4548,11 @@ function BindingEditor({
       </details>
 
       {disabledReason ? <p className="empty-note">{disabledReason}</p> : null}
-      <button type="button" className="primary wide-action" disabled={disabled} onClick={() => onApply(builtBinding)}>
-        {actionLabel}
-      </button>
+      {!applyOnChange ? (
+        <button type="button" className="primary wide-action" disabled={disabled} onClick={() => onApply(builtBinding)}>
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -4709,6 +4871,21 @@ function applyDirectKeyDraftsToKeymap(keymap: StudioKeymap, drafts: Record<strin
   return { ...keymap, layers };
 }
 
+function applyDirectComboDrafts(combos: DirectCombo[], drafts: Record<string, DirectCombo>): DirectCombo[] {
+  if (Object.keys(drafts).length === 0) {
+    return combos;
+  }
+  return combos.map((combo) => drafts[combo.id] ?? combo);
+}
+
+function sameDirectComboDraft(left: DirectCombo, right: DirectCombo): boolean {
+  return (
+    left.binding === right.binding &&
+    left.keyPositions.join(" ") === right.keyPositions.join(" ") &&
+    left.timeoutMs === right.timeoutMs
+  );
+}
+
 function toggleDisplayKeyPosition(currentPositions: number[], position: number): string {
   const nextPositions = currentPositions.includes(position)
     ? currentPositions.filter((currentPosition) => currentPosition !== position)
@@ -4821,31 +4998,55 @@ function fileDiff(filename: string, before: string, after: string): FileDiff {
 }
 
 function TrackballPanel({ settings }: { settings: TrackballSettings }) {
-  const rows = [
-    ["Left CPI", settings.leftCpi],
-    ["Right CPI", settings.rightCpi],
-    ["Left min factor", settings.pointerMinFactor],
-    ["Left max factor", settings.pointerMaxFactor],
-    ["Left speed threshold", settings.pointerSpeedThreshold],
-    ["Left accel exponent", settings.pointerAccelerationExponent],
-    ["Right min factor", settings.rightPointerMinFactor],
-    ["Right max factor", settings.rightPointerMaxFactor],
-    ["Right speed threshold", settings.rightPointerSpeedThreshold],
-    ["Right accel exponent", settings.rightPointerAccelerationExponent],
-    ["Gesture threshold", settings.gestureThreshold],
-    ["Tab threshold", settings.tabThreshold],
-    ["Desktop threshold", settings.desktopThreshold],
+  const groups = [
+    {
+      title: "Left",
+      rows: [
+        ["CPI", settings.leftCpi],
+        ["Min factor", settings.pointerMinFactor],
+        ["Max factor", settings.pointerMaxFactor],
+        ["Speed threshold", settings.pointerSpeedThreshold],
+        ["Accel exponent", settings.pointerAccelerationExponent],
+      ],
+    },
+    {
+      title: "Right",
+      rows: [
+        ["CPI", settings.rightCpi],
+        ["Min factor", settings.rightPointerMinFactor],
+        ["Max factor", settings.rightPointerMaxFactor],
+        ["Speed threshold", settings.rightPointerSpeedThreshold],
+        ["Accel exponent", settings.rightPointerAccelerationExponent],
+      ],
+    },
+    {
+      title: "Common",
+      rows: [
+        ["Gesture threshold", settings.gestureThreshold],
+        ["Tab threshold", settings.tabThreshold],
+        ["Desktop threshold", settings.desktopThreshold],
+      ],
+    },
   ];
 
   return (
     <section>
       <p className="eyebrow">Trackball</p>
       <h2>主要パラメータ</h2>
-      <div className="settings-list">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{value ?? "-"}</strong>
+      <div className="trackball-setting-groups">
+        {groups.map((group) => (
+          <div className="trackball-setting-group" key={group.title}>
+            <div className="trackball-setting-group-heading">
+              <strong>{group.title}</strong>
+            </div>
+            <div className="settings-list">
+              {group.rows.map(([label, value]) => (
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>{value ?? "-"}</strong>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>

@@ -14,8 +14,8 @@ permalink: /usage-guide/
 
 | ビルド | Direct Mode (キー) | Direct Mode (Combo / Trackball) | Firmware Mode |
 | --- | --- | --- | --- |
-| ブラウザ版 (`npm run dev`) | ✅ 利用可 | 読み取りのみ / 未対応 | ❌ **初版では無効化** |
-| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 書き込み可 | ✅ 利用可 |
+| ブラウザ版 (`npm run dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ❌ **初版では無効化** |
+| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ 利用可 |
 
 - 初版のブラウザ版は **Direct Mode 専用** です。ヘッダの `Firmware` トグルは disabled になっています。
 - Firmware モードのファイル編集、GitHub Actions ビルド、UF2 書き込み補助はすべてデスクトップ版でのみ利用できます。
@@ -29,7 +29,8 @@ KobitoKey Studio では、最初に `Firmware Mode`(デスクトップ版のみ)
 | --- | --- | --- |
 | キーを 1 個だけ素早く変更したい | Direct Mode | ビルドと UF2 書き込みなしで実機へ保存できるため |
 | ブラウザだけで試したい | Direct Mode (Chrome/Edge) | 初版のブラウザ版は Direct Mode 専用 |
-| Combo やトラックボールを確実に設定したい | デスクトップ版 + Direct Mode または Firmware Mode | ブラウザ版 Direct ではどちらも書き込めない |
+| Combo を設定したい | Firmware Mode | 現在の ZMK Studio firmware は Combo RPC を公開していないため |
+| トラックボールを設定したい | Firmware Mode | 現在の KobitoKey firmware では Direct Mode 書き込み未対応のため |
 | 設定をファイルとして残したい / GitHub Actions ビルドまで進めたい | デスクトップ版 + Firmware Mode | ローカル保存、artifact 取得、UF2 コピーが必要なため |
 
 Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファームウェアを作り直して反映します。Direct Mode は、ZMK Studio 対応 firmware が入った実機へ、対応済みの設定だけを直接保存するための高速な編集モードです。
@@ -120,7 +121,7 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 6. `実機へ書き込み` を押す
 7. 書き込み後に再読み込みされた表示を確認する
 
-Direct Mode で Combo やトラックボールを書き込む場合は、Tauri デスクトップ版を使ってください。ブラウザ版では読み取り表示または未対応になる項目があります。
+Direct Mode でキーを書き込む場合は、ブラウザ版または Tauri デスクトップ版を使えます。Combo と Trackball は参照のみです。ブラウザ版では USB 接続を推奨します。
 
 ## 1. 事前準備
 
@@ -137,7 +138,7 @@ Direct Mode で Combo やトラックボールを書き込む場合は、Tauri �
 
 | 起動方法 | 向いている用途 |
 | --- | --- |
-| Tauri デスクトップ版 | 実際の設定作業、Firmware Mode のファイル編集、ビルド、artifact 取得、UF2 コピー、Direct の Combo / Trackball 書き込み |
+| Tauri デスクトップ版 | 実際の設定作業、Firmware Mode のファイル編集、ビルド、artifact 取得、UF2 コピー、Direct の key 書き込み |
 | ブラウザ版(初版) | Direct Mode の試用と key binding の書き込み (Web Serial / Web Bluetooth) |
 
 設定作業を最後まで進めるなら、Tauri デスクトップ版を推奨します。**初版のブラウザ版は Direct Mode 専用** で、Firmware Mode、GitHub Actions、UF2 コピーは使えません。
@@ -159,7 +160,7 @@ Firmware Mode を含むフル機能を使うには、Rust と Cargo を用意し
 npm run tauri dev
 ```
 
-Tauri デスクトップ版では、ローカルファイルの読み書き、GitHub Actions 操作、artifact download、UF2 コピー、Direct Combo/Trackball 書き込みなど、ブラウザでは制限される機能をすべて使えます。
+Tauri デスクトップ版では、ローカルファイルの読み書き、GitHub Actions 操作、artifact download、UF2 コピー、Direct key 書き込みなど、ブラウザでは制限される機能をすべて使えます。
 
 ### GitHub CLI の準備
 
@@ -202,8 +203,8 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 | Direct USB | 対応 | Chrome/Edge の Web Serial で対応 |
 | Direct Bluetooth | 対応環境で利用 | 実験的対応。見つからない場合は USB 推奨 |
 | Direct key binding write | 対応 | 対応 |
-| Direct Combo write | 対応 | 読み取り表示または未対応 |
-| Direct Trackball write | 対応 | 未対応表示 |
+| Direct Combo write | 参照のみ | 参照のみ |
+| Direct Trackball write | 参照のみ | 参照のみ |
 
 ブラウザ版で Direct Mode を使う場合は、Chrome または Edge で `127.0.0.1`、`localhost`、または HTTPS から開いてください。Web Serial / Web Bluetooth は、通常の `file://` や安全でない HTTP では利用できません。
 
@@ -214,8 +215,8 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 | 設定 | Firmware Mode の保存先 | Firmware Mode の反映 | Direct Mode の保存先 | Direct Mode の反映 |
 | --- | --- | --- | --- | --- |
 | key binding | `KobitoKey.keymap` | build + UF2 書き込み | 実機の Studio 設定 | 書き込み直後 |
-| Combo | `KobitoKey.keymap` | build + UF2 書き込み | 実機の Studio 設定 | Tauri 版で書き込み直後 |
-| Trackball | 左右 overlay | build + UF2 書き込み | 実機の Studio 設定 | Tauri 版で書き込み直後 |
+| Combo | `KobitoKey.keymap` | build + UF2 書き込み | — | Direct Mode では参照のみ |
+| Trackball | 左右 overlay | build + UF2 書き込み | — | Direct Mode では参照のみ |
 | Timing | 該当 firmware 設定ファイル | build + UF2 書き込み | 現在は保存対象外 | 未対応 |
 | GitHub Actions build | なし | UF2 artifact を生成 | なし | 対象外 |
 
@@ -414,9 +415,9 @@ Direct Mode は、接続中の device へ設定を保存します。左右分割
 
 Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻るわけではありません。長期的に管理したい設定は、あとで Firmware Mode のファイルにも反映しておくと、次回 firmware を作り直したときに差分が消えにくくなります。
 
-Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap の key binding / Combo 差分を Direct summary で確認できます。差分行の `反映` またはパネル上部の `Firmware に反映` / `Combo を反映` を押すと、Direct 側の差分を firmware keymap に反映できます。ファイルへの保存または書き出しは Firmware Mode で実行します。
+Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap の key binding 差分を Direct summary で確認できます。差分行の `反映` またはパネル上部の `Firmware に反映` を押すと、Direct 側の差分を firmware keymap に反映できます。ファイルへの保存または書き出しは Firmware Mode で実行します。Combo は Direct Mode では参照のみです。
 
-Direct Mode の key / Combo / Trackball 書き込みは、成功時に device へ自動保存します。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
+Direct Mode の key 書き込みは、成功時に device へ自動保存します。Combo、Trackball、Timing は参照または未対応表示のみです。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
 ### 5.2 USB / Bluetooth で接続する(USB 推奨)
 
@@ -471,35 +472,29 @@ Direct Mode で対応している主な binding は次です。
 
 書き込み後は device から keymap を再読み込みします。表示が戻った、または変わらないように見える場合は、書き込み対象 layer と key position が正しいか、Direct Mode 対応 binding かを確認してください。
 
-### 5.4 Direct Mode で Combo を編集する
+### 5.4 Direct Mode で Combo を参照する
 
-Direct Combo の書き込みは Tauri デスクトップ版で使います。
+Direct Mode では Combo は参照のみです。現在の ZMK Studio firmware は Combo RPC を公開していないため、実機へ直接読み書きできません。
 
 1. Direct Mode で device を読み込みます。
 2. 右側の `Combos` tab を開きます。
-3. `読み込み` を押して実機 Combo を取得します。
-4. 既存 Combo を選ぶか、追加します。
-5. binding、key positions、timeout を設定します。
-6. 保存すると実機へ書き込まれ、device から再読み込みされます。
+3. Firmware keymap 由来の Combo 一覧と詳細を確認します。
 
-ブラウザ版では Combo RPC が Web client package から公開されていない場合があります。その場合は Firmware keymap の Combo を読み取り専用で表示するか、未対応として表示されます。Combo を確実に編集したい場合は Tauri デスクトップ版か Firmware Mode を使ってください。
+Combo を変更する場合は Firmware Mode で `KobitoKey.keymap` を編集し、firmware を build + flash してください。
 
-### 5.5 Direct Mode でトラックボール設定を編集する
+### 5.5 Direct Mode でトラックボール設定を参照する
 
-Direct Trackball の書き込みは Tauri デスクトップ版で使います。
+Direct Mode では Trackball は参照のみです。現在の KobitoKey firmware は Trackball 設定を Studio RPC で runtime 保存できません。
 
 1. Direct Mode で device を読み込みます。
 2. `Trackball` tab を開きます。
-3. `読み込み` を押して実機の現在値を取得します。
-4. CPI、cursor 感度、scroll 感度を編集します。
-5. `デバイスに保存` を押します。
-6. 保存後、実機から再読み込みされます。
+3. Firmware overlay 由来の Trackball 設定を確認します。
 
-firmware に Trackball RPC が入っていない場合、読み込みや保存に失敗します。その場合は Firmware Mode で overlay を編集し、build + flash してください。
+Trackball を変更する場合は、デスクトップ版の Firmware Mode で左右 overlay を更新して build + flash してください。
 
 ### 5.6 Timing tab について
 
-Direct Mode の `Timing` tab は、予定している操作 UI を表示します。現在は保存対象ではありません。timing 系の詳細設定を確実に反映したい場合は Firmware Mode で該当ファイルを編集し、firmware を build してください。
+Direct Mode の `Timing` tab は未対応表示のみです。tapping term や hold-tap timing などを確実に反映したい場合は Firmware Mode で該当ファイルを編集し、firmware を build してください。
 
 ## 6. 目的別レシピ
 
@@ -533,7 +528,7 @@ ZMK Studio 対応 firmware がない、または Direct Mode で未対応の bin
 7. `Diff` を確認して保存します。
 8. build + UF2 書き込みで反映します。
 
-Tauri デスクトップ版で実機 Combo RPC が使える場合は Direct Mode の `Combos` から追加できます。ブラウザ版や RPC 未対応 firmware の場合は Firmware Mode を使ってください。
+Combo は Direct Mode では参照のみです。追加や変更は Firmware Mode を使ってください。
 
 ### トラックボール感度を調整したい
 
@@ -549,7 +544,7 @@ Tauri デスクトップ版で実機 Combo RPC が使える場合は Direct Mode
 6. 保存して build + UF2 書き込みをします。
 7. 実機で動きを確認し、必要なら再調整します。
 
-Tauri デスクトップ版で Direct Trackball RPC が使える場合は Direct Mode の `Trackball` から保存できます。RPC がない場合や左右 overlay を明示的に管理したい場合は Firmware Mode を使ってください。
+Trackball は Direct Mode では参照のみです。変更する場合は Firmware Mode を使ってください。
 
 ### GitHub Actions build から書き込みまで行いたい
 
@@ -634,11 +629,11 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 
 ### Combo が Direct Mode で編集できない
 
-ブラウザ版では Combo RPC が未公開のため、読み取り表示または未対応になる場合があります。デスクトップ版で試すか、Firmware Mode(デスクトップ版のみ)で `KobitoKey.keymap` の Combo を編集してください。
+現在の ZMK Studio firmware は Combo RPC を公開していないため、Direct Mode では Combo を編集できません。Firmware Mode(デスクトップ版のみ)で `KobitoKey.keymap` の Combo を編集してください。
 
 ### Trackball が Direct Mode で保存できない
 
-firmware に Trackball RPC が含まれていない可能性があります。デスクトップ版の Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。ブラウザ版では Trackball は未対応として表示されます。
+firmware に Trackball RPC が含まれていません。デスクトップ版の Firmware Mode の `Trackball` で overlay を編集し、build + flash してください。
 
 ### GitHub Actions build が起動できない
 
