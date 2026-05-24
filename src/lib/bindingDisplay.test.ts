@@ -53,4 +53,11 @@ describe("bindingDisplay", () => {
     expect(bindingDisplay("&kp RET")).toEqual({ label: "ENT" });
     expect(bindingDisplay("&lt 2 SPC")).toEqual({ badge: "L2", label: "SPC" });
   });
+
+  it("renders custom Direct layer-tap thumb behaviors with readable key labels", () => {
+    expect(bindingDisplay("&lt_left_thumb 1 458796")).toEqual({ badge: "L1", label: "SPC" });
+    expect(bindingDisplay("&lt_right_thumb 2 458792")).toEqual({ badge: "L2", label: "ENT" });
+    expect(bindingDisplay("&lt_right_thumb 3 458981")).toEqual({ badge: "L3", label: "RSFT" });
+    expect(formatBindingForDisplay("&lt_left_thumb 1 458796")).toBe("&lt_left_thumb 1 SPACE");
+  });
 });
