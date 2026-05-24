@@ -152,6 +152,9 @@ export function bindingDisplay(binding: string): BindingDisplay {
     case "&none":
       return { label: "∅" };
     default:
+      if (isCustomLayerTapBehavior(behavior)) {
+        return { badge: `L${parts[1] ?? "?"}`, label: formatKey(parts.slice(2).join(" ")) };
+      }
       return { badge: behavior.replace("&", "").toUpperCase(), label: formatKey(parts.slice(1).join(" ")) };
   }
 }
@@ -170,6 +173,9 @@ export function formatBindingForDisplay(binding: string): string {
     case "&bt":
       return `&bt ${formatBtCommand(parts[1])} ${parts[2] ?? "0"}`;
     default:
+      if (isCustomLayerTapBehavior(parts[0])) {
+        return formatBindingParts(parts, [2]);
+      }
       return binding;
   }
 }
@@ -177,7 +183,7 @@ export function formatBindingForDisplay(binding: string): string {
 function formatBindingParts(parts: string[], keycodeIndexes: number[]): string {
   const keycodeIndexSet = new Set(keycodeIndexes);
   return parts
-    .map((part, index) => (keycodeIndexSet.has(index) ? normalizeKeycodeName(part) : part))
+    .map((part, index) => (keycodeIndexSet.has(index) ? normalizeDisplayKeycode(part) : part))
     .join(" ");
 }
 
@@ -204,8 +210,28 @@ function formatKey(value: string): string {
   if (!value) {
     return "";
   }
-  const normalizedValue = normalizeKeycodeName(value);
+  const normalizedValue = normalizeDisplayKeycode(value);
   return KEY_LABELS[normalizedValue] ?? normalizedValue.replace(/^N(?:UMBER_|UM_)?([0-9])$/, "$1");
+}
+
+function normalizeDisplayKeycode(value: string): string {
+  const decimalHidUsage = parseDecimalHidUsage(value);
+  return normalizeKeycodeName(decimalHidUsage ?? value);
+}
+
+function parseDecimalHidUsage(value: string): string | undefined {
+  if (!/^\d+$/.test(value)) {
+    return undefined;
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) {
+    return undefined;
+  }
+  return `0x${number.toString(16).padStart(8, "0")}`;
+}
+
+function isCustomLayerTapBehavior(behavior: string | undefined): boolean {
+  return behavior?.toLowerCase().startsWith("&lt_") ?? false;
 }
 
 function formatMouseMotion(value?: string): string {

@@ -1417,10 +1417,19 @@ select:focus-visible {
    ---------------------------------------------------------------- */
 .keyboard-viewport {
   position: relative;
+  display: flex;
+  justify-content: safe center;
+  align-items: safe center;
   width: 100%;
+  --keyboard-scale: 1;
+  --keyboard-visual-offset-y: 48px;
+  --keyboard-visible-width: var(--layout-width);
+  --keyboard-visible-height: var(--layout-height);
+
   container-type: inline-size;
-  overflow: hidden;
-  padding: var(--sp-3) 0 var(--sp-4);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3) 0;
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-xl);
   background-color: #f1f4f7;
@@ -1429,31 +1438,36 @@ select:focus-visible {
   background-size: 18px 18px;
   background-position: center;
   box-shadow: inset 0 2px 14px -8px rgba(28, 44, 56, 0.18);
-  /* Fallback for browsers without container query support: keep the
-     natural unscaled keyboard height. */
-  min-height: var(--layout-height);
+  min-height: 220px;
 }
 
 @supports (width: 100cqi) {
   .keyboard-viewport {
-    /* Height tracks container width using the natural keyboard ratio.
-       LAYOUT_WIDTH = 1236, LAYOUT_HEIGHT = 540. */
-    min-height: min(
-      calc(var(--layout-height) + 32px),
-      calc(100cqi * 540 / 1236 + 32px)
-    );
+    --keyboard-scale: max(0.62, min(1, calc(100cqi / 1236px)));
+    --keyboard-visible-width: calc(var(--layout-width) * var(--keyboard-scale));
+    --keyboard-visible-height: calc(var(--layout-height) * var(--keyboard-scale));
+
+    min-height: min(220px, calc(var(--keyboard-visible-height) + var(--keyboard-visual-offset-y) + 24px));
   }
   .keyboard-layout {
-    transform: scale(min(1, calc(100cqi / 1236px)));
-    transform-origin: top center;
+    transform: scale(var(--keyboard-scale));
+    transform-origin: top left;
   }
+}
+
+.keyboard-scroll-content {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--keyboard-visible-width);
+  height: var(--keyboard-visible-height);
+  margin-block-start: var(--keyboard-visual-offset-y);
 }
 
 .keyboard-layout {
   position: relative;
   width: var(--layout-width);
   height: var(--layout-height);
-  margin: 0 auto;
+  margin: 0;
 }
 
 .base-outline {
