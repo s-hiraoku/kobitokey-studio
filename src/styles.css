@@ -1425,6 +1425,7 @@ select:focus-visible {
   --keyboard-visual-offset-y: 48px;
   --keyboard-visible-width: var(--layout-width);
   --keyboard-visible-height: var(--layout-height);
+
   container-type: inline-size;
   overflow: auto;
   overscroll-behavior: contain;
@@ -1445,6 +1446,7 @@ select:focus-visible {
     --keyboard-scale: max(0.62, min(1, calc(100cqi / 1236px)));
     --keyboard-visible-width: calc(var(--layout-width) * var(--keyboard-scale));
     --keyboard-visible-height: calc(var(--layout-height) * var(--keyboard-scale));
+
     min-height: min(220px, calc(var(--keyboard-visible-height) + var(--keyboard-visual-offset-y) + 24px));
   }
   .keyboard-layout {
