@@ -1966,64 +1966,66 @@ function KeyboardGrid({
   onSelect: (index: number) => void;
 }) {
   return (
-    <div className="keyboard-viewport">
-      <div
-        className="keyboard-layout"
-        style={
-          {
-            "--layout-width": `${LAYOUT_WIDTH}px`,
-            "--layout-height": `${LAYOUT_HEIGHT}px`,
-          } as React.CSSProperties
-        }
-      >
-        <svg className="base-outline matrix-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
-          <path d={matrixBasePath} />
-          <path d={matrixBasePath} transform={rightMirrorTransform} />
-        </svg>
-        <svg className="base-outline thumb-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
-          <path d={trackballBasePath} />
-          <path d={thumbBasePath} />
-          <path d={trackballBasePath} transform={rightMirrorTransform} />
-          <path d={thumbBasePath} transform={rightMirrorTransform} />
-        </svg>
-        {trackballs.map((trackball) => (
-          <div
-            key={trackball.side}
-            className={`trackball ${trackball.side}`}
-            style={{
-              left: trackball.x,
-              top: trackball.y,
-              transform: `rotate(${trackball.rotation}deg)`,
-            }}
-          >
-            <i className="track-button" />
-            <i className="track-led led-a" />
-            <span />
-          </div>
-        ))}
-        <ComboOverlay
-          combos={combos}
-          selectedComboId={selectedComboId}
-          selectedKeyIndex={selectedKeyIndex}
-          onSelect={onComboSelect}
-        />
-        {kobitoKeyPhysicalLayout.map((key) => (
-          <PhysicalKeyButton
-            key={`${key.side}-${key.index}`}
-            binding={layer?.bindings[key.index] ?? ""}
-            index={key.index}
-            isDraft={draftKeyIndexes?.has(key.index) ?? false}
-            isSelected={key.index === selectedKeyIndex}
-            kind={key.kind}
-            left={key.x}
-            rotation={key.rotation ?? 0}
-            side={key.side}
-            top={key.y}
-            width={key.width ?? KEY_UNIT}
-            height={key.height ?? KEY_UNIT}
-            onSelect={onSelect}
+    <div
+      className="keyboard-viewport"
+      style={
+        {
+          "--layout-width": `${LAYOUT_WIDTH}px`,
+          "--layout-height": `${LAYOUT_HEIGHT}px`,
+        } as React.CSSProperties
+      }
+    >
+      <div className="keyboard-scroll-content">
+        <div className="keyboard-layout">
+          <svg className="base-outline matrix-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
+            <path d={matrixBasePath} />
+            <path d={matrixBasePath} transform={rightMirrorTransform} />
+          </svg>
+          <svg className="base-outline thumb-base-outline" viewBox={`0 0 ${LAYOUT_WIDTH} 540`} aria-hidden="true">
+            <path d={trackballBasePath} />
+            <path d={thumbBasePath} />
+            <path d={trackballBasePath} transform={rightMirrorTransform} />
+            <path d={thumbBasePath} transform={rightMirrorTransform} />
+          </svg>
+          {trackballs.map((trackball) => (
+            <div
+              key={trackball.side}
+              className={`trackball ${trackball.side}`}
+              style={{
+                left: trackball.x,
+                top: trackball.y,
+                transform: `rotate(${trackball.rotation}deg)`,
+              }}
+            >
+              <i className="track-button" />
+              <i className="track-led led-a" />
+              <span />
+            </div>
+          ))}
+          <ComboOverlay
+            combos={combos}
+            selectedComboId={selectedComboId}
+            selectedKeyIndex={selectedKeyIndex}
+            onSelect={onComboSelect}
           />
-        ))}
+          {kobitoKeyPhysicalLayout.map((key) => (
+            <PhysicalKeyButton
+              key={`${key.side}-${key.index}`}
+              binding={layer?.bindings[key.index] ?? ""}
+              index={key.index}
+              isDraft={draftKeyIndexes?.has(key.index) ?? false}
+              isSelected={key.index === selectedKeyIndex}
+              kind={key.kind}
+              left={key.x}
+              rotation={key.rotation ?? 0}
+              side={key.side}
+              top={key.y}
+              width={key.width ?? KEY_UNIT}
+              height={key.height ?? KEY_UNIT}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
