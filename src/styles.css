@@ -276,6 +276,7 @@ input[type="url"] {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
@@ -783,18 +784,26 @@ select:focus-visible {
    ---------------------------------------------------------------- */
 .direct-welcome {
   display: grid;
-  place-items: center;
-  min-height: calc(100vh - 134px);
-  padding: var(--sp-7) var(--sp-8);
+  align-items: safe center;
+  justify-items: center;
+  block-size: 100%;
+  min-block-size: 0;
+  overflow: auto;
+  padding: clamp(16px, 4dvh, var(--sp-7)) clamp(var(--sp-5), 4dvw, var(--sp-8));
+  overscroll-behavior: contain;
 }
 
 .direct-welcome-card {
   display: grid;
-  gap: var(--sp-5);
+  gap: clamp(var(--sp-3), 2.5dvh, var(--sp-5));
   width: min(720px, 100%);
+  max-block-size: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border: 1px solid var(--hairline);
   border-radius: var(--r-xl);
-  padding: var(--sp-7) var(--sp-8);
+  padding: clamp(var(--sp-5), 4dvh, var(--sp-7)) clamp(var(--sp-5), 4dvw, var(--sp-8));
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(63, 104, 131, 0.10), transparent 60%),
     linear-gradient(180deg, var(--card) 0%, var(--paper-2) 100%);
@@ -802,7 +811,7 @@ select:focus-visible {
     var(--shadow-1),
     0 28px 60px -32px rgba(28, 44, 56, 0.32);
   position: relative;
-  overflow: hidden;
+  overflow: auto;
 }
 .direct-welcome-card::after {
   content: "";
@@ -1233,6 +1242,40 @@ select:focus-visible {
   color: var(--ink-muted);
   font-size: 11.5px;
   line-height: 1.55;
+}
+
+@media (max-height: 760px) {
+  .direct-welcome {
+    padding-block: var(--sp-3);
+  }
+
+  .direct-welcome-card {
+    gap: var(--sp-3);
+    padding-block: var(--sp-5);
+  }
+
+  .direct-welcome-card h2 {
+    font-size: 28px;
+  }
+
+  .direct-welcome-card p {
+    margin-top: var(--sp-2);
+    line-height: 1.5;
+  }
+
+  .direct-connect-steps {
+    gap: 6px;
+  }
+
+  .direct-connect-steps li {
+    padding-block: 8px;
+  }
+
+  .runtime-warning,
+  .runtime-notice,
+  .runtime-diagnostics {
+    padding-block: 8px;
+  }
 }
 
 /* ----------------------------------------------------------------
