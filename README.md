@@ -8,7 +8,7 @@ be a general ZMK editor yet.
 
 ## Public Links
 
-- Browser app: <https://kobitokey-studio.pages.dev/>
+- Browser app: <https://kobitokey-studio.s-hiraoku.workers.dev/>
 - User guide: <https://s-hiraoku.github.io/kobitokey-studio/>
 - Supported browser target: desktop Chrome / Edge
 - Mobile browser target: unsupported screen in the initial release

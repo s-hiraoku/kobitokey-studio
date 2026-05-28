@@ -11,7 +11,7 @@ permalink: /quick-start/
 
 ## 初版での機能差(重要)
 
-ブラウザ版の公開 URL は <https://kobitokey-studio.pages.dev/> です。
+ブラウザ版の公開 URL は <https://kobitokey-studio.s-hiraoku.workers.dev/> です。
 
 | ビルド | Direct Mode | Firmware Mode |
 | --- | --- | --- |

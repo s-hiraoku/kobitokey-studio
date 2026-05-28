@@ -84,11 +84,11 @@ const checks = [
       allIncludes(files.docsIndex, ["./user-guide/", "設定内容ごとのアプリ入口"]) &&
       allIncludes(files.docsUserGuide, [
         "permalink: /user-guide/",
-        "https://kobitokey-studio.pages.dev/?mode=firmware&tab=combos",
-        "https://kobitokey-studio.pages.dev/?mode=firmware&tab=trackball",
-        "https://kobitokey-studio.pages.dev/?mode=firmware&tab=diff",
-        "https://kobitokey-studio.pages.dev/?mode=firmware&tab=build",
-        "https://kobitokey-studio.pages.dev/?mode=direct",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
         "編集に戻る",
       ]) &&
       allIncludes(files.docsQuickStart, ["../user-guide/", "編集をリセット"]) &&
@@ -544,7 +544,7 @@ const checks = [
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
-        "https://kobitokey-studio.pages.dev/?mode=firmware",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
         "production URL must include mode=firmware",
         "production page is missing release security headers",
         "/api/github/device-code",

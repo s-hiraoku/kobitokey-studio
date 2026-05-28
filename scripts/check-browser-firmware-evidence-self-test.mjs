@@ -98,7 +98,7 @@ function createValidReport() {
     verifiedAt: "2026-05-27T00:00:00Z",
     tester: "release-qa",
     production: {
-      url: "https://kobitokey-studio.pages.dev/?mode=firmware",
+      url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
       workerDeviceCodeRouteChecked: true,
       workerAccessTokenRouteChecked: true,
       workerUnsupportedScopeRejected: true,

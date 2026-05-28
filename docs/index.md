@@ -10,7 +10,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 設定内容ごとの入口から始める場合は [ユーザガイド](./user-guide/) を開いてください。すぐに手順だけ見る場合は [Quick Start](./quick-start/)、背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。公開とリリース確認は [Deployment](./deployment/) にまとめています。
 
-ブラウザ版の公開 URL は <https://kobitokey-studio.pages.dev/> です。
+ブラウザ版の公開 URL は <https://kobitokey-studio.s-hiraoku.workers.dev/> です。
 
 ## まず選ぶこと
 

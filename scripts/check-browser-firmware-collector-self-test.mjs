@@ -325,7 +325,7 @@ function runCollector(baseUrl, reportPath, options) {
       env: {
         ...process.env,
         PATH: `${dir}:${process.env.PATH || ""}`,
-        BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://kobitokey-studio.pages.dev/?mode=firmware",
+        BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
         BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL: `${baseUrl}/`,
         BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID: options.oauthClientId || "collector-oauth-client",
         BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL: baseUrl,
