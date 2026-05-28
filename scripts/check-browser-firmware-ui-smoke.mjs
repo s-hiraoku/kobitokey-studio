@@ -283,7 +283,20 @@ async function inspectComboEditActions(page, label) {
   const failures = [];
   await page.getByRole("tab", { name: /Combos/ }).click();
   const initial = await readComboState(page);
-  await page.getByRole("button", { name: "追加" }).click();
+  const comboActions = page.locator(".combo-list-actions");
+  const addButton = comboActions.getByRole("button", { name: "追加" });
+  const deleteButton = comboActions.getByRole("button", { name: "削除" });
+
+  if ((await addButton.count()) !== 1) {
+    failures.push(`${label}: combo add button should be in the combo list actions`);
+    return failures;
+  }
+  if ((await deleteButton.count()) !== 1) {
+    failures.push(`${label}: combo delete button should be in the combo list actions`);
+    return failures;
+  }
+
+  await addButton.click();
   const afterCreate = await readComboState(page);
 
   if (afterCreate.comboCount !== initial.comboCount + 1) {
@@ -304,6 +317,19 @@ async function inspectComboEditActions(page, label) {
   if (afterCreate.diffCount < initial.diffCount) {
     failures.push(`${label}: adding a combo should not lose existing diffs`);
   }
+  if (await deleteButton.isDisabled()) {
+    failures.push(`${label}: combo list delete button should be enabled for the selected combo`);
+    return failures;
+  }
+
+  await deleteButton.click();
+  const afterDelete = await readComboState(page);
+  if (afterDelete.comboCount !== initial.comboCount) {
+    failures.push(`${label}: deleting the selected combo from the list should restore the original combo count`);
+  }
+  if (afterDelete.editingCount !== 0) {
+    failures.push(`${label}: deleting the selected combo should clear the editing selection`);
+  }
 
   return failures;
 }
@@ -313,6 +339,16 @@ async function inspectTrackballEditActions(page, label) {
   await page.getByRole("tab", { name: "Trackball" }).click();
   const initial = await readTrackballState(page);
   const nextLeftCpi = initial.leftCpi + 1;
+
+  if (!initial.editorGroups.includes("Left")) {
+    failures.push(`${label}: trackball editor should group fields under Left`);
+  }
+  if (!initial.editorGroups.includes("Right")) {
+    failures.push(`${label}: trackball editor should group fields under Right`);
+  }
+  if (!initial.editorGroups.includes("Common")) {
+    failures.push(`${label}: trackball editor should group fields under Common`);
+  }
 
   await page.locator('input[name="trackball-leftCpi"]').fill(String(nextLeftCpi));
   await page.getByRole("button", { name: "設定に反映" }).click();
@@ -381,6 +417,9 @@ async function readTrackballState(page) {
       return match ? Number(match[1]) : null;
     };
     return {
+      editorGroups: Array.from(document.querySelectorAll(".trackball-editor-group legend strong")).map((node) =>
+        node.textContent?.trim() ?? "",
+      ),
       diffCount: readDiffCount(),
       leftCpi: Number(document.querySelector('input[name="trackball-leftCpi"]')?.value ?? Number.NaN),
     };

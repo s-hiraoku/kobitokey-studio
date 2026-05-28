@@ -4409,12 +4409,12 @@ function ComboWorkbench({
         combos={combos}
         selectedComboId={selectedCombo?.id ?? null}
         selectedCombos={selectedCombos}
+        onCreate={onCreate}
+        onDelete={onDelete}
         onSelect={onSelect}
       />
       <ComboEditor
         combo={selectedCombo}
-        onCreate={onCreate}
-        onDelete={onDelete}
         onSave={onSave}
         onSelect={onSelect}
       />
@@ -4954,16 +4954,25 @@ function classifyDiffLine(line: string): "add" | "del" | "elide" | "ctx" {
 
 function ComboPanel({
   combos,
+  onCreate,
+  onDelete,
   onSelect,
   selectedComboId,
   selectedCombos,
 }: {
   combos: KeymapCombo[];
+  onCreate?: () => void;
+  onDelete?: (combo: KeymapCombo) => void;
   onSelect?: (comboId: string) => void;
   selectedComboId: string | null;
   selectedCombos: KeymapCombo[];
 }) {
   const relatedComboIds = React.useMemo(() => new Set(selectedCombos.map((combo) => combo.id)), [selectedCombos]);
+  const selectedCombo = React.useMemo(
+    () => combos.find((combo) => combo.id === selectedComboId),
+    [combos, selectedComboId],
+  );
+  const hasActions = Boolean(onCreate || onDelete);
 
   return (
     <section className="combo-panel">
@@ -4974,10 +4983,33 @@ function ComboPanel({
         </div>
         <span className="section-count">{combos.length}</span>
       </div>
-      <div className="combo-list-summary" aria-label="Combo list summary">
-        <span>全 {combos.length}</span>
-        <span>選択キー {selectedCombos.length}</span>
-        <span>編集中 {selectedComboId ? "1" : "0"}</span>
+      <div className={`combo-list-toolbar ${hasActions ? "with-actions" : ""}`}>
+        <div className="combo-list-summary" aria-label="Combo list summary">
+          <span>全 {combos.length}</span>
+          <span>選択キー {selectedCombos.length}</span>
+          <span>編集中 {selectedComboId ? "1" : "0"}</span>
+        </div>
+        {hasActions ? (
+          <div className="combo-list-actions" aria-label="Combo actions">
+            {onCreate ? (
+              <button type="button" className="primary" onClick={onCreate}>
+                <Plus size={14} />
+                <span className="button-label">追加</span>
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                className="danger"
+                onClick={() => selectedCombo && onDelete(selectedCombo)}
+                disabled={!selectedCombo}
+              >
+                <Trash2 size={14} />
+                <span className="button-label">削除</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div className="combo-list">
         {combos.length === 0 ? (
@@ -5032,8 +5064,6 @@ function ComboRow({
 
 function ComboEditor({
   combo,
-  onCreate,
-  onDelete,
   onPreview,
   onSave,
   onSelect,
@@ -5041,8 +5071,6 @@ function ComboEditor({
   saveLabel = "更新",
 }: {
   combo?: KeymapCombo;
-  onCreate: () => void;
-  onDelete: (combo: KeymapCombo) => void;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
   onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
   onSelect: (comboId: string) => void;
@@ -5086,15 +5114,6 @@ function ComboEditor({
           <p className="eyebrow">Combo Edit</p>
           <h2>{combo?.id ?? "未選択"}</h2>
         </div>
-        <button
-          type="button"
-          className="primary"
-          onClick={onCreate}
-          disabled={readOnly}
-          title={readOnly ? "実機 Combo RPC の読み込み成功後に追加できます" : undefined}
-        >
-          追加
-        </button>
       </div>
       {combo ? (
         <div className="combo-editor">
@@ -5151,9 +5170,6 @@ function ComboEditor({
           <div className="combo-editor-actions">
             <button type="button" className="primary" onClick={() => onSave(combo, form)} disabled={readOnly}>
               {saveLabel}
-            </button>
-            <button type="button" className="danger" onClick={() => onDelete(combo)} disabled={readOnly}>
-              削除
             </button>
           </div>
         </div>
@@ -5873,20 +5889,38 @@ function TrackballEditor({
     setForm(completeTrackballSettings(settings));
   }, [settings]);
 
-  const fields: Array<[keyof RequiredTrackballSettings, string]> = [
-    ["leftCpi", "Left CPI"],
-    ["rightCpi", "Right CPI"],
-    ["pointerMinFactor", "Left min factor"],
-    ["pointerMaxFactor", "Left max factor"],
-    ["pointerSpeedThreshold", "Left speed threshold"],
-    ["pointerAccelerationExponent", "Left exponent"],
-    ["rightPointerMinFactor", "Right min factor"],
-    ["rightPointerMaxFactor", "Right max factor"],
-    ["rightPointerSpeedThreshold", "Right speed threshold"],
-    ["rightPointerAccelerationExponent", "Right exponent"],
-    ["gestureThreshold", "Gesture threshold"],
-    ["tabThreshold", "Tab threshold"],
-    ["desktopThreshold", "Desktop threshold"],
+  const groups: Array<{
+    title: string;
+    fields: Array<[keyof RequiredTrackballSettings, string]>;
+  }> = [
+    {
+      title: "Left",
+      fields: [
+        ["leftCpi", "CPI"],
+        ["pointerMinFactor", "Min factor"],
+        ["pointerMaxFactor", "Max factor"],
+        ["pointerSpeedThreshold", "Speed threshold"],
+        ["pointerAccelerationExponent", "Accel exponent"],
+      ],
+    },
+    {
+      title: "Right",
+      fields: [
+        ["rightCpi", "CPI"],
+        ["rightPointerMinFactor", "Min factor"],
+        ["rightPointerMaxFactor", "Max factor"],
+        ["rightPointerSpeedThreshold", "Speed threshold"],
+        ["rightPointerAccelerationExponent", "Accel exponent"],
+      ],
+    },
+    {
+      title: "Common",
+      fields: [
+        ["gestureThreshold", "Gesture threshold"],
+        ["tabThreshold", "Tab threshold"],
+        ["desktopThreshold", "Desktop threshold"],
+      ],
+    },
   ];
 
   return (
@@ -5894,18 +5928,29 @@ function TrackballEditor({
       <p className="eyebrow">Trackball Edit</p>
       <h2>トラックボール編集</h2>
       <div className="trackball-editor">
-        {fields.map(([key, label]) => (
-          <label key={key}>
-            {label}
-            <input
-              name={`trackball-${key}`}
-              min={0}
-              type="number"
-              value={form[key]}
-              onChange={(event) => setForm({ ...form, [key]: Number(event.target.value) })}
-            />
-          </label>
-        ))}
+        <div className="trackball-editor-groups">
+          {groups.map((group) => (
+            <fieldset className="trackball-setting-group trackball-editor-group" key={group.title}>
+              <legend className="trackball-setting-group-heading">
+                <strong>{group.title}</strong>
+              </legend>
+              <div className="trackball-editor-group-fields">
+                {group.fields.map(([key, label]) => (
+                  <label key={key}>
+                    {label}
+                    <input
+                      name={`trackball-${key}`}
+                      min={0}
+                      type="number"
+                      value={form[key]}
+                      onChange={(event) => setForm({ ...form, [key]: Number(event.target.value) })}
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
           設定に反映
         </button>
