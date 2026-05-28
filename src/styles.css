@@ -1393,11 +1393,12 @@ select:focus-visible {
   padding: 24px 28px 28px;
 }
 
-/* Anything before the workbench section is sized to content; the workbench
-   takes the remaining height and scrolls internally so the keyboard above
-   it stays visible. */
+/* Anything before the workbench section is sized to content; the active
+   edit or Build & Flash workbench takes the remaining height and scrolls
+   internally so the keyboard above stays visible. */
 .keyboard-panel > .workbench-tabs,
-.keyboard-panel > .direct-summary {
+.keyboard-panel > .direct-summary,
+.keyboard-panel > .browser-release-workbench {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -2264,6 +2265,11 @@ select:focus-visible {
 }
 .build-workbench {
   grid-template-columns: minmax(0, 1fr);
+}
+.keyboard-panel > .browser-release-workbench {
+  align-content: start;
+  overflow: auto;
+  padding-right: 2px;
 }
 @container workbench (min-width: 720px) {
   .build-workbench {

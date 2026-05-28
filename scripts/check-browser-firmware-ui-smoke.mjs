@@ -48,6 +48,7 @@ async function runSmoke() {
     for (const viewport of [
       { name: "desktop", width: 1440, height: 1000 },
       { name: "narrow-desktop", width: 1024, height: 900 },
+      { name: "short-desktop", width: 1024, height: 640 },
     ]) {
       const page = await browser.newPage({ viewport });
       page.on("pageerror", (error) => failures.push(`${viewport.name}: page error: ${error.message}`));
@@ -60,6 +61,7 @@ async function runSmoke() {
       failures.push(...(await inspectFirmwareActionButtons(page, viewport.name)));
       await page.getByRole("button", { name: "Build & Flash" }).click();
       await page.getByText("GitHub Commit & Build").waitFor();
+      failures.push(...(await inspectBuildFlashScrollArea(page, viewport.name)));
       failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
       failures.push(...(await inspectFirmwareUi(page, viewport.name)));
       failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
@@ -442,6 +444,35 @@ async function inspectBuildFlashBackAction(page, label) {
   }
 
   return failures;
+}
+
+async function inspectBuildFlashScrollArea(page, label) {
+  const state = await page.evaluate(() => {
+    const panel = document.querySelector(".browser-release-workbench");
+    if (!panel) return null;
+    const style = getComputedStyle(panel);
+    const before = panel.scrollTop;
+    panel.scrollTop = panel.scrollHeight;
+    const after = panel.scrollTop;
+    panel.scrollTop = before;
+    return {
+      canScroll: after > before,
+      clientHeight: panel.clientHeight,
+      overflowY: style.overflowY,
+      scrollHeight: panel.scrollHeight,
+    };
+  });
+
+  if (!state) {
+    return [`${label}: Build & Flash panel is missing`];
+  }
+  if (state.scrollHeight > state.clientHeight + 1 && state.overflowY !== "auto" && state.overflowY !== "scroll") {
+    return [`${label}: Build & Flash panel overflows vertically without scroll, overflow-y is ${state.overflowY}`];
+  }
+  if (state.scrollHeight > state.clientHeight + 1 && !state.canScroll) {
+    return [`${label}: Build & Flash panel content cannot be scrolled to the bottom`];
+  }
+  return [];
 }
 
 async function inspectTrackballEditActions(page, label) {
