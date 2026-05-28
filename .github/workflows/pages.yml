@@ -1,12 +1,31 @@
 name: Deploy GitHub Pages
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/pages.yml"
+      - "docs/**"
+      - "package-lock.json"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "wrangler.jsonc"
   push:
     branches:
       - main
+      - feature/firmware-mode
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"
+      - "package-lock.json"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "wrangler.jsonc"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +38,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-check:
+    name: Browser firmware release gates
+    runs-on: ubuntu-latest
+    env:
+      BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/kobitokey-playwright-browsers
+      WRANGLER_LOG_PATH: /tmp/kobitokey-wrangler-logs
+      WRANGLER_REGISTRY_PATH: /tmp/kobitokey-wrangler-registry
+      XDG_CONFIG_HOME: /tmp/kobitokey-xdg-config
+      npm_config_cache: /tmp/kobitokey-npm-cache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Browser firmware local release check
+        run: npm run check:browser-firmware
+      - name: Install Playwright Chromium
+        run: npx playwright-core install chromium
+      - name: Browser firmware rendered UI smoke
+        run: npm run check:browser-firmware:ui
+
   deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: release-check
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

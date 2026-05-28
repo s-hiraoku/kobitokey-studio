@@ -37,7 +37,7 @@ const files = {
   docsUserGuide: read("docs/user-guide.md"),
   docsQuickStart: read("docs/quick-start.md"),
   docsUsageGuide: read("docs/usage-guide.md"),
-  browserFirmwareCi: read(".github/workflows/browser-firmware-release.yml"),
+  pagesCi: read(".github/workflows/pages.yml"),
   externalEvidenceCheck: read("scripts/check-browser-firmware-external-evidence.mjs"),
   externalEvidenceTemplate: read("docs/browser-firmware-e2e-evidence.template.json"),
 };
@@ -279,13 +279,15 @@ const checks = [
   {
     name: "browser firmware release checks run in GitHub Actions",
     pass: () =>
-      allIncludes(files.browserFirmwareCi, [
-        "Browser Firmware Release Check",
+      allIncludes(files.pagesCi, [
+        "Browser firmware release gates",
         "npm ci",
         "npm run check:browser-firmware",
         "npx playwright-core install chromium",
         "npm run check:browser-firmware:ui",
-        "BROWSER_FIRMWARE_TMP_DIR: ${{ runner.temp }}",
+        "BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware",
+        "needs: release-check",
+        "github.event_name == 'workflow_dispatch'",
       ]),
   },
   {
