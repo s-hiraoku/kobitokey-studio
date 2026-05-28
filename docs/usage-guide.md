@@ -8,6 +8,8 @@ permalink: /usage-guide/
 
 このガイドのゴールは、ユーザが自分で KobitoKey Studio を起動し、目的に合うモードを選び、キーマップ、Combo、トラックボール設定、Firmware build、UF2 書き込みまで進められるようにすることです。
 
+設定内容ごとにアプリを直接開く場合は [ユーザガイド](../user-guide/) を使ってください。
+
 ## 初版でできること(重要)
 
 初版リリースでは、ブラウザ版とデスクトップ版で使える機能が大きく違います。
@@ -70,9 +72,9 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | --- | --- |
 | 上部バー | `Firmware` / `Direct` の切り替え、プロジェクト読み込み、接続状態 |
 | 左側 | layer 一覧 |
-| 中央 | 実際の KobitoKey 形状に沿った keymap 表示、Combo overlay、作業 tabs |
+| 中央 | 実際の KobitoKey 形状に沿った keymap 表示、Combo overlay、編集 tabs、Build/Flash とリセット actions |
 | 右側 | 選択中 key の binding 編集 |
-| 中央下部 tabs | Combo、Trackball、Build/Flash、Diff 操作 |
+| 中央下部 tabs | Combo、Trackball、Diff 操作 |
 
 基本操作は「左で layer を選ぶ → 中央で key を選ぶ → 右で設定する」です。
 
@@ -83,7 +85,8 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | `参照…` | Firmware Mode 上部 | Tauri 版で `KobitoKey_QWERTY` フォルダを picker で選ぶ |
 | `読み込み` | Firmware Mode 上部 | 指定した project から keymap と overlay を読む |
 | `GitHub から読み込み` | Firmware Mode Build/Flash | ブラウザ版で repository の keymap と overlay を読む |
-| Firmware repository URL | `Build & Flash` タブ | GitHub Actions を実行する firmware repository を指定する |
+| Firmware repository URL | `Build & Flash` ボタンで開く画面 | GitHub Actions を実行する firmware repository を指定する |
+| `編集をリセット` | Firmware Mode 中央下部 | 未 commit / 未保存の keymap と overlay 編集を読み込み時点へ戻す |
 | `保存` | Firmware Mode 中央上部 | 編集した keymap / overlay をローカルへ保存する(ハンドルがあればフォルダに直接上書き、なければダウンロード) |
 | 接続方法 select + Connect ボタン | Direct 接続パネル | USB か Bluetooth を選んでブラウザのデバイス選択ダイアログを開く |
 | `再読み込み` | Direct Mode 上部 (接続済み) | 実機から keymap などを再取得する |
@@ -233,9 +236,9 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 ### 3.1 プロジェクトを読み込む
 
 1. 上部のモード切り替えで `Firmware` を選びます。
-2. ブラウザ版では `Build & Flash` タブで `Firmware repository URL` と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。Tauri 版ではヘッダの「プロジェクトフォルダ」入力欄の隣にある `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
+2. ブラウザ版では中央下部の `Build & Flash` ボタンで `Firmware repository URL` と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。Tauri 版ではヘッダの「プロジェクトフォルダ」入力欄の隣にある `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
 3. Tauri 版では `読み込み` を押します。
-4. (任意)Tauri 版でビルドまで進める場合は `Build & Flash` タブを開き、`Firmware repository URL` に GitHub の repository URL を指定します。
+4. (任意)Tauri 版でビルドまで進める場合は `Build & Flash` ボタンを押し、`Firmware repository URL` に GitHub の repository URL を指定します。
 
 ブラウザ版の初回は GitHub repository URL と branch を指定してください。Tauri 版のプロジェクトフォルダ初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
 
@@ -340,6 +343,7 @@ Firmware Mode のトラックボール設定は overlay ファイルへ反映さ
 3. 内容に問題がなければ、ブラウザ版では `Build & Flash` の `Diff 確認済み` を押します。Tauri 版では中央上部の `保存` を押します。
 
 ブラウザ版では、`Commit & Build` で GitHub repository に commit を作るまで firmware repository は更新されません。Tauri デスクトップ版では、読み込んだ `KobitoKey_QWERTY` のファイルへ直接保存されます。
+変更を破棄したい場合は、中央下部の `編集をリセット` で keymap と overlay を読み込み時点へ戻せます。`Build & Flash` 画面では編集 tabs は隠れます。編集へ戻る場合はパネル内の `編集に戻る` を押します。
 
 保存前に見るべきポイントは次です。
 
@@ -355,7 +359,7 @@ Firmware Mode のトラックボール設定は overlay ファイルへ反映さ
 
 ブラウザ版:
 
-1. `Build & Flash` を開きます。
+1. `Build & Flash` ボタンを押します。
 2. `Firmware repository` と `Branch` を確認します。Branch が空の場合、GitHub 読み込みや commit/build は進めません。
 3. `GitHub で接続`、または token 入力で GitHub に接続します。device flow の新規タブが開かない場合は、画面に出る `GitHub 認証を開く` リンクを押して user code を入力します。
 4. `GitHub から読み込み` で keymap / overlay を読み込みます。
@@ -368,7 +372,7 @@ Firmware Mode のトラックボール設定は overlay ファイルへ反映さ
 Tauri 版:
 
 1. Firmware Mode で変更します。
-2. `Build & Flash` を開きます。
+2. `Build & Flash` ボタンを押します。
 3. 初回または設定変更後は `接続確認` を押します。
 4. すべて OK になったら `保存してBuild` を押します。
 5. `status 更新` で最新 run の状態を確認します。
@@ -568,9 +572,9 @@ Trackball は Direct Mode では参照のみです。変更する場合は Firmw
 
 ### GitHub Actions build から書き込みまで行いたい
 
-ブラウザ版では Firmware Mode の `Build & Flash` で GitHub に接続し、repository を読み込んで変更後に `Commit & Build` を押します。build 成功後に artifact を取得し、left / right UF2 を順番に bootloader volume へ保存します。
+ブラウザ版では Firmware Mode の `Build & Flash` ボタンから GitHub に接続し、repository を読み込んで変更後に `Commit & Build` を押します。build 成功後に artifact を取得し、left / right UF2 を順番に bootloader volume へ保存します。
 
-Tauri 版では Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で commit / push します。その後、KobitoKey Studio の `Build & Flash` から build を起動し、artifact を download して、左右 UF2 を順番に bootloader volume へコピーします。
+Tauri 版では Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で commit / push します。その後、KobitoKey Studio の `Build & Flash` ボタンから build を起動し、artifact を download して、左右 UF2 を順番に bootloader volume へコピーします。
 
 ### ブラウザ版で試した変更を正式反映したい
 

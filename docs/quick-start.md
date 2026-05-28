@@ -7,6 +7,7 @@ permalink: /quick-start/
 # Quick Start
 
 このページは、KobitoKey Studio を初めて使う人が最短で起動し、最初の設定変更まで進むための手順です。詳しい説明やトラブルシューティングは [使い方ガイド](../usage-guide/) を参照してください。
+設定内容ごとにアプリを直接開く場合は [ユーザガイド](../user-guide/) を使ってください。
 
 ## 初版での機能差(重要)
 
@@ -57,14 +58,14 @@ npm run tauri dev
 ファイルとして確実に設定を残す基本ルートです。ブラウザ版は GitHub repository から読み込み、commit、GitHub Actions build、artifact 取得まで進めます。Tauri デスクトップ版はローカル clone と `gh` CLI を使います。
 
 1. 上部の `Firmware` を選びます。
-2. ブラウザ版では `Build & Flash` タブで GitHub repository URL と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。Tauri 版ではヘッダの「プロジェクトフォルダ」で `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
+2. ブラウザ版では `Build & Flash` ボタンで GitHub repository URL と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。Tauri 版ではヘッダの「プロジェクトフォルダ」で `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
 3. Tauri 版では `読み込み` を押します。
 4. 左側で layer を選びます。
 5. 中央のキーボード図で変更したい key を選びます。
 6. 右側の `Binding` で新しい binding を選びます。
 7. `反映` を押します。
 8. `Diff` で変更内容を確認します。
-9. ブラウザ版では `Diff 確認済み` を押してから `Commit & Build` を押します。Tauri 版では `保存` を押します。
+9. ブラウザ版では `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。Tauri 版では `保存` を押します。
 10. build 成功後に artifact を取得し、left / right UF2 を順番に書き込みます。
 
 Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。key binding や Combo の binding / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
@@ -85,7 +86,7 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 
 ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
-1. KobitoKey Studio の `Build & Flash` tab を開きます。
+1. KobitoKey Studio の `Build & Flash` ボタンを押します。
 2. ブラウザ版では GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。Tauri 版では必要に応じて `接続確認` を押し、git / gh / workflow が OK になっていることを確認します。
 3. ブラウザ版では `Commit & Build`、Tauri 版では `保存してBuild` を押します。
 4. build 成功後、`Artifact 取得` を押します。

@@ -56,10 +56,13 @@ async function runSmoke() {
       failures.push(...(await inspectKeyBindingEditActions(page, viewport.name)));
       failures.push(...(await inspectComboEditActions(page, viewport.name)));
       failures.push(...(await inspectTrackballEditActions(page, viewport.name)));
-      await page.getByRole("tab", { name: "Build & Flash" }).click();
+      failures.push(...(await inspectFirmwareActionButtons(page, viewport.name)));
+      await page.getByRole("button", { name: "Build & Flash" }).click();
       await page.getByText("GitHub Commit & Build").waitFor();
       failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
       failures.push(...(await inspectFirmwareUi(page, viewport.name)));
+      failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
+      failures.push(...(await inspectFirmwareResetAction(page, viewport.name)));
       await page.close();
     }
   } finally {
@@ -329,6 +332,89 @@ async function inspectComboEditActions(page, label) {
   }
   if (afterDelete.editingCount !== 0) {
     failures.push(`${label}: deleting the selected combo should clear the editing selection`);
+  }
+
+  return failures;
+}
+
+async function inspectFirmwareActionButtons(page, label) {
+  const failures = [];
+  const actions = page.locator(".firmware-workbench-actions");
+  const buildButton = actions.getByRole("button", { name: "Build & Flash" });
+  const resetButton = actions.getByRole("button", { name: "編集をリセット" });
+
+  if ((await buildButton.count()) !== 1) {
+    failures.push(`${label}: Build & Flash should be a firmware action button`);
+    return failures;
+  }
+  if ((await resetButton.count()) !== 1) {
+    failures.push(`${label}: reset edits should be paired with the Build & Flash action`);
+    return failures;
+  }
+  if (await resetButton.isDisabled()) {
+    failures.push(`${label}: reset edits should be enabled after firmware edits`);
+  }
+
+  const buildTabCount = await page.getByRole("tab", { name: "Build & Flash" }).count();
+  if (buildTabCount !== 0) {
+    failures.push(`${label}: Build & Flash should not appear as an edit tab`);
+  }
+
+  return failures;
+}
+
+async function inspectFirmwareResetAction(page, label) {
+  const failures = [];
+  const resetButton = page.locator(".firmware-workbench-actions").getByRole("button", { name: "編集をリセット" });
+  await resetButton.click();
+  const afterReset = await page.evaluate(() => {
+    const diffTab = Array.from(document.querySelectorAll('[role="tab"]')).find((tab) =>
+      tab.textContent?.includes("Diff"),
+    );
+    const match = diffTab?.textContent?.match(/Diff\s*(\d+)/);
+    return {
+      diffCount: match ? Number(match[1]) : null,
+      resetDisabled: Array.from(document.querySelectorAll(".firmware-workbench-actions button")).find((button) =>
+        button.textContent?.includes("編集をリセット"),
+      )?.disabled ?? null,
+      status: document.querySelector(".statusbar")?.textContent?.trim() ?? "",
+    };
+  });
+
+  if (afterReset.diffCount !== 0) {
+    failures.push(`${label}: reset edits should clear firmware diffs`);
+  }
+  if (afterReset.resetDisabled !== true) {
+    failures.push(`${label}: reset edits button should disable after resetting`);
+  }
+  if (!afterReset.status.includes("firmware 編集を読み込み時点に戻しました")) {
+    failures.push(`${label}: reset edits should announce that firmware edits were restored`);
+  }
+
+  return failures;
+}
+
+async function inspectBuildFlashBackAction(page, label) {
+  const failures = [];
+  const buildPanelTabs = await page.locator(".browser-release-workbench .workbench-tablist").count();
+  if (buildPanelTabs !== 0) {
+    failures.push(`${label}: Build & Flash panel should hide edit tabs`);
+  }
+
+  const backButton = page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" });
+  if ((await backButton.count()) !== 1) {
+    failures.push(`${label}: Build & Flash panel should expose a back-to-edit button`);
+    return failures;
+  }
+
+  await backButton.click();
+  const editTabsVisible = await page.locator(".workbench-tablist").count();
+  if (editTabsVisible !== 1) {
+    failures.push(`${label}: back-to-edit button should restore edit tabs`);
+  }
+  const buildPanelVisible = await page.locator(".browser-release-workbench").count();
+  if (buildPanelVisible !== 0) {
+    failures.push(`${label}: back-to-edit button should close the Build & Flash panel`);
   }
 
   return failures;

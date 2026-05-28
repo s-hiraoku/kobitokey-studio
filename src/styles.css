@@ -1401,6 +1401,9 @@ select:focus-visible {
   flex: 1 1 0;
   min-height: 0;
 }
+.keyboard-panel > .firmware-workbench-actions {
+  flex: 0 0 auto;
+}
 
 .direct-connection-bar {
   display: grid;
@@ -2147,13 +2150,40 @@ select:focus-visible {
 /* ----------------------------------------------------------------
    Workbench tabs (under the keyboard)
    ---------------------------------------------------------------- */
+.firmware-workbench-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: safe center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  min-width: 0;
+  border-top: 1px dashed var(--hairline);
+  padding-top: var(--sp-4);
+}
+.firmware-workbench-actions button {
+  display: inline-flex;
+  align-items: safe center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 var(--sp-4);
+  white-space: nowrap;
+}
+.firmware-workbench-actions button svg {
+  flex: 0 0 auto;
+}
+.firmware-workbench-actions .button-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .workbench-tabs {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-top: 1px dashed var(--hairline);
-  padding-top: var(--sp-4);
 }
 
 .workbench-tablist {
@@ -2304,6 +2334,22 @@ select:focus-visible {
 }
 .workbench-grid .build-actions button:first-child { /* primary slot */
   /* leave as-is; user can promote later */
+}
+.workbench-grid .build-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.workbench-grid .build-panel-heading > div {
+  min-width: 0;
+}
+.workbench-grid .build-panel-heading button {
+  width: auto;
+  min-width: 118px;
+  margin-top: 0;
+  white-space: nowrap;
 }
 .workbench-grid .flash-panel { display: grid; gap: var(--sp-2); }
 .workbench-grid .flash-panel > div { margin-bottom: var(--sp-1); }

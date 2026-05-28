@@ -77,7 +77,8 @@ permalink: /browser-firmware-release-plan/
 - `src/lib/firmwareReleaseFlow.test.ts` で公開条件に直結する判断を固定する。
 - `src/lib/githubFirmware.ts` に GitHub repository、firmware file path、workflow URL、commit plan の境界を置く。
 - `src/lib/githubFirmwareClient.ts` に GitHub Contents / Git Data / Actions API client を置く。
-- ブラウザ版の `Build & Flash` tab では GitHub OAuth device flow または GitHub token のメモリ入力で接続し、repository 読み込み、commit、workflow dispatch、対象 commit の run 自動確認、artifact zip 展開、left / right UF2 分類まで進められる。OAuth flow は `repo` scope を要求し、fine-grained token を使う場合は対象 repository の Contents write / Actions write に絞る。
+- ブラウザ版の `Build & Flash` ボタンでは GitHub OAuth device flow または GitHub token のメモリ入力で接続し、repository 読み込み、commit、workflow dispatch、対象 commit の run 自動確認、artifact zip 展開、left / right UF2 分類まで進められる。OAuth flow は `repo` scope を要求し、fine-grained token を使う場合は対象 repository の Contents write / Actions write に絞る。
+- `Build & Flash` は Combo / Trackball / Diff の編集 tab ではなく、`編集をリセット` と並ぶ firmware action として表示する。Build & Flash パネル表示中は編集 tab を隠し、パネル内の `編集に戻る` で直前の編集 tab に戻れる。`編集をリセット` は keymap と左右 overlay の未 commit / 未保存変更を読み込み時点へ戻し、古い commit / run / artifact / flash 進捗を閉じる。
 - repository と branch が揃うまで GitHub 読み込み、commit、build、artifact、flash は進めない。branch は API 呼び出し前に trim し、空なら release gate で止める。
 - commit 成功後に workflow dispatch だけ失敗した場合は、commit SHA を保持したまま `Build 起動` で build だけを再試行できる。
 - Artifact 取得直前には run id の実体を GitHub API で再確認し、画面上の commit SHA と `head_sha` が一致し、run の `head_branch` が選択 branch と一致し、かつ run が success の場合だけ zip を取得する。
@@ -112,18 +113,18 @@ permalink: /browser-firmware-release-plan/
 2. `npm test`、`npm run build`、`wrangler deploy --dry-run` が順に通り、Worker と static assets が同じ deploy bundle に入る。
 3. Wrangler が local sandbox 上で log file の EPERM を出しても、command exit code が 0 で assets directory を読めていれば dry-run は成功扱いにできる。
 4. `npm run check:browser-firmware:merge-readiness` が通り、作業ツリーが clean で、branch が `origin/main` に遅れておらず、non-destructive merge check で conflict が出ないことを確認する。
-5. `http://127.0.0.1:1420/?mode=firmware` で `Firmware` が開き、`Build & Flash` に GitHub wizard が表示される。
+5. `http://127.0.0.1:1420/?mode=firmware` で `Firmware` が開き、`Build & Flash` ボタンから GitHub wizard が表示される。
 6. GitHub wizard に `GitHub Commit & Build`、`Firmware repository`、`Branch`、`GitHub から読み込み`、`Commit & Build`、`Build 起動`、`Artifact 取得`、release checks、`UF2 → Bootloader`、left/right 書き込みボタンが表示される。
 7. `/api/github/device-code` が same-origin Worker route として応答する。
 8. production deploy 後に `npm run check:browser-firmware:production-preflight` を実行し、`?mode=firmware` URL、release security headers、Worker API routes、unsupported OAuth scope rejection が本番で通ることを確認する。公開直前の最終 preflight では `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run check:browser-firmware:production-release-preflight` を実行し、`repo` scope の device code が本番 Worker route から発行され、同じ client id が GitHub 接続ボタン用の frontend bundle に含まれていることも確認する。
 9. GitHub Actions の `Browser Firmware Release Check` が通る。この workflow は `npm run check:browser-firmware` に加えて Playwright Chromium を入れ、`npm run check:browser-firmware:ui` で rendered UI smoke も実行する。
-10. QA 端末で `npm run check:browser-firmware:ui` を実行し、`?mode=firmware` の Build & Flash が Chrome/Edge 相当で描画されること、Build/Flash ボタンが崩れないこと、右ペインが key inspector だけになっていること、key binding / Combo / Trackball 編集が表示と Diff に反映されること、release wizard が未接続・token 入力後・未ロード状態を正しく止めること、token が localStorage に残らず消去ボタンで消えること、layer 追加・複製が使えて参照中 layer と最後以外の layer は削除できないことを確認する。Codex sandbox など macOS のブラウザプロセス制限がある環境では、通常の `npm run check:browser-firmware` と外部証跡 gate を優先する。
+10. QA 端末で `npm run check:browser-firmware:ui` を実行し、`?mode=firmware` の Build & Flash が Chrome/Edge 相当で描画されること、Build/Flash ボタンと `編集をリセット` ボタンが編集 tab の外に並び、Build & Flash パネル中は編集 tab が隠れて `編集に戻る` で復帰できること、ボタン表示が崩れないこと、右ペインが key inspector だけになっていること、key binding / Combo / Trackball 編集が表示と Diff に反映されること、`編集をリセット` が Diff を消して読み込み時点へ戻すこと、release wizard が未接続・token 入力後・未ロード状態を正しく止めること、token が localStorage に残らず消去ボタンで消えること、layer 追加・複製が使えて参照中 layer と最後以外の layer は削除できないことを確認する。Codex sandbox など macOS のブラウザプロセス制限がある環境では、通常の `npm run check:browser-firmware` と外部証跡 gate を優先する。
 11. 公開判定に使う外部 E2E 証跡ファイルは、可能なら `BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run collect:browser-firmware:e2e-report -- --out <report.json>` で生成する。QA 端末で production URL の rendered UI smoke も同時に実行できる場合は `--run-ui-smoke` を付ける。collector は production URL と API route の security header / Worker route、OAuth scope 制限、本番 Worker route 経由の OAuth device-code 発行、GitHub commit の変更ファイル一覧、Actions run の head SHA / head branch、Actions artifact の name / id / size / expiry、Actions artifact zip 内の UF2 entry name / SHA-256、manifest entry name / SHA-256、左右 UF2 の SHA-256 を収集し、生成後に validator へ通す。手動で作る場合は `docs/browser-firmware-e2e-evidence.template.json` を元に verifier、`?mode=firmware` 付き production URL、CI run、GitHub run、artifact、flash 結果、Build & Flash / token 非保存と消去 / key editing / Combo / Trackball / release wizard precondition / layer 操作 smoke 結果を埋める。token と UF2 bytes は記録しない。validator は template placeholder、Firmware Mode 以外の production URL、production/API security headers 未確認、Worker OAuth device-code 発行未確認、GitHub commit / run URL の repository 不一致、Actions run の head SHA 不一致、Actions run の head branch と選択 branch の不一致、managed firmware files 以外を含む commit、missing / expired / empty Actions artifact、Actions artifact zip 内 UF2 と一致しない left/right UF2 hash、manifest 分類なのに manifest entry 証跡がない場合、filename 分類なのに left/right token がない場合、placeholder hash、CI 未通過、left/right の bootloader marker 未確認、書き込み直前確認未実施、keyboard half 未確認、UI smoke 未実行、token 非保存/消去 smoke 未実行、key binding / Combo / Trackball 編集 smoke 未実行、release wizard precondition smoke 未実行、layer 追加・複製・参照中 layer 削除ブロック・安全な削除の smoke 未実行を拒否する。
 
 ### 2. GitHub E2E
 
 1. Cloudflare production に `VITE_GITHUB_OAUTH_CLIENT_ID` を設定する。
-2. PC の Chrome / Edge で公開 URL を開き、`Firmware` → `Build & Flash` を開く。
+2. PC の Chrome / Edge で公開 URL を開き、`Firmware` → `Build & Flash` ボタンで GitHub wizard を開く。
 3. `GitHub で接続` で device flow を完了する。新規タブが popup block された場合も、画面上の `GitHub 認証を開く` リンクから認証を開けることを確認する。client id 不備、認証キャンセル、期限切れが画面上の失敗メッセージとして返ることも確認する。
 4. `Firmware repository` と `Branch` を指定し、`GitHub から読み込み` で `config/KobitoKey.keymap` と左右 overlay が読み込まれる。
 5. keymap か overlay を 1 箇所だけ変更し、`Diff 確認済み` → `Commit & Build` を押す。

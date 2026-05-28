@@ -335,7 +335,11 @@ function App() {
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
-  const [workbenchTab, setWorkbenchTab] = React.useState<WorkbenchTabId>("combos");
+  const [workbenchTab, setWorkbenchTab] = React.useState<WorkbenchTabId>(() => initialWorkbenchTab());
+  const [lastEditWorkbenchTab, setLastEditWorkbenchTab] = React.useState<WorkbenchTabId>(() => {
+    const initial = initialWorkbenchTab();
+    return initial === "build" ? "combos" : initial;
+  });
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
   const [firmwareBuildCheck, setFirmwareBuildCheck] = React.useState<FirmwareBuildCheck | null>(null);
@@ -797,6 +801,53 @@ function App() {
     } catch (error) {
       setStatus(`保存失敗: ${formatError(error)}`);
     }
+  }
+
+  function resetFirmwareEdits() {
+    if (!files || keymapDiff.length === 0) {
+      setStatus("リセットする firmware 編集はありません");
+      return;
+    }
+
+    setFiles({
+      ...files,
+      keymap: savedKeymap,
+      leftOverlay: savedLeftOverlay,
+      rightOverlay: savedRightOverlay,
+    });
+    setActiveLayerIndex(0);
+    setSelectedKeyIndex(0);
+    setSelectedComboId(null);
+    setBrowserFirmwareDiffReviewed(false);
+    setBrowserFirmwareCommitSha(null);
+    setBrowserFirmwareCommitUrl("");
+    setBrowserFirmwareRunId(null);
+    setBrowserFirmwareRunUrl("");
+    setBrowserFirmwareBuildStatus("idle");
+    setBrowserFirmwareArtifacts(null);
+    setBrowserFirmwareDownloadedSide(null);
+    setBrowserFirmwareLeftFlashed(false);
+    setBrowserFirmwareRightFlashed(false);
+    setBuildStatus("編集を読み込み時点に戻しました");
+    setStatus("firmware 編集を読み込み時点に戻しました");
+  }
+
+  function selectFirmwareWorkbenchTab(tab: WorkbenchTabId) {
+    setWorkbenchTab(tab);
+    if (tab !== "build") {
+      setLastEditWorkbenchTab(tab);
+    }
+  }
+
+  function openFirmwareBuildFlash() {
+    if (workbenchTab !== "build") {
+      setLastEditWorkbenchTab(workbenchTab);
+    }
+    setWorkbenchTab("build");
+  }
+
+  function closeFirmwareBuildFlash() {
+    setWorkbenchTab(lastEditWorkbenchTab === "build" ? "combos" : lastEditWorkbenchTab);
   }
 
   async function applyBinding(nextBinding: string) {
@@ -2344,7 +2395,7 @@ function App() {
 	          ) : editorMode === "firmware" ? (
 	            <div className="topbar-hint">
 	              <UploadCloud size={17} />
-	              <span>Build & Flash タブで GitHub repository を読み込みます</span>
+	              <span>Build & Flash ボタンから GitHub repository を読み込みます</span>
 	            </div>
 	          ) : directKeymap ? (
             <div className="studio-loader connected-loader" role="group" aria-label="接続状態">
@@ -2522,61 +2573,49 @@ function App() {
               portPath={selectedStudioPort}
             />
           ) : (
-            <WorkbenchTabs
-              activeTab={workbenchTab}
-              onTabChange={setWorkbenchTab}
-              comboCount={combos.length}
-              diffCount={keymapDiff.length}
-            >
-              {workbenchTab === "combos" ? (
-                <ComboWorkbench
-                  combos={combos}
-                  selectedCombos={selectedCombos}
-                  selectedCombo={selectedCombo}
-                  onSelect={setSelectedComboId}
-                  onCreate={createCombo}
-                  onDelete={removeCombo}
-                  onSave={saveCombo}
+            <>
+              <FirmwareWorkbenchActions
+                activeTab={workbenchTab}
+                canReset={keymapDiff.length > 0}
+                onBuildFlash={openFirmwareBuildFlash}
+                onReset={resetFirmwareEdits}
+              />
+              {workbenchTab === "build" && !isDesktopRuntime ? (
+                <BrowserFirmwareReleaseWorkbench
+                  artifacts={browserFirmwareArtifacts}
+                  branch={browserFirmwareBranch}
+                  buildStatus={buildStatus}
+                  busyOperation={browserFirmwareOperation}
+                  commitSha={browserFirmwareCommitSha}
+                  commitUrl={browserFirmwareCommitUrl}
+                  downloadedSide={browserFirmwareDownloadedSide}
+                  flashSide={flashSide}
+                  onBack={closeFirmwareBuildFlash}
+                  readiness={browserFirmwareReadiness}
+                  repoRef={browserFirmwareRepoRef}
+                  repoUrl={firmwareRepoUrl}
+                  runId={browserFirmwareRunId}
+                  runUrl={browserFirmwareRunUrl}
+                  token={browserGithubToken}
+                  onBranchChange={setBrowserFirmwareBranch}
+                  onCancelGithubConnection={cancelBrowserGithubConnection}
+                  onClearToken={clearBrowserGithubToken}
+                  onCommitBuild={commitAndDispatchBrowserFirmwareBuild}
+                  onConnectGithub={connectBrowserGithub}
+                  onCopyUf2={copyBrowserFirmwareUf2}
+                  onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
+                  onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
+                  onLoadProject={loadBrowserFirmwareProject}
+                  onRefreshRun={refreshBrowserFirmwareBuildRun}
+                  onRepoUrlChange={setFirmwareRepoUrl}
+                  onTokenChange={setBrowserGithubToken}
+                  onTriggerBuild={triggerBrowserFirmwareBuild}
+                  userCode={browserGithubUserCode}
+                  verificationUri={browserGithubVerificationUri}
                 />
               ) : null}
-              {workbenchTab === "trackball" ? (
-                <TrackballWorkbench settings={trackball} onApply={applyTrackballSettings} />
-              ) : null}
-	              {workbenchTab === "build" && !isDesktopRuntime ? (
-	                <BrowserFirmwareReleaseWorkbench
-	                  artifacts={browserFirmwareArtifacts}
-	                  branch={browserFirmwareBranch}
-	                  buildStatus={buildStatus}
-	                  busyOperation={browserFirmwareOperation}
-	                  commitSha={browserFirmwareCommitSha}
-	                  commitUrl={browserFirmwareCommitUrl}
-	                  downloadedSide={browserFirmwareDownloadedSide}
-	                  flashSide={flashSide}
-	                  readiness={browserFirmwareReadiness}
-	                  repoRef={browserFirmwareRepoRef}
-	                  repoUrl={firmwareRepoUrl}
-	                  runId={browserFirmwareRunId}
-	                  runUrl={browserFirmwareRunUrl}
-	                  token={browserGithubToken}
-	                  onBranchChange={setBrowserFirmwareBranch}
-	                  onCancelGithubConnection={cancelBrowserGithubConnection}
-	                  onClearToken={clearBrowserGithubToken}
-	                  onCommitBuild={commitAndDispatchBrowserFirmwareBuild}
-	                  onConnectGithub={connectBrowserGithub}
-	                  onCopyUf2={copyBrowserFirmwareUf2}
-	                  onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
-	                  onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
-	                  onLoadProject={loadBrowserFirmwareProject}
-	                  onRefreshRun={refreshBrowserFirmwareBuildRun}
-	                  onRepoUrlChange={setFirmwareRepoUrl}
-	                  onTokenChange={setBrowserGithubToken}
-	                  onTriggerBuild={triggerBrowserFirmwareBuild}
-	                  userCode={browserGithubUserCode}
-	                  verificationUri={browserGithubVerificationUri}
-	                />
-	              ) : null}
-	              {workbenchTab === "build" && isDesktopRuntime ? (
-	                <BuildWorkbench
+              {workbenchTab === "build" && isDesktopRuntime ? (
+                <BuildWorkbench
                   buildCheck={firmwareBuildCheck}
                   buildStatus={buildStatus}
                   flashSide={flashSide}
@@ -2587,6 +2626,7 @@ function App() {
                   bootloaderVolumes={bootloaderVolumes}
                   selectedUf2={selectedUf2}
                   selectedVolume={selectedVolume}
+                  onBack={closeFirmwareBuildFlash}
                   onSelectUf2={setSelectedUf2}
                   onSelectVolume={setSelectedVolume}
                   onCheckBuildReady={checkFirmwareBuildReady}
@@ -2601,8 +2641,31 @@ function App() {
                   onCopySelectedUf2={copySelectedUf2}
                 />
               ) : null}
-              {workbenchTab === "diff" ? <DiffWorkbench diffs={keymapDiff} /> : null}
-            </WorkbenchTabs>
+              {workbenchTab !== "build" ? (
+                <WorkbenchTabs
+                  activeTab={workbenchTab}
+                  onTabChange={selectFirmwareWorkbenchTab}
+                  comboCount={combos.length}
+                  diffCount={keymapDiff.length}
+                >
+                  {workbenchTab === "combos" ? (
+                    <ComboWorkbench
+                      combos={combos}
+                      selectedCombos={selectedCombos}
+                      selectedCombo={selectedCombo}
+                      onSelect={setSelectedComboId}
+                      onCreate={createCombo}
+                      onDelete={removeCombo}
+                      onSave={saveCombo}
+                    />
+                  ) : null}
+                  {workbenchTab === "trackball" ? (
+                    <TrackballWorkbench settings={trackball} onApply={applyTrackballSettings} />
+                  ) : null}
+                  {workbenchTab === "diff" ? <DiffWorkbench diffs={keymapDiff} /> : null}
+                </WorkbenchTabs>
+              ) : null}
+            </>
           )}
         </section>
 
@@ -4339,9 +4402,33 @@ type WorkbenchTabId = "combos" | "trackball" | "build" | "diff";
 const WORKBENCH_TABS: Array<{ id: WorkbenchTabId; label: string }> = [
   { id: "combos", label: "Combos" },
   { id: "trackball", label: "Trackball" },
-  { id: "build", label: "Build & Flash" },
   { id: "diff", label: "Diff" },
 ];
+
+function FirmwareWorkbenchActions({
+  activeTab,
+  canReset,
+  onBuildFlash,
+  onReset,
+}: {
+  activeTab: WorkbenchTabId;
+  canReset: boolean;
+  onBuildFlash: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="firmware-workbench-actions" role="group" aria-label="Firmware actions">
+      <button type="button" className={activeTab === "build" ? "primary active" : "primary"} onClick={onBuildFlash}>
+        <UploadCloud size={16} />
+        <span className="button-label">Build & Flash</span>
+      </button>
+      <button type="button" className="danger" onClick={onReset} disabled={!canReset}>
+        <Undo2 size={16} />
+        <span className="button-label">編集をリセット</span>
+      </button>
+    </div>
+  );
+}
 
 function WorkbenchTabs({
   activeTab,
@@ -4446,6 +4533,7 @@ function BrowserFirmwareReleaseWorkbench({
   commitUrl,
   downloadedSide,
   flashSide,
+  onBack,
   onBranchChange,
   onCancelGithubConnection,
   onClearToken,
@@ -4476,6 +4564,7 @@ function BrowserFirmwareReleaseWorkbench({
   commitUrl: string;
   downloadedSide: FlashSide | null;
   flashSide: FlashSide;
+  onBack: () => void;
   onBranchChange: (value: string) => void;
   onCancelGithubConnection: () => void;
   onClearToken: () => void;
@@ -4504,9 +4593,15 @@ function BrowserFirmwareReleaseWorkbench({
   return (
     <div className="workbench-grid build-workbench browser-release-workbench" aria-busy={isBusy}>
       <section className="build-panel">
-        <div>
-          <p className="eyebrow">Browser Firmware</p>
-          <h2>GitHub Commit & Build</h2>
+        <div className="build-panel-heading">
+          <div>
+            <p className="eyebrow">Browser Firmware</p>
+            <h2>GitHub Commit & Build</h2>
+          </div>
+          <button type="button" onClick={onBack}>
+            <Undo2 size={15} />
+            <span className="button-label">編集に戻る</span>
+          </button>
         </div>
         <label className="build-repo-field" htmlFor="browser-firmware-repository">
           <span>Firmware repository</span>
@@ -4701,6 +4796,7 @@ function BuildWorkbench({
   firmwareRepoLabel,
   firmwareRepoUrl,
   onCheckBuildReady,
+  onBack,
   onCopySelectedUf2,
   onDownloadArtifacts,
   onFlashSideChange,
@@ -4724,6 +4820,7 @@ function BuildWorkbench({
   firmwareRepoLabel: string;
   firmwareRepoUrl: string;
   onCheckBuildReady: () => void;
+  onBack: () => void;
   onCopySelectedUf2: () => void;
   onDownloadArtifacts: () => void;
   onFlashSideChange: (side: FlashSide) => void;
@@ -4742,9 +4839,15 @@ function BuildWorkbench({
   return (
     <div className="workbench-grid build-workbench">
       <section className="build-panel">
-        <div>
-          <p className="eyebrow">Build</p>
-          <h2>GitHub Actions</h2>
+        <div className="build-panel-heading">
+          <div>
+            <p className="eyebrow">Build</p>
+            <h2>GitHub Actions</h2>
+          </div>
+          <button type="button" onClick={onBack}>
+            <Undo2 size={15} />
+            <span className="button-label">編集に戻る</span>
+          </button>
         </div>
         <label className="build-repo-field" htmlFor="tauri-firmware-repository-url">
           <span>Firmware repository URL</span>
@@ -5995,6 +6098,14 @@ function initialEditorMode(): EditorMode {
     return "direct";
   }
   return new URLSearchParams(window.location.search).get("mode") === "firmware" ? "firmware" : "direct";
+}
+
+function initialWorkbenchTab(): WorkbenchTabId {
+  if (typeof window === "undefined") {
+    return "combos";
+  }
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return tab === "trackball" || tab === "build" || tab === "diff" ? tab : "combos";
 }
 
 function getWebRuntimeDiagnostics(isDesktopRuntime: boolean): {

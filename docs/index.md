@@ -8,7 +8,7 @@ permalink: /
 
 KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボール設定、ファームウェアのビルド、UF2 書き込みをまとめて扱うための専用設定エディタです。
 
-すぐに始める場合は [Quick Start](./quick-start/) を開いてください。背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。公開とリリース確認は [Deployment](./deployment/) にまとめています。
+設定内容ごとの入口から始める場合は [ユーザガイド](./user-guide/) を開いてください。すぐに手順だけ見る場合は [Quick Start](./quick-start/)、背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。公開とリリース確認は [Deployment](./deployment/) にまとめています。
 
 ブラウザ版の公開 URL は <https://kobitokey-studio.pages.dev/> です。
 
@@ -29,6 +29,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 ## 使い方の入口
 
+- [設定内容ごとのアプリ入口を見る](./user-guide/)
 - [Quick Start で最短手順を見る](./quick-start/)
 - [最初の準備を確認する](./usage-guide/#1-事前準備)
 - [モードの違いを確認する](./usage-guide/#2-モード選択の考え方)
