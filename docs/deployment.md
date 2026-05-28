@@ -37,7 +37,7 @@ Pages project の `Settings` → `Builds & deployments` で確認できます。
 
 Worker bundle は `src/worker.ts` から作られ、Vite build 後の redirected Wrangler configuration は `dist/kobitokey_studio/wrangler.json` に出力されます。公開前に `npm run check:browser-firmware` を通すと、OS の一時ディレクトリ配下へ Wrangler dry-run output を作り、Worker と assets が束ねられることを確認できます。
 
-Worker API は `/api/github/device-code`、`/api/github/access-token`、`/api/github/artifact-zip` を `POST` のみ受け付けます。OAuth response と artifact proxy response は `Cache-Control: no-store` を返し、不正 JSON は `invalid_json` の 400 として返します。static asset と API response の両方に security headers を付けます。device-code route は `repo` scope だけを許可し、artifact proxy は GitHub owner / repo / artifact id を検証してから GitHub API へ転送します。
+Worker API は `/api/github/device-code`、`/api/github/access-token`、`/api/github/artifact-zip` を `POST` のみ受け付けます。OAuth response と artifact proxy response は `Cache-Control: no-store` を返し、不正 JSON は `invalid_json` の 400 として返します。`assets.run_worker_first` を有効にしているため、static asset と API response の両方が Worker を通り、security headers が付与されます。device-code route は `repo` scope だけを許可し、artifact proxy は GitHub owner / repo / artifact id を検証してから GitHub API へ転送します。
 
 ### Environment variables
 

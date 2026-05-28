@@ -25,6 +25,7 @@ const files = {
   sessionTest: read("src/lib/browserFirmwareSession.test.ts"),
   worker: read("src/worker.ts"),
   workerTest: read("src/worker.test.ts"),
+  wranglerConfig: read("wrangler.jsonc"),
   bootloader: read("src/lib/uf2Bootloader.ts"),
   bootloaderTest: read("src/lib/uf2Bootloader.test.ts"),
   keymapParser: read("src/lib/keymapParser.ts"),
@@ -326,6 +327,7 @@ const checks = [
   {
     name: "Worker responses include release security headers",
     pass: () =>
+      allIncludes(files.wranglerConfig, ['"binding": "ASSETS"', '"run_worker_first": true']) &&
       allIncludes(files.worker, [
         '"Content-Security-Policy"',
         '"Referrer-Policy"',
