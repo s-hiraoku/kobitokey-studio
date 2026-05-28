@@ -27,15 +27,15 @@ export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/github/device-code") {
-      return withSecurityHeaders(await proxyDeviceCode(request));
+      return withSecurityHeaders(await proxyDeviceCode(request), request);
     }
     if (url.pathname === "/api/github/access-token") {
-      return withSecurityHeaders(await proxyAccessToken(request));
+      return withSecurityHeaders(await proxyAccessToken(request), request);
     }
     if (url.pathname === "/api/github/artifact-zip") {
-      return withSecurityHeaders(await proxyArtifactZip(request));
+      return withSecurityHeaders(await proxyArtifactZip(request), request);
     }
-    return withSecurityHeaders(await env.ASSETS.fetch(request));
+    return withSecurityHeaders(await env.ASSETS.fetch(request), request);
   },
 };
 
@@ -200,17 +200,19 @@ function isGitHubPathSegment(value: string): boolean {
   return /^[A-Za-z0-9_.-]+$/.test(value) && !value.startsWith(".") && !value.endsWith(".");
 }
 
-function withSecurityHeaders(response: Response): Response {
+function withSecurityHeaders(response: Response, request: Request): Response {
+  const url = new URL(request.url);
+  const isLocalDev = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
   const secured = new Response(response.body, response);
   secured.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self'",
+      isLocalDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data:",
-      "connect-src 'self' https://api.github.com",
+      isLocalDev ? "connect-src 'self' https://api.github.com http: ws:" : "connect-src 'self' https://api.github.com",
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'none'",

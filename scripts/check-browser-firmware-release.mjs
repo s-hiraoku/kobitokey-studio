@@ -334,9 +334,12 @@ const checks = [
         '"X-Content-Type-Options"',
         '"Permissions-Policy"',
         '"frame-ancestors \'none\'"',
+        "isLocalDev",
+        "\"script-src 'self' 'unsafe-inline' 'unsafe-eval'\"",
       ]) &&
       allIncludes(files.workerTest, [
         "adds browser security headers to static asset responses",
+        "allows Vite dev preamble under local development hosts",
         "adds browser security headers to API responses without losing no-store",
         "Content-Security-Policy",
         "no-referrer",

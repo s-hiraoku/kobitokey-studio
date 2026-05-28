@@ -335,6 +335,13 @@ describe("worker GitHub API proxy", () => {
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
   });
 
+  it("allows Vite dev preamble under local development hosts", async () => {
+    const response = await worker.fetch(new Request("http://127.0.0.1:1420/"), env);
+
+    expect(response.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+    expect(response.headers.get("Content-Security-Policy")).toContain("connect-src 'self' https://api.github.com http: ws:");
+  });
+
   it("adds browser security headers to API responses without losing no-store", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const response = await worker.fetch(
