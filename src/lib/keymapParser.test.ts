@@ -4,6 +4,7 @@ import {
   addLayer,
   deleteCombo,
   deleteLayer,
+  findLayerReferenceSites,
   formatBindings,
   nextLayerId,
   parseKeymap,
@@ -136,6 +137,56 @@ describe("keymap updates", () => {
     expect(duplicate.id).toBe("default_layer_copy");
     expect(duplicate.label).toBe("Base Copy");
     expect(duplicate.bindings).toEqual(parsed.layers[0].bindings);
+  });
+
+  it("finds references to a target layer before deletion", () => {
+    const source = sampleKeymap()
+      .replace("&kp K1", "&mo 1")
+      .replace("bindings = <&kp TAB>;", "layers = <1>;\n            bindings = <&lt 1 TAB>;");
+    const references = findLayerReferenceSites(parseKeymap(source), 1);
+
+    expect(references).toEqual([
+      {
+        kind: "layer-binding",
+        layerIndex: 0,
+        keyIndex: 0,
+        binding: "&mo 1",
+      },
+      {
+        kind: "combo-binding",
+        comboId: "combo_tab",
+        binding: "&lt 1 TAB",
+      },
+      {
+        kind: "combo-layers",
+        comboId: "combo_tab",
+        layers: [1],
+      },
+    ]);
+  });
+
+  it("preserves combo layer scope when editing a combo", () => {
+    const source = sampleKeymap().replace("bindings = <&kp TAB>;", "layers = <1>;\n            bindings = <&kp TAB>;");
+    const combo = parseKeymap(source).combos[0];
+
+    expect(combo.layers).toEqual([1]);
+
+    const updated = updateCombo(source, combo, {
+      id: "combo_esc",
+      binding: "&kp ESC",
+      keyPositions: [3, 4],
+      timeoutMs: 50,
+    });
+
+    const reparsed = parseKeymap(updated);
+    expect(reparsed.combos[0]).toMatchObject({
+      id: "combo_esc",
+      binding: "&kp ESC",
+      keyPositions: [3, 4],
+      layers: [1],
+      timeoutMs: 50,
+    });
+    expect(updated).toContain("layers = <1>;");
   });
 
   it("updates, adds, and deletes combo blocks", () => {

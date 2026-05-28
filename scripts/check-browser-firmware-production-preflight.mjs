@@ -1,0 +1,214 @@
+const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.pages.dev/?mode=firmware";
+
+const args = process.argv.slice(2);
+const requireOAuth =
+  args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";
+
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`Usage: node scripts/check-browser-firmware-production-preflight.mjs [production-url]
+       node scripts/check-browser-firmware-production-preflight.mjs --require-oauth [production-url]
+
+Checks that a deployed browser Firmware Mode URL has release security headers
+and same-origin Worker API routes before running the full external E2E evidence
+collector.
+
+Default URL:
+  ${DEFAULT_PRODUCTION_URL}
+
+Optional environment:
+  BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID
+    When set, the preflight also verifies that the deployed Worker can start
+    a real GitHub OAuth device flow with repo scope.
+  BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH=true
+    Fails unless BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is set and the
+    deployed Worker can start a real GitHub OAuth device flow with repo scope,
+    and the deployed frontend bundle contains the same public client id.`);
+  process.exit(0);
+}
+
+const productionUrl = args.find((arg) => !arg.startsWith("--")) || process.env.BROWSER_FIRMWARE_PRODUCTION_URL || DEFAULT_PRODUCTION_URL;
+const issues = [];
+
+await checkProductionPreflight(productionUrl);
+
+if (issues.length > 0) {
+  console.error(`${productionUrl} is not ready for browser firmware production preflight:`);
+  for (const issue of issues) {
+    console.error(`- ${issue}`);
+  }
+  process.exit(1);
+}
+
+console.log(`OK ${productionUrl} passed browser firmware production preflight`);
+
+async function checkProductionPreflight(rawUrl) {
+  const url = parseHttpsUrl(rawUrl);
+  if (!url) {
+    issues.push("production URL must be a valid http(s) URL");
+    return;
+  }
+  if (url.searchParams.get("mode") !== "firmware") {
+    issues.push("production URL must include mode=firmware");
+  }
+
+  const page = await fetch(url).catch((error) => {
+    issues.push(`production page request failed: ${formatError(error)}`);
+    return null;
+  });
+  if (!page) return;
+  if (!page.ok) {
+    issues.push(`production page returned ${page.status}`);
+  }
+  if (!hasReleaseSecurityHeaders(page.headers)) {
+    issues.push("production page is missing release security headers");
+  }
+  const pageHtml = await page.text().catch((error) => {
+    issues.push(`production page body could not be read: ${formatError(error)}`);
+    return "";
+  });
+
+  const apiBase = new URL(url);
+  await checkInvalidJsonRoute(new URL("/api/github/device-code", apiBase), "device-code");
+  await checkInvalidJsonRoute(new URL("/api/github/access-token", apiBase), "access-token");
+  await checkInvalidJsonRoute(new URL("/api/github/artifact-zip", apiBase), "artifact-zip");
+  await checkUnsupportedOAuthScope(new URL("/api/github/device-code", apiBase));
+  await checkOAuthDeviceFlow(new URL("/api/github/device-code", apiBase));
+  await checkFrontendOAuthClientId(url, pageHtml);
+}
+
+async function checkInvalidJsonRoute(url, label) {
+  const response = await postJson(url, "{");
+  if (!response) return;
+  if (response.status !== 400) {
+    issues.push(`${label} route should reject invalid JSON with 400, got ${response.status}`);
+    return;
+  }
+  if (response.headers.get("cache-control") !== "no-store") {
+    issues.push(`${label} route should return Cache-Control: no-store`);
+  }
+  if (!hasReleaseSecurityHeaders(response.headers)) {
+    issues.push(`${label} route is missing release security headers`);
+  }
+  const body = await response.json().catch(() => null);
+  if (body?.error !== "invalid_json") {
+    issues.push(`${label} route should return invalid_json for malformed JSON`);
+  }
+}
+
+async function checkUnsupportedOAuthScope(url) {
+  const response = await postJson(url, JSON.stringify({ clientId: "browser-firmware-production-preflight", scope: "admin:org" }));
+  if (!response) return;
+  if (response.status !== 400) {
+    issues.push(`device-code route should reject unsupported OAuth scope with 400, got ${response.status}`);
+    return;
+  }
+  const body = await response.json().catch(() => null);
+  if (body?.error !== "unsupported_oauth_scope") {
+    issues.push("device-code route should return unsupported_oauth_scope for unsupported scopes");
+  }
+}
+
+async function checkOAuthDeviceFlow(url) {
+  const clientId = process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim();
+  if (!clientId) {
+    if (requireOAuth) {
+      issues.push("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required when OAuth preflight is required");
+    }
+    return;
+  }
+
+  const response = await postJson(url, JSON.stringify({ clientId, scope: "repo" }));
+  if (!response) return;
+  if (response.status !== 200) {
+    issues.push(`device-code route should start OAuth device flow with 200, got ${response.status}`);
+    return;
+  }
+  if (response.headers.get("cache-control") !== "no-store") {
+    issues.push("device-code OAuth response should return Cache-Control: no-store");
+  }
+  if (!hasReleaseSecurityHeaders(response.headers)) {
+    issues.push("device-code OAuth response is missing release security headers");
+  }
+  const body = await response.json().catch(() => null);
+  if (!body?.device_code || !body?.user_code || !body?.verification_uri || !body?.expires_in) {
+    issues.push("device-code route should return a complete GitHub OAuth device code response");
+  }
+}
+
+async function checkFrontendOAuthClientId(pageUrl, pageHtml) {
+  const clientId = process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim();
+  if (!clientId) return;
+  if (pageHtml.includes(clientId)) return;
+
+  const assetUrls = collectSameOriginAssetUrls(pageUrl, pageHtml);
+  for (const assetUrl of assetUrls) {
+    const response = await fetch(assetUrl).catch(() => null);
+    if (!response?.ok) continue;
+    const text = await response.text().catch(() => "");
+    if (text.includes(clientId)) {
+      return;
+    }
+  }
+  issues.push("production frontend bundle should include BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID for the GitHub connect button");
+}
+
+function collectSameOriginAssetUrls(pageUrl, pageHtml) {
+  const urls = [];
+  const seen = new Set();
+  const assetPattern = /<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+)["']/gi;
+  for (const match of pageHtml.matchAll(assetPattern)) {
+    const value = match[1];
+    const assetUrl = toSameOriginUrl(pageUrl, value);
+    if (!assetUrl || seen.has(assetUrl)) continue;
+    seen.add(assetUrl);
+    urls.push(assetUrl);
+  }
+  return urls;
+}
+
+function toSameOriginUrl(pageUrl, value) {
+  try {
+    const url = new URL(value, pageUrl);
+    return url.origin === pageUrl.origin ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function postJson(url, body) {
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } catch (error) {
+    issues.push(`${url.pathname} request failed: ${formatError(error)}`);
+    return null;
+  }
+}
+
+function hasReleaseSecurityHeaders(headers) {
+  return (
+    Boolean(headers.get("content-security-policy")) &&
+    headers.get("referrer-policy") === "no-referrer" &&
+    headers.get("x-content-type-options") === "nosniff" &&
+    Boolean(headers.get("permissions-policy"))
+  );
+}
+
+function parseHttpsUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" || url.hostname === "127.0.0.1" || url.hostname === "localhost") {
+      return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
+}

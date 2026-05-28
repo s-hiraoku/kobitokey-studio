@@ -38,6 +38,33 @@ import {
   type StudioKeymap,
 } from "./lib/directKeymap";
 import {
+  canFlashFirmwareSide,
+  deriveFirmwareReleaseReadiness,
+  type FirmwareBuildStatus,
+  type FirmwareReleaseReadiness,
+  type FlashSide,
+} from "./lib/firmwareReleaseFlow";
+import {
+  readBrowserFirmwareSession,
+  writeBrowserFirmwareSession,
+} from "./lib/browserFirmwareSession";
+import {
+  commitGitHubFirmwareFiles,
+  dispatchGitHubFirmwareBuild,
+  downloadGitHubFirmwareArtifacts,
+  findGitHubFirmwareBuildRun,
+  readGitHubFirmwareProjectSnapshot,
+  type GitHubArtifactUf2,
+  type GitHubFirmwareArtifacts,
+} from "./lib/githubFirmwareClient";
+import {
+  formatGitHubRepositoryRef,
+  parseGitHubRepositoryRef,
+  type GitHubRepositoryRef,
+} from "./lib/githubFirmware";
+import { hasGitHubOAuthScope, pollGitHubDeviceToken, requestGitHubDeviceCode } from "./lib/githubDeviceFlow";
+import { assertUf2BootloaderDirectory } from "./lib/uf2Bootloader";
+import {
   BLUETOOTH_ACTION_CHOICES,
   BLUETOOTH_PROFILE_CHOICES,
   KEY_CHOICE_GROUPS,
@@ -51,10 +78,12 @@ import {
 import {
   KeymapCombo,
   KeymapLayer,
+  LayerReferenceSite,
   addCombo,
   addLayer,
   deleteCombo,
   deleteLayer,
+  findLayerReferenceSites,
   nextLayerId,
   parseKeymap,
   updateCombo,
@@ -76,6 +105,7 @@ import {
   parseTrackballSettings,
   updateBlockNumberSetting,
 } from "./lib/trackballParser";
+import type { ProjectFiles } from "./lib/projectFiles";
 import {
   connectWebStudioDevice,
   disconnectWebStudioDevice,
@@ -91,15 +121,6 @@ import {
   writeWebTrackballSettings,
 } from "./lib/zmkStudioWeb";
 import "./styles.css";
-
-type ProjectFiles = {
-  keymapPath?: string;
-  keymap: string;
-  leftOverlayPath?: string;
-  leftOverlay: string;
-  rightOverlayPath?: string;
-  rightOverlay: string;
-};
 
 type FileDiff = {
   filename: string;
@@ -165,7 +186,23 @@ type DirectCombo = KeymapCombo & {
 type DirectComboSource = "none" | "device" | "firmware";
 
 type EditorMode = "firmware" | "direct";
-type FlashSide = "left" | "right";
+type BrowserFirmwareOperation =
+  | "idle"
+  | "oauth"
+  | "load"
+  | "commit-build"
+  | "build"
+  | "refresh-run"
+  | "download-artifact"
+  | "flash";
+type FlashConfirmationKind = "write" | "manual-complete";
+type FlashConfirmationRequest = {
+  id: number;
+  side: FlashSide;
+  kind: FlashConfirmationKind;
+  uf2Name: string;
+  volumeName?: string;
+};
 type StudioConnectionState = "disconnected" | "connecting" | "connected" | "error";
 type DirectConnectionIssue = {
   summary: string;
@@ -208,13 +245,14 @@ type DesktopStudioConnection = {
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
+    showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
   }
 }
 
 const DEFAULT_PROJECT_ROOT = "";
 const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
 const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
-const ENABLE_LAYER_STRUCTURE_EDITING = false;
+const ENABLE_LAYER_STRUCTURE_EDITING = true;
 
 function useMobileUnsupported() {
   const [isMobileUnsupported, setIsMobileUnsupported] = React.useState(() => {
@@ -254,9 +292,13 @@ function MobileUnsupportedScreen() {
 function App() {
   const isMobileUnsupported = useMobileUnsupported();
   const isDesktopRuntime = isTauriRuntime();
-  const [editorMode, setEditorMode] = React.useState<EditorMode>("direct");
+  const storedBrowserFirmwareSession = React.useMemo(
+    () => readBrowserFirmwareSession(typeof window === "undefined" ? null : window.localStorage),
+    [],
+  );
+  const [editorMode, setEditorMode] = React.useState<EditorMode>(() => initialEditorMode());
   const [projectRoot, setProjectRoot] = React.useState(DEFAULT_PROJECT_ROOT);
-  const [firmwareRepoUrl, setFirmwareRepoUrl] = React.useState(DEFAULT_FIRMWARE_REPO_URL);
+  const [firmwareRepoUrl, setFirmwareRepoUrl] = React.useState(storedBrowserFirmwareSession?.repoUrl ?? DEFAULT_FIRMWARE_REPO_URL);
   const [files, setFiles] = React.useState<ProjectFiles | null>(null);
   const folderInputRef = React.useRef<HTMLInputElement | null>(null);
   const [projectDirHandle, setProjectDirHandle] = React.useState<FileSystemDirectoryHandle | null>(null);
@@ -283,6 +325,10 @@ function App() {
   });
   const [toast, setToast] = React.useState<ToastMessage | null>(null);
   const directWriteRequestRef = React.useRef(0);
+  const githubDeviceFlowAbortRef = React.useRef<AbortController | null>(null);
+  const browserFirmwareOperationRef = React.useRef<BrowserFirmwareOperation>("idle");
+  const browserFirmwareRepoBranchInitializedRef = React.useRef(false);
+  const flashConfirmationResolverRef = React.useRef<((confirmed: boolean) => void) | null>(null);
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
   const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
@@ -299,22 +345,36 @@ function App() {
   const [selectedVolume, setSelectedVolume] = React.useState("");
   const [flashSide, setFlashSide] = React.useState<FlashSide>("left");
   const [firmwareUf2Targets, setFirmwareUf2Targets] = React.useState<FirmwareUf2Targets>({ unknown: [] });
+  const [browserGithubToken, setBrowserGithubToken] = React.useState("");
+  const [browserGithubUserCode, setBrowserGithubUserCode] = React.useState("");
+  const [browserGithubVerificationUri, setBrowserGithubVerificationUri] = React.useState("");
+  const [browserFirmwareBranch, setBrowserFirmwareBranch] = React.useState(storedBrowserFirmwareSession?.branch ?? "main");
+  const [browserFirmwareCommitSha, setBrowserFirmwareCommitSha] = React.useState<string | null>(storedBrowserFirmwareSession?.commitSha ?? null);
+  const [browserFirmwareCommitUrl, setBrowserFirmwareCommitUrl] = React.useState(storedBrowserFirmwareSession?.commitUrl ?? "");
+  const [browserFirmwareRunId, setBrowserFirmwareRunId] = React.useState<number | null>(storedBrowserFirmwareSession?.runId ?? null);
+  const [browserFirmwareRunUrl, setBrowserFirmwareRunUrl] = React.useState(storedBrowserFirmwareSession?.runUrl ?? "");
+  const [browserFirmwareLoadedHeadSha, setBrowserFirmwareLoadedHeadSha] = React.useState<string | null>(null);
+  const [browserFirmwareBuildStatus, setBrowserFirmwareBuildStatus] = React.useState<FirmwareBuildStatus>(storedBrowserFirmwareSession?.buildStatus ?? "idle");
+  const [browserFirmwareDiffReviewed, setBrowserFirmwareDiffReviewed] = React.useState(false);
+  const [browserFirmwareFilesLoadedFromGitHub, setBrowserFirmwareFilesLoadedFromGitHub] = React.useState(false);
+  const [browserFirmwareArtifacts, setBrowserFirmwareArtifacts] = React.useState<GitHubFirmwareArtifacts | null>(null);
+  const [browserFirmwareDownloadedSide, setBrowserFirmwareDownloadedSide] = React.useState<FlashSide | null>(null);
+  const [browserFirmwareLeftFlashed, setBrowserFirmwareLeftFlashed] = React.useState(storedBrowserFirmwareSession?.leftFlashed ?? false);
+  const [browserFirmwareRightFlashed, setBrowserFirmwareRightFlashed] = React.useState(storedBrowserFirmwareSession?.rightFlashed ?? false);
+  const [browserFirmwareOperation, setBrowserFirmwareOperation] = React.useState<BrowserFirmwareOperation>("idle");
+  const [flashConfirmation, setFlashConfirmation] = React.useState<FlashConfirmationRequest | null>(null);
   const canUseWebUsb = supportsWebStudioConnection("usb");
   const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
   const firmwareRepoLabel = React.useMemo(() => formatFirmwareRepoLabel(firmwareRepoUrl), [firmwareRepoUrl]);
+  const browserFirmwareRepoRef = React.useMemo(
+    () => parseGitHubRepositoryRef(firmwareRepoUrl),
+    [firmwareRepoUrl],
+  );
+  const browserFirmwareBranchRef = browserFirmwareBranch.trim();
 
   React.useEffect(() => {
     loadFixture();
   }, []);
-
-  // Firmware mode is excluded from the browser release for now. If the
-  // user lands on it (e.g. older saved state), bounce them back to
-  // Direct so they don't see disabled UI half the page.
-  React.useEffect(() => {
-    if (!isDesktopRuntime && editorMode === "firmware") {
-      setEditorMode("direct");
-    }
-  }, [isDesktopRuntime, editorMode]);
 
   const isDirectMode = editorMode === "direct";
   const activeKeymapSource = React.useMemo(
@@ -378,8 +438,19 @@ function App() {
   );
   const showDirectEmptyState = isDirectMode && !directKeymap;
   const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
+  const activeLayerReferences = React.useMemo(
+    () => findLayerReferenceSites(parsedKeymap, activeLayerIndex),
+    [activeLayerIndex, parsedKeymap],
+  );
+  const activeLayerDeletionBlockReason = activeLayerIndex === layers.length - 1 && activeLayerReferences.length
+    ? `参照中のため削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`
+    : "";
   const canDeleteActiveLayer =
-    canEditLayerStructure && Boolean(activeLayer) && layers.length > 1 && activeLayerIndex === layers.length - 1;
+    canEditLayerStructure &&
+    Boolean(activeLayer) &&
+    layers.length > 1 &&
+    activeLayerIndex === layers.length - 1 &&
+    activeLayerReferences.length === 0;
   const selectedCombos = React.useMemo(
     () => activeCombos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [activeCombos, selectedKeyIndex],
@@ -401,9 +472,66 @@ function App() {
       ].filter((diff) => diff.lines.length > 0),
     [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
   );
+  const browserFirmwareReadiness = React.useMemo(
+    () =>
+      deriveFirmwareReleaseReadiness({
+        authenticated: browserGithubToken.trim().length > 0,
+        branchSelected: browserFirmwareBranchRef.length > 0,
+        repositorySelected: Boolean(browserFirmwareRepoRef),
+        filesLoaded: isDesktopRuntime ? Boolean(files) : browserFirmwareFilesLoadedFromGitHub,
+        hasLocalChanges: keymapDiff.length > 0,
+        diffReviewed: browserFirmwareDiffReviewed,
+        commitSha: browserFirmwareCommitSha,
+        buildRunId: browserFirmwareRunId === null ? null : String(browserFirmwareRunId),
+        buildStatus: browserFirmwareBuildStatus,
+        artifactFiles: browserFirmwareArtifacts?.files.map((file) => file.name) ?? [],
+        artifactTargets: browserFirmwareArtifacts?.targets,
+        leftFlashed: browserFirmwareLeftFlashed,
+        rightFlashed: browserFirmwareRightFlashed,
+      }),
+    [
+      browserFirmwareArtifacts,
+      browserFirmwareBuildStatus,
+      browserFirmwareCommitSha,
+      browserFirmwareDiffReviewed,
+      browserFirmwareFilesLoadedFromGitHub,
+      browserFirmwareLeftFlashed,
+      browserFirmwareRepoRef,
+      browserFirmwareRightFlashed,
+      browserFirmwareRunId,
+      browserFirmwareBranchRef.length,
+      browserGithubToken,
+      files,
+      isDesktopRuntime,
+      keymapDiff.length,
+    ],
+  );
   React.useEffect(() => {
     setBindingDraft(selectedBinding);
   }, [activeLayerIndex, editorMode, selectedBinding, selectedKeyIndex]);
+
+  React.useEffect(() => {
+    setBrowserFirmwareDiffReviewed(false);
+  }, [files?.keymap, files?.leftOverlay, files?.rightOverlay]);
+
+  React.useEffect(() => {
+    if (!browserFirmwareRepoBranchInitializedRef.current) {
+      browserFirmwareRepoBranchInitializedRef.current = true;
+      return;
+    }
+    setBrowserFirmwareFilesLoadedFromGitHub(false);
+    setBrowserFirmwareDiffReviewed(false);
+    setBrowserFirmwareCommitSha(null);
+    setBrowserFirmwareCommitUrl("");
+    setBrowserFirmwareLoadedHeadSha(null);
+    setBrowserFirmwareRunId(null);
+    setBrowserFirmwareRunUrl("");
+    setBrowserFirmwareBuildStatus("idle");
+    setBrowserFirmwareArtifacts(null);
+    setBrowserFirmwareDownloadedSide(null);
+    setBrowserFirmwareLeftFlashed(false);
+    setBrowserFirmwareRightFlashed(false);
+  }, [browserFirmwareBranch, firmwareRepoUrl]);
 
   React.useEffect(() => {
     setDirectKeyWriteFeedback((current) => (current.kind === "writing" ? current : { kind: "idle", message: "" }));
@@ -418,6 +546,105 @@ function App() {
     }, toast.kind === "error" ? 5200 : 3200);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  React.useEffect(() => {
+    return () => {
+      flashConfirmationResolverRef.current?.(false);
+      flashConfirmationResolverRef.current = null;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (isDesktopRuntime) {
+      return;
+    }
+    writeBrowserFirmwareSession(
+      {
+        branch: browserFirmwareBranch,
+        buildStatus: browserFirmwareBuildStatus,
+        commitSha: browserFirmwareCommitSha,
+        commitUrl: browserFirmwareCommitUrl,
+        leftFlashed: browserFirmwareLeftFlashed,
+        repoUrl: firmwareRepoUrl,
+        rightFlashed: browserFirmwareRightFlashed,
+        runId: browserFirmwareRunId,
+        runUrl: browserFirmwareRunUrl,
+      },
+      window.localStorage,
+    );
+  }, [
+      browserFirmwareBranch,
+      browserFirmwareBranchRef.length,
+    browserFirmwareBuildStatus,
+    browserFirmwareCommitSha,
+    browserFirmwareCommitUrl,
+    browserFirmwareLeftFlashed,
+    browserFirmwareRightFlashed,
+    browserFirmwareRunId,
+    browserFirmwareRunUrl,
+    firmwareRepoUrl,
+    isDesktopRuntime,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      isDesktopRuntime ||
+      !browserGithubToken.trim() ||
+      !browserFirmwareRepoRef ||
+      !browserFirmwareCommitSha ||
+      browserFirmwareBuildStatus === "success" ||
+      browserFirmwareBuildStatus === "failure" ||
+      browserFirmwareBuildStatus === "cancelled"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    async function pollBrowserFirmwareRun() {
+      if (!browserFirmwareRepoRef || !browserFirmwareCommitSha) {
+        return;
+      }
+      try {
+        const run = await findGitHubFirmwareBuildRun(
+          browserFirmwareRepoRef,
+          browserFirmwareBranchRef,
+          browserFirmwareCommitSha,
+          { token: browserGithubToken },
+        );
+        if (cancelled) {
+          return;
+        }
+        if (!run) {
+          setBuildStatus("対象 commit の GitHub Actions run を待っています");
+          return;
+        }
+        setBrowserFirmwareRunId(run.id);
+        setBrowserFirmwareRunUrl(run.htmlUrl);
+        setBrowserFirmwareBuildStatus(mapGitHubRunStatus(run.status, run.conclusion));
+        setBuildStatus(`GitHub Actions: ${run.status} / ${run.conclusion ?? "pending"} / run ${run.id}`);
+      } catch (error) {
+        if (!cancelled) {
+          setBuildStatus(`GitHub Actions 自動確認失敗: ${formatError(error)}`);
+        }
+      }
+    }
+
+    void pollBrowserFirmwareRun();
+    const interval = window.setInterval(() => {
+      void pollBrowserFirmwareRun();
+    }, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    browserFirmwareBranchRef,
+    browserFirmwareBuildStatus,
+    browserFirmwareCommitSha,
+    browserFirmwareRepoRef,
+    browserGithubToken,
+    isDesktopRuntime,
+  ]);
 
   function showToast(kind: ToastKind, message: string) {
     setToast({ id: Date.now(), kind, message });
@@ -649,7 +876,7 @@ function App() {
       keymap: addLayer(files.keymap, {
         id,
         label,
-        bindings: Array.from({ length: 40 }, () => "&trans"),
+        bindings: Array.from({ length: kobitoKeyPhysicalLayout.length }, () => "&trans"),
       }),
     });
     setActiveLayerIndex(index);
@@ -691,6 +918,11 @@ function App() {
 
     if (activeLayerIndex !== layers.length - 1) {
       setStatus("layer 削除は番号参照のずれを避けるため最後の layer のみ対応しています");
+      return;
+    }
+
+    if (activeLayerReferences.length > 0) {
+      setStatus(`参照中の layer は削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`);
       return;
     }
 
@@ -1518,6 +1750,410 @@ function App() {
     }
   }
 
+  function requireBrowserFirmwareRef(): GitHubRepositoryRef | null {
+    if (!browserFirmwareRepoRef) {
+      setBuildStatus("GitHub repository URL を owner/repo 形式で指定してください");
+      return null;
+    }
+    if (!browserGithubToken.trim()) {
+      setBuildStatus("GitHub token を入力してください");
+      return null;
+    }
+    if (!browserFirmwareBranchRef) {
+      setBuildStatus("GitHub branch を入力してください");
+      return null;
+    }
+    return browserFirmwareRepoRef;
+  }
+
+  function beginBrowserFirmwareOperation(operation: BrowserFirmwareOperation): boolean {
+    if (browserFirmwareOperationRef.current !== "idle") {
+      setBuildStatus(`${browserFirmwareOperationLabel(browserFirmwareOperationRef.current)} が完了してから次の操作をしてください`);
+      return false;
+    }
+    browserFirmwareOperationRef.current = operation;
+    setBrowserFirmwareOperation(operation);
+    return true;
+  }
+
+  function endBrowserFirmwareOperation(operation: BrowserFirmwareOperation) {
+    if (browserFirmwareOperationRef.current === operation) {
+      browserFirmwareOperationRef.current = "idle";
+      setBrowserFirmwareOperation("idle");
+    }
+  }
+
+  async function connectBrowserGithub() {
+    if (!beginBrowserFirmwareOperation("oauth")) return;
+    const clientId = githubOAuthClientId();
+    if (!clientId) {
+      setBuildStatus("GitHub OAuth client id が未設定です。VITE_GITHUB_OAUTH_CLIENT_ID を設定するか token を入力してください");
+      endBrowserFirmwareOperation("oauth");
+      return;
+    }
+
+    const previousController = githubDeviceFlowAbortRef.current;
+    githubDeviceFlowAbortRef.current = null;
+    previousController?.abort();
+    setBrowserGithubUserCode("");
+    setBrowserGithubVerificationUri("");
+    const abortController = new AbortController();
+    githubDeviceFlowAbortRef.current = abortController;
+
+    try {
+      const device = await requestGitHubDeviceCode({
+        clientId,
+        scope: "repo",
+      });
+      if (githubDeviceFlowAbortRef.current !== abortController) {
+        return;
+      }
+      const verificationUri = device.verificationUriComplete ?? device.verificationUri;
+      setBrowserGithubUserCode(device.userCode);
+      setBrowserGithubVerificationUri(verificationUri);
+      window.open(verificationUri, "_blank", "noopener,noreferrer");
+      setBuildStatus(`GitHub の device 認証で ${device.userCode} を入力してください。開かない場合は画面上のリンクから認証を開けます`);
+      const token = await pollGitHubDeviceToken({
+        clientId,
+        deviceCode: device.deviceCode,
+        expiresIn: device.expiresIn,
+        interval: device.interval,
+        signal: abortController.signal,
+      });
+      if (githubDeviceFlowAbortRef.current !== abortController) {
+        return;
+      }
+      if (!hasGitHubOAuthScope(token.scope, "repo")) {
+        throw new Error("GitHub OAuth token に repo scope がありません。repository の読み書きと Actions 実行を許可して接続し直してください");
+      }
+      setBrowserGithubToken(token.accessToken);
+      setBrowserGithubUserCode("");
+      setBrowserGithubVerificationUri("");
+      setBuildStatus(`GitHub 接続が完了しました: ${token.scope || "scope 未確認"}`);
+    } catch (error) {
+      if (githubDeviceFlowAbortRef.current !== abortController) {
+        return;
+      }
+      if (abortController.signal.aborted) {
+        setBuildStatus("GitHub 接続をキャンセルしました");
+      } else {
+        setBrowserGithubUserCode("");
+        setBrowserGithubVerificationUri("");
+        setBuildStatus(`GitHub 接続失敗: ${formatError(error)}`);
+      }
+    } finally {
+      if (githubDeviceFlowAbortRef.current === abortController) {
+        githubDeviceFlowAbortRef.current = null;
+      }
+      endBrowserFirmwareOperation("oauth");
+    }
+  }
+
+  function cancelBrowserGithubConnection() {
+    githubDeviceFlowAbortRef.current?.abort();
+    githubDeviceFlowAbortRef.current = null;
+    endBrowserFirmwareOperation("oauth");
+    setBrowserGithubUserCode("");
+    setBrowserGithubVerificationUri("");
+  }
+
+  function clearBrowserGithubToken() {
+    githubDeviceFlowAbortRef.current?.abort();
+    githubDeviceFlowAbortRef.current = null;
+    setBrowserGithubToken("");
+    setBrowserGithubUserCode("");
+    setBrowserGithubVerificationUri("");
+    setBuildStatus("GitHub token をメモリから消去しました");
+  }
+
+  async function loadBrowserFirmwareProject() {
+    const ref = requireBrowserFirmwareRef();
+    if (!ref) return;
+    if (!beginBrowserFirmwareOperation("load")) return;
+
+    try {
+      setBuildStatus(`GitHub から ${formatGitHubRepositoryRef(ref)} / ${browserFirmwareBranchRef} を読み込み中`);
+      const snapshot = await readGitHubFirmwareProjectSnapshot(ref, browserFirmwareBranchRef, {
+        token: browserGithubToken,
+      });
+      const project = snapshot.files;
+      setProjectRoot(formatGitHubRepositoryRef(ref));
+      setProjectDirHandle(null);
+      setFiles(project);
+      setSavedKeymap(project.keymap);
+      setSavedLeftOverlay(project.leftOverlay);
+      setSavedRightOverlay(project.rightOverlay);
+      setBrowserFirmwareFilesLoadedFromGitHub(true);
+      setBrowserFirmwareCommitSha(null);
+      setBrowserFirmwareCommitUrl("");
+      setBrowserFirmwareLoadedHeadSha(snapshot.headSha);
+      setBrowserFirmwareRunId(null);
+      setBrowserFirmwareRunUrl("");
+      setBrowserFirmwareBuildStatus("idle");
+      setBrowserFirmwareArtifacts(null);
+      setBrowserFirmwareDownloadedSide(null);
+      setBrowserFirmwareLeftFlashed(false);
+      setBrowserFirmwareRightFlashed(false);
+      setBuildStatus(`GitHub から firmware files を読み込みました: ${formatGitHubRepositoryRef(ref)}`);
+    } catch (error) {
+      setBuildStatus(`GitHub firmware 読み込み失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("load");
+    }
+  }
+
+  async function commitAndDispatchBrowserFirmwareBuild() {
+    const ref = requireBrowserFirmwareRef();
+    if (!ref || !files) return;
+    if (!browserFirmwareReadiness.canCommit) {
+      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? "Commit 前の条件が揃っていません");
+      return;
+    }
+
+    if (!browserFirmwareLoadedHeadSha) {
+      setBuildStatus("GitHub から読み込み直してから commit してください");
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("commit-build")) return;
+
+    let commit: Awaited<ReturnType<typeof commitGitHubFirmwareFiles>>;
+    try {
+      setBuildStatus("GitHub に commit を作成しています");
+      commit = await commitGitHubFirmwareFiles({
+        ref,
+        branch: browserFirmwareBranchRef,
+        expectedHeadSha: browserFirmwareLoadedHeadSha,
+        files,
+        options: { token: browserGithubToken },
+      });
+      setBrowserFirmwareCommitSha(commit.commitSha);
+      setBrowserFirmwareCommitUrl(commit.htmlUrl);
+      setBrowserFirmwareLoadedHeadSha(commit.commitSha);
+      setBrowserFirmwareRunId(null);
+      setBrowserFirmwareRunUrl("");
+      setBrowserFirmwareBuildStatus("queued");
+      setBrowserFirmwareArtifacts(null);
+      setBrowserFirmwareDownloadedSide(null);
+      setBrowserFirmwareLeftFlashed(false);
+      setBrowserFirmwareRightFlashed(false);
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+    } catch (error) {
+      setBrowserFirmwareBuildStatus("failure");
+      setBuildStatus(`GitHub commit 失敗: ${formatError(error)}`);
+      endBrowserFirmwareOperation("commit-build");
+      return;
+    }
+
+    try {
+      await dispatchBrowserFirmwareBuildForCommit(ref, commit.commitSha);
+      setBuildStatus(`commit と build 起動が完了しました: ${commit.commitSha.slice(0, 7)}`);
+    } catch (error) {
+      setBrowserFirmwareBuildStatus("failure");
+      setBuildStatus(
+        `commit は完了しましたが build 起動に失敗しました: ${formatError(error)}。Build 起動で再試行できます`,
+      );
+    } finally {
+      endBrowserFirmwareOperation("commit-build");
+    }
+  }
+
+  async function triggerBrowserFirmwareBuild() {
+    const ref = requireBrowserFirmwareRef();
+    if (!ref || !browserFirmwareCommitSha) {
+      setBuildStatus("commit 作成後に build を起動できます");
+      return;
+    }
+    if (!browserFirmwareReadiness.canBuild) {
+      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? "Build 起動条件が揃っていません");
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("build")) return;
+
+    try {
+      await dispatchBrowserFirmwareBuildForCommit(ref, browserFirmwareCommitSha);
+    } catch (error) {
+      setBrowserFirmwareBuildStatus("failure");
+      setBuildStatus(`GitHub build 起動失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("build");
+    }
+  }
+
+  async function dispatchBrowserFirmwareBuildForCommit(ref: GitHubRepositoryRef, commitSha: string) {
+    setBuildStatus("GitHub Actions build を起動しています");
+    setBrowserFirmwareRunId(null);
+    setBrowserFirmwareRunUrl("");
+    setBrowserFirmwareBuildStatus("queued");
+    setBrowserFirmwareArtifacts(null);
+    setBrowserFirmwareDownloadedSide(null);
+    setBrowserFirmwareLeftFlashed(false);
+    setBrowserFirmwareRightFlashed(false);
+    await dispatchGitHubFirmwareBuild(ref, browserFirmwareBranchRef, { token: browserGithubToken });
+    setBuildStatus(`build workflow を起動しました: ${commitSha.slice(0, 7)}`);
+  }
+
+  async function refreshBrowserFirmwareBuildRun() {
+    const ref = requireBrowserFirmwareRef();
+    if (!ref || !browserFirmwareCommitSha) {
+      setBuildStatus("commit 作成後に build run を確認できます");
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("refresh-run")) return;
+
+    try {
+      const run = await findGitHubFirmwareBuildRun(ref, browserFirmwareBranchRef, browserFirmwareCommitSha, {
+        token: browserGithubToken,
+      });
+      if (!run) {
+        setBuildStatus("対象 commit の GitHub Actions run はまだ見つかりません");
+        return;
+      }
+      setBrowserFirmwareRunId(run.id);
+      setBrowserFirmwareRunUrl(run.htmlUrl);
+      setBrowserFirmwareBuildStatus(mapGitHubRunStatus(run.status, run.conclusion));
+      setBuildStatus(`GitHub Actions: ${run.status} / ${run.conclusion ?? "pending"} / run ${run.id}`);
+    } catch (error) {
+      setBuildStatus(`GitHub Actions 確認失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("refresh-run");
+    }
+  }
+
+  async function downloadBrowserFirmwareArtifacts() {
+    const ref = requireBrowserFirmwareRef();
+    if (!ref || browserFirmwareRunId === null || !browserFirmwareCommitSha) {
+      setBuildStatus("成功した build run を確認してから artifact を取得してください");
+      return;
+    }
+    if (!browserFirmwareReadiness.canDownloadArtifact) {
+      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? "artifact 取得条件が揃っていません");
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("download-artifact")) return;
+    // Drop previously verified UF2 bytes before revalidating the run/artifact.
+    setBrowserFirmwareArtifacts(null);
+    setBrowserFirmwareDownloadedSide(null);
+    setBrowserFirmwareLeftFlashed(false);
+    setBrowserFirmwareRightFlashed(false);
+
+    try {
+      const artifacts = await downloadGitHubFirmwareArtifacts(
+        ref,
+        browserFirmwareRunId,
+        { token: browserGithubToken },
+        {
+          expectedHeadSha: browserFirmwareCommitSha,
+          expectedHeadBranch: browserFirmwareBranchRef,
+          requireSuccess: true,
+        },
+      );
+      setBrowserFirmwareArtifacts(artifacts);
+      setBuildStatus(
+        `artifact を取得しました: left ${artifacts.targets.left ? "OK" : "未検出"} / right ${
+          artifacts.targets.right ? "OK" : "未検出"
+        }${artifacts.manifestPath ? " / manifest OK" : ""}`,
+      );
+    } catch (error) {
+      setBuildStatus(`GitHub artifact 取得失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("download-artifact");
+    }
+  }
+
+  async function copyBrowserFirmwareUf2(side: FlashSide) {
+    if (!canFlashFirmwareSide(browserFirmwareReadiness, side)) {
+      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側を書き込む条件が揃っていません`);
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("flash")) return;
+
+    try {
+      if (browserFirmwareDownloadedSide === side) {
+        const targetName = browserFirmwareArtifacts?.targets[side] ?? `${sideLabel(side)} UF2`;
+        if (!(await confirmBrowserFirmwareManualFlashComplete(side, targetName))) {
+          setBuildStatus(`${sideLabel(side)} UF2 の完了記録をキャンセルしました`);
+          return;
+        }
+        markBrowserFirmwareSideFlashed(side);
+        setBrowserFirmwareDownloadedSide(null);
+        setBuildStatus(`${sideLabel(side)} UF2 の手動コピー完了として記録しました`);
+        return;
+      }
+
+      const targetName = browserFirmwareArtifacts?.targets[side];
+      const target = targetName ? browserFirmwareArtifacts?.files.find((file) => file.name === targetName) : null;
+      if (!target) {
+        setBuildStatus(`${sideLabel(side)} UF2 が見つかりません`);
+        return;
+      }
+
+      if (typeof window.showDirectoryPicker === "function") {
+        if (!(await confirmBrowserFirmwareFlashWrite(side, target.name))) {
+          setBuildStatus(`${sideLabel(side)} UF2 書き込みをキャンセルしました`);
+          return;
+        }
+        const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+        await writeUf2ToDirectoryHandle(handle, target);
+        markBrowserFirmwareSideFlashed(side);
+        setBuildStatus(`${sideLabel(side)} UF2 を ${handle.name} にコピーしました`);
+        return;
+      }
+
+      if (!(await confirmBrowserFirmwareFlashWrite(side, target.name))) {
+        setBuildStatus(`${sideLabel(side)} UF2 ダウンロードをキャンセルしました`);
+        return;
+      }
+      downloadBytes(target.name.split("/").pop() ?? target.name, target.bytes);
+      setBrowserFirmwareDownloadedSide(side);
+      setBuildStatus(
+        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じボタンを押して完了として記録してください`,
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setBuildStatus(`${sideLabel(side)} UF2 書き込み失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("flash");
+    }
+  }
+
+  function markBrowserFirmwareSideFlashed(side: FlashSide) {
+    if (side === "left") {
+      setBrowserFirmwareLeftFlashed(true);
+      setFlashSide("right");
+    } else {
+      setBrowserFirmwareRightFlashed(true);
+    }
+  }
+
+  function requestFlashConfirmation(request: Omit<FlashConfirmationRequest, "id">): Promise<boolean> {
+    flashConfirmationResolverRef.current?.(false);
+    return new Promise((resolve) => {
+      flashConfirmationResolverRef.current = resolve;
+      setFlashConfirmation({
+        ...request,
+        id: Date.now(),
+        uf2Name: request.uf2Name.split("/").pop() ?? request.uf2Name,
+        volumeName: request.volumeName ? request.volumeName.split("/").pop() ?? request.volumeName : undefined,
+      });
+    });
+  }
+
+  function resolveFlashConfirmation(confirmed: boolean) {
+    flashConfirmationResolverRef.current?.(confirmed);
+    flashConfirmationResolverRef.current = null;
+    setFlashConfirmation(null);
+  }
+
+  function confirmBrowserFirmwareFlashWrite(side: FlashSide, uf2Name: string): Promise<boolean> {
+    return requestFlashConfirmation({ kind: "write", side, uf2Name });
+  }
+
+  function confirmBrowserFirmwareManualFlashComplete(side: FlashSide, uf2Name: string): Promise<boolean> {
+    return requestFlashConfirmation({ kind: "manual-complete", side, uf2Name });
+  }
+
   async function readFlashTargets() {
     const targets = await invoke<FirmwareFlashTargets>("resolve_firmware_flash_targets", { root: projectRoot });
     const nextFirmwareTargets = firmwareTargetsFromResolved(targets);
@@ -1558,9 +2194,13 @@ function App() {
       return;
     }
 
-    const fileName = selectedUf2.split("/").pop() ?? selectedUf2;
     const volumeName = selectedVolume.split("/").pop() ?? selectedVolume;
-    const confirmed = window.confirm(`${fileName} を ${volumeName} にコピーします。左右を確認してください。`);
+    const confirmed = await requestFlashConfirmation({
+      kind: "write",
+      side: flashSide,
+      uf2Name: selectedUf2,
+      volumeName,
+    });
     if (!confirmed) {
       return;
     }
@@ -1593,9 +2233,8 @@ function App() {
       return;
     }
 
-    const fileName = uf2Path.split("/").pop() ?? uf2Path;
     const volumeName = volumePath.split("/").pop() ?? volumePath;
-    const confirmed = window.confirm(`${sideLabel(side)}: ${fileName} を ${volumeName} にコピーします。左右を確認してください。`);
+    const confirmed = await requestFlashConfirmation({ kind: "write", side, uf2Name: uf2Path, volumeName });
     if (!confirmed) {
       return;
     }
@@ -1623,31 +2262,26 @@ function App() {
         </div>
         <div className="topbar-tools">
           <div className="mode-toggle" aria-label="Editor mode">
-            <button
-              type="button"
-              className={editorMode === "firmware" ? "active" : ""}
-              onClick={() => setEditorMode("firmware")}
-              disabled={!isDesktopRuntime}
-              aria-disabled={!isDesktopRuntime}
-              title={
-                !isDesktopRuntime
-                  ? "Firmware モードは初版のリリース対象外です。デスクトップ版でのみ利用できます。"
-                  : undefined
-              }
-            >
-              Firmware
-              {!isDesktopRuntime ? <em className="mode-toggle-badge">Desktop限定</em> : null}
-            </button>
-            <button
-              type="button"
-              className={editorMode === "direct" ? "active" : ""}
-              onClick={() => setEditorMode("direct")}
-            >
+		            <button
+		              type="button"
+		              className={editorMode === "firmware" ? "active" : ""}
+		              onPointerDown={() => setEditorMode("firmware")}
+		              onClick={() => setEditorMode("firmware")}
+		            >
+	              Firmware
+	              {!isDesktopRuntime ? <em className="mode-toggle-badge">GitHub連携</em> : null}
+	            </button>
+	            <button
+	              type="button"
+	              className={editorMode === "direct" ? "active" : ""}
+	              onPointerDown={() => setEditorMode("direct")}
+	              onClick={() => setEditorMode("direct")}
+	            >
               Direct
             </button>
           </div>
-          {editorMode === "firmware" ? (
-            <div className="project-loader" role="group" aria-label="プロジェクトフォルダ">
+	          {editorMode === "firmware" && isDesktopRuntime ? (
+	            <div className="project-loader" role="group" aria-label="プロジェクトフォルダ">
               <label className="project-loader-field">
                 <span className="project-loader-label">
                   プロジェクトフォルダ
@@ -1656,6 +2290,8 @@ function App() {
                   ) : null}
                 </span>
                 <input
+                  id="firmware-project-root"
+                  name="firmwareProjectRoot"
                   aria-label="KobitoKey_QWERTY フォルダのパス"
                   placeholder="例: ~/dev/KobitoKey_QWERTY"
                   title="keymap と overlay を読み書きするローカルフォルダ"
@@ -1689,6 +2325,7 @@ function App() {
               <input
                 ref={folderInputRef}
                 type="file"
+                name="firmwareProjectFolder"
                 /* eslint-disable @typescript-eslint/ban-ts-comment */
                 /* @ts-ignore — non-standard but widely supported attribute */
                 webkitdirectory=""
@@ -1704,7 +2341,12 @@ function App() {
                 }}
               />
             </div>
-          ) : directKeymap ? (
+	          ) : editorMode === "firmware" ? (
+	            <div className="topbar-hint">
+	              <UploadCloud size={17} />
+	              <span>Build & Flash タブで GitHub repository を読み込みます</span>
+	            </div>
+	          ) : directKeymap ? (
             <div className="studio-loader connected-loader" role="group" aria-label="接続状態">
               <span className="connected-chip">
                 {studioConnectionKind === "bluetooth" ? <Bluetooth size={14} /> : <Usb size={14} />}
@@ -1790,7 +2432,8 @@ function App() {
                 title={
                   isDirectMode
                     ? "Direct Mode では layer 構造を変更できません"
-                    : "番号参照のずれを避けるため、最後の layer だけ削除できます"
+                    : activeLayerDeletionBlockReason ||
+                      "番号参照のずれを避けるため、最後の layer だけ削除できます"
                 }
                 aria-label="選択中の layer を削除"
               >
@@ -1899,8 +2542,41 @@ function App() {
               {workbenchTab === "trackball" ? (
                 <TrackballWorkbench settings={trackball} onApply={applyTrackballSettings} />
               ) : null}
-              {workbenchTab === "build" ? (
-                <BuildWorkbench
+	              {workbenchTab === "build" && !isDesktopRuntime ? (
+	                <BrowserFirmwareReleaseWorkbench
+	                  artifacts={browserFirmwareArtifacts}
+	                  branch={browserFirmwareBranch}
+	                  buildStatus={buildStatus}
+	                  busyOperation={browserFirmwareOperation}
+	                  commitSha={browserFirmwareCommitSha}
+	                  commitUrl={browserFirmwareCommitUrl}
+	                  downloadedSide={browserFirmwareDownloadedSide}
+	                  flashSide={flashSide}
+	                  readiness={browserFirmwareReadiness}
+	                  repoRef={browserFirmwareRepoRef}
+	                  repoUrl={firmwareRepoUrl}
+	                  runId={browserFirmwareRunId}
+	                  runUrl={browserFirmwareRunUrl}
+	                  token={browserGithubToken}
+	                  onBranchChange={setBrowserFirmwareBranch}
+	                  onCancelGithubConnection={cancelBrowserGithubConnection}
+	                  onClearToken={clearBrowserGithubToken}
+	                  onCommitBuild={commitAndDispatchBrowserFirmwareBuild}
+	                  onConnectGithub={connectBrowserGithub}
+	                  onCopyUf2={copyBrowserFirmwareUf2}
+	                  onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
+	                  onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
+	                  onLoadProject={loadBrowserFirmwareProject}
+	                  onRefreshRun={refreshBrowserFirmwareBuildRun}
+	                  onRepoUrlChange={setFirmwareRepoUrl}
+	                  onTokenChange={setBrowserGithubToken}
+	                  onTriggerBuild={triggerBrowserFirmwareBuild}
+	                  userCode={browserGithubUserCode}
+	                  verificationUri={browserGithubVerificationUri}
+	                />
+	              ) : null}
+	              {workbenchTab === "build" && isDesktopRuntime ? (
+	                <BuildWorkbench
                   buildCheck={firmwareBuildCheck}
                   buildStatus={buildStatus}
                   flashSide={flashSide}
@@ -1939,7 +2615,7 @@ function App() {
               comboError={directComboError}
               connectionState={studioConnectionState}
               maxCombos={displayedDirectMaxCombos}
-              canOpenFirmwareMode={isDesktopRuntime}
+	              canOpenFirmwareMode={true}
               keyIndex={selectedKeyIndex}
               onApply={applyBinding}
               onCreateCombo={createDirectCombo}
@@ -1958,50 +2634,112 @@ function App() {
               keyWriteFeedback={directKeyWriteFeedback}
             />
           ) : (
-            <FirmwareInspectorTabs
+            <FirmwareKeyInspector
               binding={bindingDraft}
-              buildCheck={firmwareBuildCheck}
-              buildStatus={buildStatus}
-              bootloaderVolumes={bootloaderVolumes}
-              combo={selectedCombo}
-              combos={combos}
-              flashSide={flashSide}
-              firmwareUf2Targets={firmwareUf2Targets}
-              firmwareRepoLabel={firmwareRepoLabel}
-              firmwareRepoUrl={firmwareRepoUrl}
               keyIndex={selectedKeyIndex}
               onApplyBinding={applyBinding}
-              onCopyUf2={copySelectedUf2}
-              onCheckBuildReady={checkFirmwareBuildReady}
-              onCreateCombo={createCombo}
-              onDeleteCombo={removeCombo}
-              onDownloadArtifacts={downloadArtifacts}
-              onFirmwareRepoUrlChange={setFirmwareRepoUrl}
-              onRefreshBuildStatus={refreshBuildStatus}
-              onRefreshFlashTargets={refreshFlashTargets}
-              onFlashSideChange={setFlashSide}
-              onFlashWizardCopy={copyWizardUf2}
-              onSaveCombo={saveCombo}
-              onSaveTrackball={applyTrackballSettings}
-              onSelectCombo={setSelectedComboId}
-              onSelectedUf2Change={setSelectedUf2}
-              onSelectedVolumeChange={setSelectedVolume}
-              onTriggerBuild={triggerBuild}
-              onSavePushBuild={savePushAndTriggerBuild}
               selectedBinding={selectedBinding}
-              selectedCombos={selectedCombos}
-              selectedUf2={selectedUf2}
-              selectedVolume={selectedVolume}
-              trackball={trackball}
-              uf2Files={uf2Files}
-            />
+	            />
           )}
         </aside>
       </section>
       )}
 
+      <FlashConfirmationDialog request={flashConfirmation} onResolve={resolveFlashConfirmation} />
+
       <footer className="statusbar">{status}</footer>
     </main>
+  );
+}
+
+function FlashConfirmationDialog({
+  request,
+  onResolve,
+}: {
+  request: FlashConfirmationRequest | null;
+  onResolve: (confirmed: boolean) => void;
+}) {
+  const dialogRef = React.useRef<HTMLDialogElement | null>(null);
+  const [keyboardHalfChecked, setKeyboardHalfChecked] = React.useState(false);
+
+  React.useEffect(() => {
+    setKeyboardHalfChecked(false);
+    const dialog = dialogRef.current;
+    if (!request || !dialog) {
+      return;
+    }
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    return () => {
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, [request]);
+
+  if (!request) {
+    return null;
+  }
+
+  const side = sideLabel(request.side);
+  const titleId = `flash-confirm-title-${request.id}`;
+  const descriptionId = `flash-confirm-description-${request.id}`;
+  const isManualCompletion = request.kind === "manual-complete";
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="flash-confirm-dialog"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onResolve(false);
+      }}
+    >
+      <div className="flash-confirm-icon" aria-hidden="true">
+        <AlertTriangle size={20} />
+      </div>
+      <div className="flash-confirm-body">
+        <p className="eyebrow">UF2 Flash Confirmation</p>
+        <h2 id={titleId}>{side} 側の書き込み確認</h2>
+        <p id={descriptionId}>
+          {isManualCompletion
+            ? `${request.uf2Name} を ${side} 側の bootloader volume に手動コピー済みなら、完了として記録します。`
+            : `${request.uf2Name} を ${side} 側の bootloader volume にコピーします。`}
+        </p>
+        {request.volumeName ? (
+          <dl className="flash-confirm-targets">
+            <div>
+              <dt>UF2</dt>
+              <dd>{request.uf2Name}</dd>
+            </div>
+            <div>
+              <dt>Volume</dt>
+              <dd>{request.volumeName}</dd>
+            </div>
+          </dl>
+        ) : null}
+        <label className="flash-confirm-check">
+          <input
+            type="checkbox"
+            checked={keyboardHalfChecked}
+            onChange={(event) => setKeyboardHalfChecked(event.target.checked)}
+            autoFocus
+          />
+          <span>接続中の keyboard half が {side} 側で、コピー先として正しいことを確認しました</span>
+        </label>
+        <div className="flash-confirm-actions">
+          <button type="button" onClick={() => onResolve(false)}>
+            キャンセル
+          </button>
+          <button type="button" className="primary" disabled={!keyboardHalfChecked} onClick={() => onResolve(true)}>
+            {isManualCompletion ? "完了として記録" : "確認して続行"}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -3091,6 +3829,8 @@ function DirectWelcome({
             <label className="connect-transport-field">
               <span>接続方法</span>
               <select
+                id="direct-connection-kind"
+                name="directConnectionKind"
                 value={connectionKind}
                 disabled={isConnecting}
                 onChange={(event) => onTransportChange(event.target.value as StudioConnectionKind)}
@@ -3102,7 +3842,12 @@ function DirectWelcome({
             {isDesktopRuntime && connectionKind === "usb" ? (
               <label>
                 USB デバイス
-                <select value={selectedPort} onChange={(event) => onPortChange(event.target.value)}>
+                <select
+                  id="direct-usb-device"
+                  name="directUsbDevice"
+                  value={selectedPort}
+                  onChange={(event) => onPortChange(event.target.value)}
+                >
                   <option value="">USB device 未選択</option>
                   {ports.map((port) => (
                     <option key={port.path} value={port.path}>
@@ -3115,7 +3860,12 @@ function DirectWelcome({
             {isDesktopRuntime && connectionKind === "bluetooth" ? (
               <label>
                 Bluetooth デバイス
-                <select value={selectedBluetoothDevice} onChange={(event) => onBluetoothDeviceChange(event.target.value)}>
+                <select
+                  id="direct-bluetooth-device"
+                  name="directBluetoothDevice"
+                  value={selectedBluetoothDevice}
+                  onChange={(event) => onBluetoothDeviceChange(event.target.value)}
+                >
                   <option value="">Bluetooth device 未選択</option>
                   {bluetoothDevices.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>
@@ -3166,314 +3916,24 @@ function DirectWelcome({
   );
 }
 
-function FirmwareInspectorTabs({
+function FirmwareKeyInspector({
   binding,
-  bootloaderVolumes,
-  buildCheck,
-  buildStatus,
-  flashSide,
-  firmwareUf2Targets,
-  combo,
-  combos,
-  firmwareRepoLabel,
-  firmwareRepoUrl,
   keyIndex,
   onApplyBinding,
-  onCheckBuildReady,
-  onCopyUf2,
-  onCreateCombo,
-  onDeleteCombo,
-  onDownloadArtifacts,
-  onFlashSideChange,
-  onFlashWizardCopy,
-  onFirmwareRepoUrlChange,
-  onRefreshBuildStatus,
-  onRefreshFlashTargets,
-  onSaveCombo,
-  onSaveTrackball,
-  onSelectCombo,
-  onSelectedUf2Change,
-  onSelectedVolumeChange,
-  onSavePushBuild,
-  onTriggerBuild,
   selectedBinding,
-  selectedCombos,
-  selectedUf2,
-  selectedVolume,
-  trackball,
-  uf2Files,
 }: {
   binding: string;
-  bootloaderVolumes: string[];
-  buildCheck: FirmwareBuildCheck | null;
-  buildStatus: string;
-  flashSide: FlashSide;
-  firmwareUf2Targets: FirmwareUf2Targets;
-  combo?: KeymapCombo;
-  combos: KeymapCombo[];
-  firmwareRepoLabel: string;
-  firmwareRepoUrl: string;
   keyIndex: number;
   onApplyBinding: (binding: string) => void;
-  onCheckBuildReady: () => void;
-  onCopyUf2: () => void;
-  onCreateCombo: () => void;
-  onDeleteCombo: (combo: KeymapCombo) => void;
-  onDownloadArtifacts: () => void;
-  onFlashSideChange: (side: FlashSide) => void;
-  onFlashWizardCopy: (side: FlashSide) => void;
-  onFirmwareRepoUrlChange: (value: string) => void;
-  onRefreshBuildStatus: () => void;
-  onRefreshFlashTargets: () => void;
-  onSaveCombo: (combo: KeymapCombo, input: ComboFormValue) => void;
-  onSaveTrackball: (settings: RequiredTrackballSettings) => void;
-  onSelectCombo: (comboId: string) => void;
-  onSelectedUf2Change: (value: string) => void;
-  onSelectedVolumeChange: (value: string) => void;
-  onSavePushBuild: () => void;
-  onTriggerBuild: () => void;
   selectedBinding: string;
-  selectedCombos: KeymapCombo[];
-  selectedUf2: string;
-  selectedVolume: string;
-  trackball: TrackballSettings;
-  uf2Files: string[];
-}) {
-  const [activeTab, setActiveTab] = React.useState<"key" | "combo" | "trackball" | "build">("key");
-  const tabLabels: Array<{ id: "key" | "combo" | "trackball" | "build"; icon: React.ReactNode; label: string }> = [
-    { id: "key", icon: <SlidersHorizontal size={13} />, label: "Key Config" },
-    { id: "combo", icon: <UploadCloud size={13} />, label: "Combos" },
-    { id: "trackball", icon: <MousePointer size={13} />, label: "Trackball" },
-    { id: "build", icon: <Download size={13} />, label: "Build" },
-  ];
-
-  return (
-    <section className="firmware-inspector">
-      <div className="direct-inspector-tabs" role="tablist" aria-label="Firmware settings">
-        {tabLabels.map((tab) => (
-          <button
-            type="button"
-            key={tab.id}
-            className={activeTab === tab.id ? "active" : ""}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      {activeTab === "key" ? (
-        <section>
-          <p className="eyebrow">Key {keyIndex + 1}</p>
-          <h2>{selectedBinding}</h2>
-          <BindingEditor actionLabel="Binding に反映" binding={binding} onApply={onApplyBinding} />
-        </section>
-      ) : activeTab === "combo" ? (
-        <div className="firmware-tab-stack">
-          <ComboPanel
-            combos={combos}
-            selectedComboId={combo?.id ?? null}
-            selectedCombos={selectedCombos}
-            onSelect={onSelectCombo}
-          />
-          <ComboEditor
-            combo={combo}
-            onCreate={onCreateCombo}
-            onDelete={onDeleteCombo}
-            onSave={onSaveCombo}
-            onSelect={onSelectCombo}
-          />
-        </div>
-      ) : activeTab === "trackball" ? (
-        <div className="firmware-tab-stack">
-          <TrackballPanel settings={trackball} />
-          <TrackballEditor settings={trackball} onApply={onSaveTrackball} />
-        </div>
-      ) : (
-        <BuildPanel
-          bootloaderVolumes={bootloaderVolumes}
-          buildCheck={buildCheck}
-          buildStatus={buildStatus}
-          flashSide={flashSide}
-          firmwareUf2Targets={firmwareUf2Targets}
-          firmwareRepoLabel={firmwareRepoLabel}
-          firmwareRepoUrl={firmwareRepoUrl}
-          onCopyUf2={onCopyUf2}
-          onCheckBuildReady={onCheckBuildReady}
-          onDownloadArtifacts={onDownloadArtifacts}
-          onFlashSideChange={onFlashSideChange}
-          onFlashWizardCopy={onFlashWizardCopy}
-          onFirmwareRepoUrlChange={onFirmwareRepoUrlChange}
-          onRefreshBuildStatus={onRefreshBuildStatus}
-          onRefreshFlashTargets={onRefreshFlashTargets}
-          onSelectedUf2Change={onSelectedUf2Change}
-          onSelectedVolumeChange={onSelectedVolumeChange}
-          onSavePushBuild={onSavePushBuild}
-          onTriggerBuild={onTriggerBuild}
-          selectedUf2={selectedUf2}
-          selectedVolume={selectedVolume}
-          uf2Files={uf2Files}
-        />
-      )}
-    </section>
-  );
-}
-
-function BuildPanel({
-  bootloaderVolumes,
-  buildCheck,
-  buildStatus,
-  flashSide,
-  firmwareUf2Targets,
-  firmwareRepoLabel,
-  firmwareRepoUrl,
-  onCheckBuildReady,
-  onCopyUf2,
-  onDownloadArtifacts,
-  onFlashSideChange,
-  onFlashWizardCopy,
-  onFirmwareRepoUrlChange,
-  onRefreshBuildStatus,
-  onRefreshFlashTargets,
-  onSelectedUf2Change,
-  onSelectedVolumeChange,
-  onSavePushBuild,
-  onTriggerBuild,
-  selectedUf2,
-  selectedVolume,
-  uf2Files,
-}: {
-  bootloaderVolumes: string[];
-  buildCheck: FirmwareBuildCheck | null;
-  buildStatus: string;
-  flashSide: FlashSide;
-  firmwareUf2Targets: FirmwareUf2Targets;
-  firmwareRepoLabel: string;
-  firmwareRepoUrl: string;
-  onCheckBuildReady: () => void;
-  onCopyUf2: () => void;
-  onDownloadArtifacts: () => void;
-  onFlashSideChange: (side: FlashSide) => void;
-  onFlashWizardCopy: (side: FlashSide) => void;
-  onFirmwareRepoUrlChange: (value: string) => void;
-  onRefreshBuildStatus: () => void;
-  onRefreshFlashTargets: () => void;
-  onSelectedUf2Change: (value: string) => void;
-  onSelectedVolumeChange: (value: string) => void;
-  onSavePushBuild: () => void;
-  onTriggerBuild: () => void;
-  selectedUf2: string;
-  selectedVolume: string;
-  uf2Files: string[];
 }) {
   return (
-    <section className="build-panel">
-      <div>
-        <p className="eyebrow">Build / Flash</p>
-        <h2>アップロード支援</h2>
-      </div>
-      <label className="build-repo-field">
-        <span>Firmware repository URL</span>
-        <input
-          type="url"
-          placeholder="https://github.com/<owner>/<repo>"
-          value={firmwareRepoUrl}
-          onChange={(event) => onFirmwareRepoUrlChange(event.target.value)}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        <small>build workflow を起動する repository ({firmwareRepoLabel})</small>
-      </label>
-      <ol>
-        <li>Git diff を確認して保存</li>
-        <li>GitHub Actions の build を起動</li>
-        <li>artifact から左右 UF2 を取得</li>
-        <li>左右を順番に bootloader へ書き込み</li>
-      </ol>
-      <FirmwareWriteGuide />
-      <p className="build-status">{buildStatus}</p>
-      <button type="button" onClick={onTriggerBuild}>
-        <UploadCloud size={17} />
-        Build 起動
-      </button>
-      <button type="button" onClick={onCheckBuildReady}>
-        <CheckCircle2 size={17} />
-        接続確認
-      </button>
-      <button type="button" className="primary" onClick={onSavePushBuild}>
-        <UploadCloud size={17} />
-        保存してBuild
-      </button>
-      <button type="button" onClick={onRefreshBuildStatus}>
-        最新 run 確認
-      </button>
-      <button type="button" onClick={onDownloadArtifacts}>
-        Artifact 取得
-      </button>
-      <BuildCheckList check={buildCheck} />
-      <div className="flash-wizard">
-        <div className="flash-wizard-header">
-          <strong>{sideLabel(flashSide)} 側を書き込み</strong>
-          <span>{formatUf2Name(firmwareUf2Targets[flashSide])}</span>
-        </div>
-        <div className="flash-side-toggle" role="group" aria-label="Flash side">
-          {(["left", "right"] as FlashSide[]).map((side) => (
-            <button
-              type="button"
-              key={side}
-              className={flashSide === side ? "active" : ""}
-              onClick={() => onFlashSideChange(side)}
-            >
-              {sideLabel(side)}
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={onRefreshFlashTargets}>
-          UF2 / Volume 更新
-        </button>
-        <button
-          type="button"
-          className="primary"
-          disabled={
-            !firmwareUf2Targets[flashSide] ||
-            bootloaderVolumes.length === 0 ||
-            (bootloaderVolumes.length > 1 && !selectedVolume)
-          }
-          onClick={() => onFlashWizardCopy(flashSide)}
-        >
-          {sideLabel(flashSide)} UF2 をコピー
-        </button>
-        <small>
-          {bootloaderVolumes.length > 0
-            ? `検出中: ${bootloaderVolumes.map((volume) => volume.split("/").pop()).join(", ")}`
-            : `${sideLabel(flashSide)} 側を bootloader に入れてから更新してください`}
-        </small>
-        <label>
-          UF2
-          <select value={selectedUf2} onChange={(event) => onSelectedUf2Change(event.target.value)}>
-            <option value="">未選択</option>
-            {uf2Files.map((file) => (
-              <option key={file} value={file}>
-                {file.split("/").pop()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Bootloader
-          <select value={selectedVolume} onChange={(event) => onSelectedVolumeChange(event.target.value)}>
-            <option value="">未選択</option>
-            {bootloaderVolumes.map((volume) => (
-              <option key={volume} value={volume}>
-                {volume.split("/").pop()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={onCopyUf2}>
-          UF2 をコピー
-        </button>
-      </div>
+    <section className="firmware-inspector firmware-key-inspector">
+      <section>
+        <p className="eyebrow">Key {keyIndex + 1}</p>
+        <h2>{selectedBinding}</h2>
+        <BindingEditor actionLabel="Binding に反映" binding={binding} onApply={onApplyBinding} />
+      </section>
     </section>
   );
 }
@@ -3755,13 +4215,17 @@ function ComboReferencePanel({ combo }: { combo?: KeymapCombo }) {
             <span>Keys</span>
             <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
           </div>
-          <div>
-            <span>Binding</span>
-            <strong>{combo.binding}</strong>
-          </div>
-          <div>
-            <span>Timeout</span>
-            <strong>{combo.timeoutMs} ms</strong>
+	          <div>
+	            <span>Binding</span>
+	            <strong>{combo.binding}</strong>
+	          </div>
+	          <div>
+	            <span>Layers</span>
+	            <strong>{formatComboLayerScope(combo)}</strong>
+	          </div>
+	          <div>
+	            <span>Timeout</span>
+	            <strong>{combo.timeoutMs} ms</strong>
           </div>
         </div>
       ) : (
@@ -3790,6 +4254,8 @@ function ScaleSlider({
         <strong>{value.toFixed(2)}x</strong>
       </div>
       <input
+        name={`timing-${label}`}
+        aria-label={label}
         type="range"
         min={0.25}
         max={3}
@@ -3971,6 +4437,261 @@ function TrackballWorkbench({
   );
 }
 
+function BrowserFirmwareReleaseWorkbench({
+  artifacts,
+  branch,
+  buildStatus,
+  busyOperation,
+  commitSha,
+  commitUrl,
+  downloadedSide,
+  flashSide,
+  onBranchChange,
+  onCancelGithubConnection,
+  onClearToken,
+  onCommitBuild,
+  onConnectGithub,
+  onCopyUf2,
+  onDiffReviewed,
+  onDownloadArtifacts,
+  onLoadProject,
+  onRefreshRun,
+  onRepoUrlChange,
+  onTokenChange,
+  onTriggerBuild,
+  readiness,
+  repoRef,
+  repoUrl,
+  runId,
+  runUrl,
+  token,
+  userCode,
+  verificationUri,
+}: {
+  artifacts: GitHubFirmwareArtifacts | null;
+  branch: string;
+  buildStatus: string;
+  busyOperation: BrowserFirmwareOperation;
+  commitSha: string | null;
+  commitUrl: string;
+  downloadedSide: FlashSide | null;
+  flashSide: FlashSide;
+  onBranchChange: (value: string) => void;
+  onCancelGithubConnection: () => void;
+  onClearToken: () => void;
+  onCommitBuild: () => void;
+  onConnectGithub: () => void;
+  onCopyUf2: (side: FlashSide) => void;
+  onDiffReviewed: () => void;
+  onDownloadArtifacts: () => void;
+  onLoadProject: () => void;
+  onRefreshRun: () => void;
+  onRepoUrlChange: (value: string) => void;
+  onTokenChange: (value: string) => void;
+  onTriggerBuild: () => void;
+  readiness: FirmwareReleaseReadiness;
+  repoRef: GitHubRepositoryRef | null;
+  repoUrl: string;
+  runId: number | null;
+  runUrl: string;
+  token: string;
+  userCode: string;
+  verificationUri: string;
+}) {
+  const isBusy = busyOperation !== "idle";
+  const busyLabel = browserFirmwareOperationLabel(busyOperation);
+
+  return (
+    <div className="workbench-grid build-workbench browser-release-workbench" aria-busy={isBusy}>
+      <section className="build-panel">
+        <div>
+          <p className="eyebrow">Browser Firmware</p>
+          <h2>GitHub Commit & Build</h2>
+        </div>
+        <label className="build-repo-field" htmlFor="browser-firmware-repository">
+          <span>Firmware repository</span>
+          <input
+            id="browser-firmware-repository"
+            name="browserFirmwareRepository"
+            type="text"
+            placeholder="juichi50iii/KobitoKey_QWERTY"
+            value={repoUrl}
+            onChange={(event) => onRepoUrlChange(event.target.value)}
+            disabled={isBusy}
+            spellCheck={false}
+            autoComplete="off"
+            aria-describedby="browser-firmware-repository-help"
+          />
+          <small id="browser-firmware-repository-help">
+            {repoRef ? `対象: ${formatGitHubRepositoryRef(repoRef)}` : "owner/repo または GitHub URL を入力"}
+          </small>
+        </label>
+        <label className="build-repo-field" htmlFor="browser-firmware-branch">
+          <span>Branch</span>
+          <input
+            id="browser-firmware-branch"
+            name="browserFirmwareBranch"
+            type="text"
+            value={branch}
+            onChange={(event) => onBranchChange(event.target.value)}
+            disabled={isBusy}
+            spellCheck={false}
+            autoComplete="off"
+            aria-describedby="browser-firmware-branch-help"
+          />
+          <small id="browser-firmware-branch-help">commit と workflow dispatch に使う branch</small>
+        </label>
+        <label className="build-repo-field" htmlFor="browser-firmware-token">
+          <span>GitHub token</span>
+          <input
+            id="browser-firmware-token"
+            name="browserFirmwareToken"
+            type="password"
+            value={token}
+            onChange={(event) => onTokenChange(event.target.value)}
+            disabled={isBusy}
+            autoComplete="new-password"
+            placeholder="fine-grained token / OAuth token"
+            aria-describedby="browser-firmware-token-help"
+          />
+          <small id="browser-firmware-token-help">
+            token はメモリ上だけで使います。fine-grained token は Contents write と Actions write を付けます。
+          </small>
+        </label>
+        <div className="build-actions">
+          <button type="button" onClick={onConnectGithub} disabled={isBusy}>
+            <UploadCloud size={16} />
+            <span className="button-label">GitHub で接続</span>
+          </button>
+          {userCode ? (
+            <button type="button" onClick={onCancelGithubConnection}>
+              <span className="button-label">認証をキャンセル</span>
+            </button>
+          ) : null}
+          {token.trim() ? (
+            <button type="button" onClick={onClearToken} disabled={isBusy && !userCode}>
+              <span className="button-label">token を消去</span>
+            </button>
+          ) : null}
+        </div>
+        {userCode ? (
+          <p className="build-status">
+            GitHub device code: <strong>{userCode}</strong>
+            {verificationUri ? (
+              <>
+                {" / "}
+                <a href={verificationUri} target="_blank" rel="noreferrer">
+                  GitHub 認証を開く
+                </a>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+        <p className="build-status" role="status" aria-live="polite" aria-atomic="true">
+          {isBusy ? `${busyLabel}: ${buildStatus}` : buildStatus}
+        </p>
+        <BrowserReleaseGateList readiness={readiness} />
+        <div className="build-actions">
+          <button type="button" onClick={onLoadProject} disabled={isBusy || !token.trim() || !repoRef || !branch.trim()}>
+            <Download size={16} />
+            <span className="button-label">GitHub から読み込み</span>
+          </button>
+          <button type="button" onClick={onDiffReviewed} disabled={isBusy || readiness.step !== "review-diff"}>
+            <CheckCircle2 size={16} />
+            <span className="button-label">Diff 確認済み</span>
+          </button>
+          <button type="button" className="primary" onClick={onCommitBuild} disabled={isBusy || !readiness.canCommit}>
+            <UploadCloud size={16} />
+            <span className="button-label">Commit & Build</span>
+          </button>
+          <button type="button" onClick={onTriggerBuild} disabled={isBusy || !readiness.canBuild}>
+            <UploadCloud size={16} />
+            <span className="button-label">Build 起動</span>
+          </button>
+          <button type="button" onClick={onRefreshRun} disabled={isBusy || !readiness.canBuild}>
+            <span className="button-label">最新 run</span>
+          </button>
+          <button type="button" onClick={onDownloadArtifacts} disabled={isBusy || !readiness.canDownloadArtifact}>
+            <span className="button-label">Artifact 取得</span>
+          </button>
+        </div>
+        <div className="browser-release-meta">
+          <span>次: {readiness.nextAction}</span>
+          {commitSha ? (
+            <a href={commitUrl || undefined} target="_blank" rel="noreferrer">
+              commit {commitSha.slice(0, 7)}
+            </a>
+          ) : null}
+          {runId ? (
+            <a href={runUrl || undefined} target="_blank" rel="noreferrer">
+              run {runId}
+            </a>
+          ) : null}
+        </div>
+      </section>
+      <section className="flash-panel">
+        <div>
+          <p className="eyebrow">Flash</p>
+          <h2>UF2 → Bootloader</h2>
+        </div>
+        <FirmwareWriteGuide />
+        <div className="flash-wizard">
+          <div className="flash-wizard-header">
+            <strong>{sideLabel(flashSide)} 側を書き込み</strong>
+            <span>{artifacts?.targets[flashSide] ?? "UF2 未検出"}</span>
+          </div>
+          <div className="flash-side-toggle" role="group" aria-label="Flash side">
+            {(["left", "right"] as FlashSide[]).map((side) => (
+              <button
+                type="button"
+                key={side}
+                className={flashSide === side ? "active" : ""}
+                disabled={isBusy || (side === "left" ? !readiness.canFlashLeft : !readiness.canFlashRight)}
+                onClick={() => onCopyUf2(side)}
+              >
+                <span className="button-label">
+                  {downloadedSide === side ? `${sideLabel(side)} コピー完了を記録` : `${sideLabel(side)} を書き込み`}
+                </span>
+              </button>
+            ))}
+          </div>
+          <small>
+            {artifacts
+              ? `left ${artifacts.targets.left ? "OK" : "未検出"} / right ${
+                  artifacts.targets.right ? "OK" : "未検出"
+                }${artifacts.manifestPath ? ` / manifest ${artifacts.manifestPath}` : ""}`
+              : "成功した build の artifact を取得すると左右 UF2 を分類します"}
+          </small>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function BrowserReleaseGateList({ readiness }: { readiness: FirmwareReleaseReadiness }) {
+  const gates = [
+    ["GitHub", readiness.step !== "connect-github"],
+    ["Repository", readiness.step !== "connect-github" && readiness.step !== "select-repository"],
+    ["Files", !["connect-github", "select-repository", "load-files"].includes(readiness.step)],
+    ["Diff", readiness.canCommit || Boolean(readiness.canBuild) || readiness.step === "commit"],
+    ["Build", readiness.canDownloadArtifact || readiness.canFlashLeft || readiness.canFlashRight || readiness.complete],
+    ["Left", readiness.canFlashRight || readiness.complete],
+    ["Right", readiness.complete],
+  ] as const;
+
+  return (
+    <div className={`build-check-list ${readiness.blockers.length === 0 ? "ok" : "error"}`} aria-label="Browser firmware release checks">
+      {gates.map(([label, ok]) => (
+        <div className="build-check-item" key={label}>
+          {ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+          <span>{label}</span>
+          <em>{ok ? "OK" : readiness.blockers[0] ?? readiness.nextAction}</em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BuildWorkbench({
   bootloaderVolumes,
   buildCheck,
@@ -4025,9 +4746,11 @@ function BuildWorkbench({
           <p className="eyebrow">Build</p>
           <h2>GitHub Actions</h2>
         </div>
-        <label className="build-repo-field">
+        <label className="build-repo-field" htmlFor="tauri-firmware-repository-url">
           <span>Firmware repository URL</span>
           <input
+            id="tauri-firmware-repository-url"
+            name="tauriFirmwareRepositoryUrl"
             type="url"
             placeholder="https://github.com/<owner>/<repo>"
             value={firmwareRepoUrl}
@@ -4047,21 +4770,21 @@ function BuildWorkbench({
         <div className="build-actions">
           <button type="button" onClick={onCheckBuildReady}>
             <CheckCircle2 size={16} />
-            接続確認
+            <span className="button-label">接続確認</span>
           </button>
           <button type="button" className="primary" onClick={onSavePushBuild}>
             <UploadCloud size={16} />
-            保存してBuild
+            <span className="button-label">保存してBuild</span>
           </button>
           <button type="button" onClick={onTriggerBuild}>
             <UploadCloud size={16} />
-            Build 起動
+            <span className="button-label">Build 起動</span>
           </button>
           <button type="button" onClick={onRefreshBuildStatus}>
-            最新 run
+            <span className="button-label">最新 run</span>
           </button>
           <button type="button" onClick={onDownloadArtifacts}>
-            Artifact 取得
+            <span className="button-label">Artifact 取得</span>
           </button>
         </div>
         <BuildCheckList check={buildCheck} />
@@ -4110,34 +4833,34 @@ function BuildWorkbench({
               : `${sideLabel(flashSide)} 側を bootloader に入れてから更新してください`}
           </small>
         </div>
-        <button type="button" className="wide-action" onClick={onRefreshFlashTargets}>
-          UF2 / Volume を更新
-        </button>
-        <label>
-          UF2
-          <select value={selectedUf2} onChange={(event) => onSelectUf2(event.target.value)}>
-            <option value="">未選択</option>
-            {uf2Files.map((file) => (
-              <option key={file} value={file}>
-                {file.split("/").pop()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Bootloader
-          <select value={selectedVolume} onChange={(event) => onSelectVolume(event.target.value)}>
-            <option value="">未選択</option>
-            {bootloaderVolumes.map((volume) => (
-              <option key={volume} value={volume}>
-                {volume.split("/").pop()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="primary wide-action" onClick={onCopySelectedUf2}>
-          UF2 を bootloader にコピー
-        </button>
+        <details className="flash-advanced">
+          <summary>手動で UF2 / Bootloader を選ぶ</summary>
+          <label>
+            UF2
+            <select name="manualUf2File" value={selectedUf2} onChange={(event) => onSelectUf2(event.target.value)}>
+              <option value="">未選択</option>
+              {uf2Files.map((file) => (
+                <option key={file} value={file}>
+                  {file.split("/").pop()}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Bootloader
+            <select name="manualBootloaderVolume" value={selectedVolume} onChange={(event) => onSelectVolume(event.target.value)}>
+              <option value="">未選択</option>
+              {bootloaderVolumes.map((volume) => (
+                <option key={volume} value={volume}>
+                  {volume.split("/").pop()}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="primary wide-action" onClick={onCopySelectedUf2}>
+            UF2 を bootloader にコピー
+          </button>
+        </details>
       </section>
     </div>
   );
@@ -4296,11 +5019,12 @@ function ComboRow({
       onClick={() => onSelect?.(combo.id)}
     >
       <span className="combo-row-keys">{combo.keyPositions.map((position) => position + 1).join(" + ")}</span>
-      <BindingChip binding={combo.binding} compact />
-      <span className="combo-row-flags">
-        {isSelected ? <span>編集中</span> : null}
-        {isRelated ? <span>選択キー</span> : null}
-      </span>
+	      <BindingChip binding={combo.binding} compact />
+	      <span className="combo-row-flags">
+	        <span className="combo-row-scope">{formatComboLayerScope(combo)}</span>
+	        {isSelected ? <span className="combo-row-state">編集中</span> : null}
+	        {isRelated ? <span className="combo-row-state">選択キー</span> : null}
+	      </span>
       <em>{combo.timeoutMs}ms</em>
     </button>
   );
@@ -4379,13 +5103,17 @@ function ComboEditor({
               <span>Keys</span>
               <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
             </div>
-            <div>
-              <span>Binding</span>
-              <BindingChip binding={combo.binding} compact />
-            </div>
-            <div>
-              <span>Timeout</span>
-              <strong>{combo.timeoutMs}ms</strong>
+	            <div>
+	              <span>Binding</span>
+	              <BindingChip binding={combo.binding} compact />
+	            </div>
+	            <div>
+	              <span>Layers</span>
+	              <strong>{formatComboLayerScope(combo)}</strong>
+	            </div>
+	            <div>
+	              <span>Timeout</span>
+	              <strong>{combo.timeoutMs}ms</strong>
             </div>
           </div>
           <ComboKeyPicker
@@ -4412,6 +5140,7 @@ function ComboEditor({
           <label>
             Timeout
             <input
+              name={`combo-${combo.id}-timeout`}
               min={1}
               type="number"
               value={form.timeoutMs}
@@ -4543,7 +5272,11 @@ function BindingEditor({
         <summary>ZMK 詳細編集</summary>
         <label>
           ZMK binding
-          <input value={form.raw || builtBinding} onChange={(event) => setForm(parseBindingForm(event.target.value))} />
+          <input
+            name="zmkBinding"
+            value={form.raw || builtBinding}
+            onChange={(event) => setForm(parseBindingForm(event.target.value))}
+          />
         </label>
       </details>
 
@@ -4748,7 +5481,7 @@ function ChoiceStrip({
   selectedValue: string;
 }) {
   return (
-    <div className="choice-strip">
+    <div className={`choice-strip${label.toLowerCase() === "type" ? " binding-type-strip" : ""}`}>
       <span>{label}</span>
       <div>
         {choices.map((choice) => (
@@ -4848,6 +5581,44 @@ function parseDisplayKeyPositions(value: string): number[] {
 
 function directKeyDraftKey(layerIndex: number, keyIndex: number): string {
   return `${layerIndex}:${keyIndex}`;
+}
+
+function formatLayerReferenceSummary(references: LayerReferenceSite[]): string {
+  const preview = references.slice(0, 3).map((reference) => {
+    if (reference.kind === "combo-binding" || reference.kind === "combo-layers") {
+      return `Combo ${reference.comboId}`;
+    }
+
+    return `Layer ${reference.layerIndex} / Key ${reference.keyIndex + 1}`;
+  });
+  const remaining = references.length - preview.length;
+  return remaining > 0 ? `${preview.join(", ")} ほか ${remaining} 件` : preview.join(", ");
+}
+
+function formatComboLayerScope(combo: KeymapCombo): string {
+  const explicitLayers = combo.layers && combo.layers.length > 0 ? combo.layers : comboLayerMaskScope(combo);
+  if (!explicitLayers || explicitLayers.length === 0) {
+    return "全 layer";
+  }
+  return uniqueSortedLayerIndexes(explicitLayers).map((layer) => `L${layer}`).join(", ");
+}
+
+function comboLayerMaskScope(combo: KeymapCombo): number[] | null {
+  const layerMask = "layerMask" in combo && typeof combo.layerMask === "number" ? combo.layerMask >>> 0 : 0xffffffff;
+  if (layerMask === 0xffffffff) {
+    return null;
+  }
+  const layers: number[] = [];
+  for (let layer = 0; layer < 32; layer += 1) {
+    if ((layerMask & (1 << layer)) !== 0) {
+      layers.push(layer);
+    }
+  }
+  return layers;
+}
+
+function uniqueSortedLayerIndexes(values: number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value >= 0))].sort((left, right) => left - right);
 }
 
 function applyDirectKeyDraftsToKeymap(keymap: StudioKeymap, drafts: Record<string, DirectKeyDraft>): StudioKeymap {
@@ -4967,6 +5738,27 @@ function sideLabel(side: FlashSide): string {
   return side === "left" ? "Left" : "Right";
 }
 
+function browserFirmwareOperationLabel(operation: BrowserFirmwareOperation): string {
+  switch (operation) {
+    case "oauth":
+      return "GitHub 接続";
+    case "load":
+      return "GitHub 読み込み";
+    case "commit-build":
+      return "Commit & Build";
+    case "build":
+      return "Build 起動";
+    case "refresh-run":
+      return "最新 run 確認";
+    case "download-artifact":
+      return "Artifact 取得";
+    case "flash":
+      return "UF2 書き込み";
+    case "idle":
+      return "待機";
+  }
+}
+
 function formatUf2Name(path: string | undefined): string {
   return path?.split("/").pop() ?? "UF2 未検出";
 }
@@ -4988,6 +5780,20 @@ function formatRunStatus(output: string): string {
   } catch {
     return output || "GitHub Actions run が見つかりません";
   }
+}
+
+function mapGitHubRunStatus(status: string, conclusion: string | null): FirmwareBuildStatus {
+  if (status === "queued") return "queued";
+  if (status === "in_progress" || status === "waiting" || status === "requested") return "in_progress";
+  if (status !== "completed") return "unknown";
+  if (conclusion === "success") return "success";
+  if (conclusion === "cancelled" || conclusion === "skipped") return "cancelled";
+  return "failure";
+}
+
+function githubOAuthClientId(): string {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  return env?.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() ?? "";
 }
 
 function fileDiff(filename: string, before: string, after: string): FileDiff {
@@ -5092,6 +5898,7 @@ function TrackballEditor({
           <label key={key}>
             {label}
             <input
+              name={`trackball-${key}`}
               min={0}
               type="number"
               value={form[key]}
@@ -5136,6 +5943,13 @@ function downloadText(filename: string, contents: string) {
 
 function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
+}
+
+function initialEditorMode(): EditorMode {
+  if (typeof window === "undefined") {
+    return "direct";
+  }
+  return new URLSearchParams(window.location.search).get("mode") === "firmware" ? "firmware" : "direct";
 }
 
 function getWebRuntimeDiagnostics(isDesktopRuntime: boolean): {
@@ -5217,6 +6031,32 @@ async function writeProjectToDirectoryHandle(
       await writable.close();
     }
   }
+}
+
+async function writeUf2ToDirectoryHandle(handle: FileSystemDirectoryHandle, file: GitHubArtifactUf2): Promise<void> {
+  await ensureWritablePermission(handle);
+  await assertUf2BootloaderDirectory(handle);
+  const filename = file.name.split("/").pop() ?? file.name;
+  const fileHandle = await handle.getFileHandle(filename, { create: true });
+  const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
+  try {
+    await writable.write(arrayBufferFromBytes(file.bytes));
+  } finally {
+    await writable.close();
+  }
+}
+
+function downloadBytes(filename: string, bytes: Uint8Array) {
+  const url = URL.createObjectURL(new Blob([arrayBufferFromBytes(bytes)], { type: "application/octet-stream" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 async function readProjectFromDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<ProjectFiles> {

@@ -10,18 +10,18 @@ permalink: /deployment/
 
 | 対象 | 公開先 | 更新元 |
 | --- | --- | --- |
-| ブラウザアプリ | <https://kobitokey-studio.pages.dev/> | Cloudflare Pages が `main` から `npm run build` |
+| ブラウザアプリ | <https://kobitokey-studio.pages.dev/> | Cloudflare Workers + static assets が `main` から `npm run build` |
 | 使い方ガイド | <https://s-hiraoku.github.io/kobitokey-studio/> | GitHub Pages が `docs/` から Jekyll build |
 
 ## ブラウザアプリの公開
 
-KobitoKey Studio のブラウザ版は Cloudflare Pages で公開します。
+KobitoKey Studio のブラウザ版は Cloudflare Workers + static assets で公開します。GitHub OAuth device flow と artifact zip proxy のため、同一オリジンの Worker API を使います。
 
 公開 URL:
 
 - <https://kobitokey-studio.pages.dev/>
 
-### Cloudflare Pages の build settings
+### Cloudflare の build settings
 
 Pages project の `Settings` → `Builds & deployments` で確認できます。
 
@@ -30,10 +30,24 @@ Pages project の `Settings` → `Builds & deployments` で確認できます。
 | Production branch | `main` |
 | Framework preset | `None` |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
+| Build output directory | `dist/client` |
 | Root directory | `/` |
 
 `main` に push すると自動で production deployment が作られます。
+
+Worker bundle は `src/worker.ts` から作られ、Vite build 後の redirected Wrangler configuration は `dist/kobitokey_studio/wrangler.json` に出力されます。公開前に `npm run check:browser-firmware` を通すと、OS の一時ディレクトリ配下へ Wrangler dry-run output を作り、Worker と assets が束ねられることを確認できます。
+
+Worker API は `/api/github/device-code`、`/api/github/access-token`、`/api/github/artifact-zip` を `POST` のみ受け付けます。OAuth response と artifact proxy response は `Cache-Control: no-store` を返し、不正 JSON は `invalid_json` の 400 として返します。static asset と API response の両方に security headers を付けます。device-code route は `repo` scope だけを許可し、artifact proxy は GitHub owner / repo / artifact id を検証してから GitHub API へ転送します。
+
+### Environment variables
+
+ブラウザ版 Firmware Mode の `GitHub で接続` ボタンを使うには、GitHub OAuth App の client id を Cloudflare 側に設定します。
+
+| 変数 | 用途 |
+| --- | --- |
+| `VITE_GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth device flow の client id |
+
+OAuth flow は `repo` scope を要求します。この値が未設定でも、beta UI の token 入力欄に対象 repository の Contents write / Actions write 権限を持つ fine-grained GitHub token を入れれば検証できます。token は browser memory 上だけで使い、local storage には保存しません。
 
 ### リリース確認
 
@@ -42,6 +56,7 @@ Pages project の `Settings` → `Builds & deployments` で確認できます。
 3. Status が成功になったら <https://kobitokey-studio.pages.dev/> を開く。
 4. PC 幅では通常 UI が表示されることを確認する。
 5. スマホ幅では「スマホは未対応でーす」画面が表示されることを確認する。
+6. Browser Firmware Mode を公開する場合は、まず `npm run check:browser-firmware` を通す。このコマンドは `scripts/run-browser-firmware-check.mjs` から release audit、external evidence validator self-test、unit tests、production build、Wrangler dry-run deploy packaging を順に確認する。runner は `BROWSER_FIRMWARE_TMP_DIR`、`RUNNER_TEMP`、または OS の一時ディレクトリ配下に Wrangler log / dry-run output を置き、ローカル sandbox と GitHub Actions のどちらでもユーザー設定ディレクトリに依存しない。production deploy 後は `npm run check:browser-firmware:production-preflight` で `?mode=firmware` の公開 URL、release security headers、Worker API routes、unsupported OAuth scope rejection を先に確認する。公開直前の最終 preflight では `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run check:browser-firmware:production-release-preflight` を実行し、`repo` scope の device code が本番 Worker route から発行され、同じ client id が GitHub 接続ボタン用の frontend bundle に含まれていることも確認する。続けて QA 端末で `npm run check:browser-firmware:ui` を実行し、[Browser Firmware Release Plan](../browser-firmware-release-plan/) の公開判定チェックリストを実 repository と実機で通す。外部 E2E 証跡は `BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run collect:browser-firmware:e2e-report -- --out <report.json>` で生成し、QA 端末で本番 URL の rendered UI smoke も同時に走らせる場合は `--run-ui-smoke` を付ける。production URL と API route の security headers、Worker OAuth device-code 発行 / artifact routes、unsupported OAuth scope rejection、Actions run の head SHA / head branch、Actions artifact の name / id / size / expiry、Actions artifact zip 内 UF2 / manifest entry の SHA-256、left/right の bootloader marker / 書き込み直前確認 / keyboard half 確認、token 非保存/消去、key binding / Combo / Trackball 編集、release wizard precondition、layer 追加・複製・参照中 layer 削除ブロック・安全な削除の UI smoke 結果を含めて `npm run check:browser-firmware:e2e-report -- <report.json>` で検証する。
 
 ### 独自ドメイン
 
@@ -60,7 +75,7 @@ Pages project の `Settings` → `Builds & deployments` で確認できます。
 
 - PC の Chrome / Edge: 対応
 - スマホブラウザ: 初版では未対応画面を表示
-- Browser release: Direct Mode のみ
+- Browser release: Direct Mode と Firmware Mode beta
 - Tauri desktop release: Direct Mode と Firmware Mode
 
 Direct Mode は Web Serial / Web Bluetooth を使うため、ブラウザ版は HTTPS、`127.0.0.1`、または `localhost` で開く必要があります。

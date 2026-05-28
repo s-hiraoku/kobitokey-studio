@@ -66,7 +66,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 2. `Combos` または `Trackball` を開く
 3. 変更する
 4. `Diff` を確認する
-5. 保存して build + UF2 書き込みで反映する
+5. ブラウザ版は `Commit & Build`、Tauri 版は保存して build し、UF2 書き込みで反映する
 
 ## 設定別の早見表
 

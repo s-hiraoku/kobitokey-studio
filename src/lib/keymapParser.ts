@@ -15,6 +15,7 @@ export type KeymapCombo = {
   id: string;
   binding: string;
   keyPositions: number[];
+  layers?: number[];
   timeoutMs: number;
   blockStart: number;
   blockEnd: number;
@@ -24,8 +25,27 @@ export type KeymapComboInput = {
   id: string;
   binding: string;
   keyPositions: number[];
+  layers?: number[];
   timeoutMs: number;
 };
+
+export type LayerReferenceSite =
+  | {
+      kind: "layer-binding";
+      layerIndex: number;
+      keyIndex: number;
+      binding: string;
+    }
+  | {
+      kind: "combo-binding";
+      comboId: string;
+      binding: string;
+    }
+  | {
+      kind: "combo-layers";
+      comboId: string;
+      layers: number[];
+    };
 
 export type KeymapLayerInput = {
   id: string;
@@ -77,6 +97,7 @@ function parseCombos(source: string): KeymapCombo[] {
     const id = match.groups?.id;
     const body = match.groups?.body ?? "";
     const keyPositions = parseNumberList(readAngleProperty(body, "key-positions"));
+    const layers = parseNumberList(readAngleProperty(body, "layers"));
     const binding = tokenizeBindings(readAngleProperty(body, "bindings") ?? "")[0] ?? "";
     const timeoutMs = Number(readAngleProperty(body, "timeout-ms") ?? 0);
 
@@ -88,6 +109,7 @@ function parseCombos(source: string): KeymapCombo[] {
       id,
       binding,
       keyPositions,
+      layers,
       timeoutMs,
       blockStart: combosBlock.bodyStart + (match.index ?? 0),
       blockEnd: combosBlock.bodyStart + (match.index ?? 0) + match[0].length,
@@ -184,6 +206,36 @@ export function deleteLayer(source: string, layer: KeymapLayer): string {
   return source.slice(0, layer.blockStart).replace(/\s*$/, "\n") + source.slice(layer.blockEnd);
 }
 
+export function findLayerReferenceSites(parsed: ParsedKeymap, targetLayerIndex: number): LayerReferenceSite[] {
+  if (!Number.isInteger(targetLayerIndex) || targetLayerIndex < 0) {
+    return [];
+  }
+
+  const references: LayerReferenceSite[] = [];
+  parsed.layers.forEach((layer, layerIndex) => {
+    if (layerIndex === targetLayerIndex) {
+      return;
+    }
+
+    layer.bindings.forEach((binding, keyIndex) => {
+      if (bindingReferencesLayer(binding, targetLayerIndex)) {
+        references.push({ kind: "layer-binding", layerIndex, keyIndex, binding });
+      }
+    });
+  });
+
+  parsed.combos.forEach((combo) => {
+    if (bindingReferencesLayer(combo.binding, targetLayerIndex)) {
+      references.push({ kind: "combo-binding", comboId: combo.id, binding: combo.binding });
+    }
+    if (combo.layers?.includes(targetLayerIndex)) {
+      references.push({ kind: "combo-layers", comboId: combo.id, layers: combo.layers });
+    }
+  });
+
+  return references;
+}
+
 export function nextLayerId(layers: KeymapLayer[], base = `layer${layers.length}`): string {
   const existingIds = new Set(layers.map((layer) => layer.id));
   const normalizedBase = sanitizeNodeId(base) || `layer${layers.length}`;
@@ -203,7 +255,7 @@ export function nextLayerId(layers: KeymapLayer[], base = `layer${layers.length}
 }
 
 export function updateCombo(source: string, combo: KeymapCombo, input: KeymapComboInput): string {
-  const nextBlock = formatComboBlock(input);
+  const nextBlock = formatComboBlock({ ...input, layers: input.layers ?? combo.layers });
   return source.slice(0, combo.blockStart) + nextBlock + source.slice(combo.blockEnd);
 }
 
@@ -239,13 +291,16 @@ function addComboBlock(source: string, input: KeymapComboInput): string {
 }
 
 function formatComboBlock(input: KeymapComboInput): string {
-  return [
+  const lines = [
     `${input.id} {`,
     `    timeout-ms = <${input.timeoutMs}>;`,
     `    key-positions = <${input.keyPositions.join(" ")}>;`,
-    `    bindings = <${input.binding}>;`,
-    `};`,
-  ].join("\n");
+  ];
+  if (input.layers && input.layers.length > 0) {
+    lines.push(`    layers = <${input.layers.join(" ")}>;`);
+  }
+  lines.push(`    bindings = <${input.binding}>;`, `};`);
+  return lines.join("\n");
 }
 
 function formatLayerBlock(input: KeymapLayerInput): string {
@@ -321,6 +376,14 @@ function defaultLayerLabel(id: string, index: number): string {
 function normalizeBinding(binding: string): string {
   const normalized = binding.trim().replace(/\s+/g, " ");
   return normalized.startsWith("&") ? normalized : `&kp ${normalized}`;
+}
+
+function bindingReferencesLayer(binding: string, targetLayerIndex: number): boolean {
+  const normalized = normalizeBinding(binding);
+  const layerMatch =
+    normalized.match(/^&lt\s+(\d+)(?:\s|$)/) ??
+    normalized.match(/^&(?:mo|to|tog|sl)\s+(\d+)(?:\s|$)/);
+  return layerMatch ? Number(layerMatch[1]) === targetLayerIndex : false;
 }
 
 function sanitizeNodeId(value: string): string {

@@ -471,6 +471,57 @@ describe("direct keymap conversion", () => {
     ]);
   });
 
+  it("diffs Direct combo layer masks against firmware combo layer scopes", () => {
+    const firmwareCombos = parseKeymap(
+      comboFixtureSource().replace("bindings = <&kp ENTER>;", "layers = <1>;\n            bindings = <&kp ENTER>;"),
+    ).combos;
+    const directCombos: Array<KeymapCombo & { layerMask: number }> = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        layers: [2],
+        layerMask: 1 << 2,
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+
+    expect(firmwareCombosToStudioSet(firmwareCombos).combos[0].layerMask).toBe(1 << 1);
+    expect(diffDirectCombosAgainstFirmware(directCombos, firmwareCombos)).toEqual([
+      {
+        comboIndex: 0,
+        kind: "changed",
+        firmwareCombo: {
+          id: "combo_tab",
+          binding: "&kp ENTER",
+          keyPositions: [1, 2],
+          layers: [1],
+          timeoutMs: 35,
+        },
+        directCombo: {
+          id: "direct_combo_1",
+          binding: "&kp RET",
+          keyPositions: [1, 2],
+          layers: [2],
+          timeoutMs: 35,
+        },
+      },
+      {
+        comboIndex: 1,
+        kind: "removed",
+        firmwareCombo: {
+          id: "combo_old",
+          binding: "&kp B",
+          keyPositions: [3, 4],
+          timeoutMs: 70,
+        },
+        directCombo: null,
+      },
+    ]);
+  });
+
   it("applies Direct combo diffs back to firmware source", () => {
     const source = comboFixtureSource();
     const directCombos: KeymapCombo[] = [
@@ -506,6 +557,31 @@ describe("direct keymap conversion", () => {
     const nextCombos = parseKeymap(nextSource).combos;
     expect(nextCombos.map((combo) => combo.id)).toEqual(["combo_tab", "combo_old", "direct_combo_3"]);
     expect(nextCombos.map((combo) => combo.binding)).toEqual(["&kp ENTER", "&kp C", "&kp D"]);
+    expect(diffDirectCombosAgainstFirmware(directCombos, nextCombos)).toEqual([]);
+  });
+
+  it("applies Direct combo layer scope changes back to firmware source", () => {
+    const source = comboFixtureSource().replace("bindings = <&kp ENTER>;", "layers = <1>;\n            bindings = <&kp ENTER>;");
+    const directCombos: Array<KeymapCombo & { layerMask: number }> = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        layerMask: 1 << 2,
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      parseKeymap(source).combos[1] as KeymapCombo & { layerMask: number },
+    ];
+    directCombos[1].layerMask = 0xffffffff;
+    const diffs = diffDirectCombosAgainstFirmware(directCombos, parseKeymap(source).combos);
+
+    const nextSource = applyDirectFirmwareComboDiffsToSource(source, diffs);
+
+    const nextCombos = parseKeymap(nextSource).combos;
+    expect(nextCombos[0].layers).toEqual([2]);
+    expect(nextSource).toContain("layers = <2>;");
     expect(diffDirectCombosAgainstFirmware(directCombos, nextCombos)).toEqual([]);
   });
 });

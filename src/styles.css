@@ -2215,6 +2215,7 @@ select:focus-visible {
   min-width: 0;
   min-height: 0;
   flex: 1 1 0;
+  container: workbench / inline-size;
   /* Only the content of the active workbench tab scrolls; the keyboard
      above stays anchored in view. */
   overflow: auto;
@@ -2232,7 +2233,17 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 .build-workbench {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+@container workbench (min-width: 720px) {
+  .build-workbench {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@supports not (container-type: inline-size) {
+  .build-workbench {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 .workbench-grid > section {
   min-width: 0;
@@ -2260,14 +2271,36 @@ select:focus-visible {
 .workbench-grid .build-panel ol { margin-top: var(--sp-3); }
 .workbench-grid .build-actions {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
   gap: var(--sp-2);
 }
 .workbench-grid .build-actions button {
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  min-height: 38px;
+  min-inline-size: 0;
+  min-width: 0;
+  min-height: 40px;
   margin-top: 0;
+  padding: var(--sp-2) var(--sp-3);
   font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  overflow: hidden;
+}
+.workbench-grid .build-actions button svg {
+  flex: 0 0 auto;
+}
+.workbench-grid .build-actions button .button-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: nowrap;
 }
 .workbench-grid .build-actions button:first-child { /* primary slot */
   /* leave as-is; user can promote later */
@@ -2426,8 +2459,7 @@ select:focus-visible {
 
 .direct-inspector,
 .direct-settings,
-.firmware-inspector,
-.firmware-tab-stack {
+.firmware-inspector {
   display: grid;
   gap: 16px;
 }
@@ -2821,6 +2853,9 @@ select:focus-visible {
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 4px;
 }
+.binding-type-strip > div {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
 
 .choice-strip button,
 .choice-grid button {
@@ -3025,7 +3060,12 @@ select:focus-visible {
   background: var(--card);
   font-size: 9px;
 }
-.combo-row.selected .combo-row-flags span:first-child {
+.combo-row .combo-row-scope {
+  border-color: color-mix(in srgb, var(--pine-line) 42%, var(--hairline-soft));
+  background: var(--paper-2);
+  color: var(--ink-muted);
+}
+.combo-row.selected .combo-row-state {
   border-color: var(--pine-line);
   background: var(--pine);
   color: var(--on-pine);
@@ -3101,7 +3141,7 @@ select:focus-visible {
 }
 .combo-editor-summary {
   display: grid;
-  grid-template-columns: minmax(70px, auto) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr));
   gap: 6px;
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-md);
@@ -3305,6 +3345,13 @@ select:focus-visible {
   line-height: 1.45;
   word-break: break-all;
 }
+.build-status strong {
+  color: var(--ink-strong);
+}
+.build-status a {
+  color: var(--pine-deep);
+  font-weight: 800;
+}
 
 .build-target {
   margin: var(--sp-2) 0;
@@ -3415,13 +3462,163 @@ select:focus-visible {
   gap: var(--sp-2);
 }
 .flash-side-toggle button {
-  min-height: 32px;
+  display: flex;
+  align-self: start;
+  align-items: safe center;
+  justify-content: center;
+  min-height: 40px;
+  min-inline-size: 0;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
   font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  overflow: hidden;
+}
+.flash-side-toggle button .button-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: nowrap;
 }
 .flash-side-toggle button.active {
   border-color: var(--pine-line);
   background: var(--pine-wash);
   color: var(--pine-deep);
+}
+.flash-advanced {
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-sm);
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: rgba(255, 255, 255, 0.42);
+}
+.flash-advanced summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.flash-advanced[open] {
+  display: grid;
+  gap: var(--sp-2);
+}
+.flash-advanced[open] summary {
+  margin-bottom: var(--sp-1);
+}
+.flash-advanced label {
+  margin-top: 0;
+}
+
+.flash-confirm-dialog {
+  width: min(520px, calc(100vw - 48px));
+  border: 1px solid var(--pine-line);
+  border-radius: var(--r-md);
+  padding: 0;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 18px 54px -28px rgba(15, 19, 24, 0.55);
+}
+.flash-confirm-dialog::backdrop {
+  background: rgba(15, 19, 24, 0.42);
+}
+.flash-confirm-dialog[open] {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+}
+.flash-confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--amber-warn);
+  border-radius: var(--r-md);
+  background: var(--amber-warn-bg);
+  color: #6f4a06;
+}
+.flash-confirm-body {
+  display: grid;
+  gap: var(--sp-3);
+}
+.flash-confirm-body h2 {
+  margin: -2px 0 0;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+.flash-confirm-body p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+.flash-confirm-targets {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-sm);
+  background: var(--paper-2);
+}
+.flash-confirm-targets div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: baseline;
+}
+.flash-confirm-targets dt {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.flash-confirm-targets dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flash-confirm-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-2);
+  align-items: start;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.flash-confirm-check input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  border-radius: 4px;
+}
+.flash-confirm-check input:checked {
+  border-color: var(--pine-deep);
+  background:
+    linear-gradient(135deg, transparent 0 42%, var(--on-pine) 43% 57%, transparent 58% 100%),
+    linear-gradient(45deg, transparent 0 47%, var(--on-pine) 48% 62%, transparent 63% 100%),
+    var(--pine);
+}
+.flash-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.flash-confirm-actions button {
+  min-height: 36px;
+  padding: 0 var(--sp-4);
 }
 
 /* ----------------------------------------------------------------

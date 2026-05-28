@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kobitokey-studio",
   "compatibility_date": "2026-05-17",
+  "main": "./src/worker.ts",
   "observability": {
     "enabled": true
   },
