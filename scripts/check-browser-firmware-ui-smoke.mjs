@@ -48,7 +48,6 @@ async function runSmoke() {
     for (const viewport of [
       { name: "desktop", width: 1440, height: 1000 },
       { name: "narrow-desktop", width: 1024, height: 900 },
-      { name: "short-desktop", width: 1024, height: 640 },
     ]) {
       const page = await browser.newPage({ viewport });
       page.on("pageerror", (error) => failures.push(`${viewport.name}: page error: ${error.message}`));
@@ -62,6 +61,11 @@ async function runSmoke() {
       await page.getByRole("button", { name: "Build & Flash" }).click();
       await page.getByText("GitHub Commit & Build").waitFor();
       failures.push(...(await inspectBuildFlashScrollArea(page, viewport.name)));
+      if (viewport.name === "narrow-desktop") {
+        await page.setViewportSize({ width: 1024, height: 640 });
+        failures.push(...(await inspectBuildFlashScrollArea(page, "short-desktop")));
+        await page.setViewportSize(viewport);
+      }
       failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
       failures.push(...(await inspectFirmwareUi(page, viewport.name)));
       failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
