@@ -53,6 +53,7 @@ async function runSmoke() {
       page.on("pageerror", (error) => failures.push(`${viewport.name}: page error: ${error.message}`));
       await page.goto(`${BASE_URL}/?mode=firmware`, { waitUntil: "networkidle" });
       failures.push(...(await inspectLayerStructureActions(page, viewport.name)));
+      failures.push(...(await resetFirmwareEditsIfEnabled(page, viewport.name, "layer structure smoke")));
       failures.push(...(await inspectKeyBindingEditActions(page, viewport.name)));
       failures.push(...(await inspectComboEditActions(page, viewport.name)));
       failures.push(...(await inspectTrackballEditActions(page, viewport.name)));
@@ -389,6 +390,29 @@ async function inspectFirmwareResetAction(page, label) {
   }
   if (!afterReset.status.includes("firmware 編集を読み込み時点に戻しました")) {
     failures.push(`${label}: reset edits should announce that firmware edits were restored`);
+  }
+
+  return failures;
+}
+
+async function resetFirmwareEditsIfEnabled(page, label, context) {
+  const failures = [];
+  const resetButton = page.locator(".firmware-workbench-actions").getByRole("button", { name: "編集をリセット" });
+  if ((await resetButton.count()) !== 1 || (await resetButton.isDisabled())) {
+    return failures;
+  }
+
+  await resetButton.click();
+  const diffCount = await page.evaluate(() => {
+    const diffTab = Array.from(document.querySelectorAll('[role="tab"]')).find((tab) =>
+      tab.textContent?.includes("Diff"),
+    );
+    const match = diffTab?.textContent?.match(/Diff\s*(\d+)/);
+    return match ? Number(match[1]) : null;
+  });
+
+  if (diffCount !== 0) {
+    failures.push(`${label}: reset after ${context} should clear firmware diffs, got ${diffCount}`);
   }
 
   return failures;
