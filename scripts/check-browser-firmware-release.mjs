@@ -586,14 +586,16 @@ const checks = [
         "production.url in the E2E report",
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
+        "e2e report commit.sha must match the current git HEAD",
+        "--skip-current-head",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "--require-oauth",
         "scripts/check-browser-firmware-external-evidence.mjs",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "`commit.sha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "`commit.sha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "must match the current git `HEAD`"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",

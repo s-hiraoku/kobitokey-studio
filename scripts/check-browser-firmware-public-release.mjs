@@ -23,7 +23,10 @@ Optional:
     Defaults to BROWSER_FIRMWARE_PRODUCTION_URL or production.url in the E2E report.
     If provided, it must match the E2E report production.url.
   --skip-merge-readiness
-    Use only if checking a deployed commit that is no longer the current branch.`);
+    Use only if checking a deployed commit that is no longer the current branch.
+  --skip-current-head
+    Use only if the E2E report intentionally targets a deployed commit that is
+    not the current git HEAD.`);
   process.exit(0);
 }
 
@@ -33,6 +36,7 @@ const requestedProductionUrl = args.find((arg, index) => {
   return args[index - 1] !== "--e2e-report";
 });
 const skipMergeReadiness = args.includes("--skip-merge-readiness");
+const skipCurrentHead = args.includes("--skip-current-head");
 const issues = [];
 let report;
 
@@ -66,6 +70,17 @@ if (reportProductionUrl && requestedProductionUrl && !sameUrl(reportProductionUr
 }
 if (reportProductionUrl && envProductionUrl && !sameUrl(reportProductionUrl, envProductionUrl)) {
   issues.push("BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url");
+}
+if (report && !skipCurrentHead) {
+  const reportCommitSha = typeof report.commit?.sha === "string" ? report.commit.sha.trim() : "";
+  const currentHeadSha = readGitHeadSha();
+  if (!reportCommitSha) {
+    issues.push("e2e report commit.sha is required so public-release can prove the current commit");
+  } else if (!currentHeadSha) {
+    issues.push("current git HEAD could not be read; use --skip-current-head only when checking a deployed commit intentionally");
+  } else if (reportCommitSha !== currentHeadSha) {
+    issues.push("e2e report commit.sha must match the current git HEAD");
+  }
 }
 
 if (issues.length > 0) {
@@ -107,6 +122,14 @@ function sameUrl(left, right) {
 
 function formatError(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function readGitHeadSha() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
 }
 
 function run(command, commandArgs) {
