@@ -149,6 +149,14 @@ flow and the deployed frontend bundle that powers the GitHub connect button:
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
 ```
 
+For the final public-release decision, use the combined gate with the validated
+external E2E report. This command fails unless merge readiness, the OAuth
+production preflight, and the evidence validator all pass:
+
+```sh
+BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
+```
+
 To reduce manual entry, generate the report from production/GitHub/UF2 inputs
 and validate it in one step. The collector reads the GitHub commit file list
 from the API, so a commit touching anything outside the managed firmware files

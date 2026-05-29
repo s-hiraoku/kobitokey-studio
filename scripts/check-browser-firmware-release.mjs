@@ -10,6 +10,7 @@ const files = {
   mergeReadiness: read("scripts/check-browser-firmware-merge-readiness.mjs"),
   mergeReadinessSelfTest: read("scripts/check-browser-firmware-merge-readiness-self-test.mjs"),
   productionPreflight: read("scripts/check-browser-firmware-production-preflight.mjs"),
+  publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
   productionPreflightSelfTest: read("scripts/check-browser-firmware-production-preflight-self-test.mjs"),
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
   main: read("src/main.tsx"),
@@ -576,8 +577,20 @@ const checks = [
       scriptIncludes("check:browser-firmware:collector-self-test", "node scripts/check-browser-firmware-collector-self-test.mjs") &&
       scriptIncludes("check:browser-firmware:production-preflight", "node scripts/check-browser-firmware-production-preflight.mjs") &&
       scriptIncludes("check:browser-firmware:production-release-preflight", "node scripts/check-browser-firmware-production-preflight.mjs --require-oauth") &&
+      scriptIncludes("check:browser-firmware:public-release", "node scripts/check-browser-firmware-public-release.mjs") &&
       scriptIncludes("check:browser-firmware:production-preflight-self-test", "node scripts/check-browser-firmware-production-preflight-self-test.mjs") &&
       scriptIncludes("collect:browser-firmware:e2e-report", "node scripts/collect-browser-firmware-e2e-evidence.mjs") &&
+      allIncludes(files.publicReleaseCheck, [
+        "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
+        "--e2e-report <report.json>",
+        "scripts/check-browser-firmware-merge-readiness.mjs",
+        "scripts/check-browser-firmware-production-preflight.mjs",
+        "--require-oauth",
+        "scripts/check-browser-firmware-external-evidence.mjs",
+      ]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
