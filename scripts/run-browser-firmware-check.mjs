@@ -23,6 +23,7 @@ run("node", ["scripts/check-browser-firmware-evidence-self-test.mjs"]);
 run("node", ["scripts/check-browser-firmware-collector-self-test.mjs"]);
 run("node", ["scripts/check-browser-firmware-merge-readiness-self-test.mjs"]);
 run("node", ["scripts/check-browser-firmware-production-preflight-self-test.mjs"]);
+run("node", ["scripts/check-browser-firmware-public-release-self-test.mjs"]);
 run("node", ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--help"]);
 run(npmCommand, ["test"]);
 run(npmCommand, ["run", "build"]);
