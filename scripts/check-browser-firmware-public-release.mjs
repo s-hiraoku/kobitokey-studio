@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 
 const args = process.argv.slice(2);
@@ -20,19 +20,21 @@ Required:
 
 Optional:
   production-url
-    Defaults to BROWSER_FIRMWARE_PRODUCTION_URL or the production preflight default.
+    Defaults to BROWSER_FIRMWARE_PRODUCTION_URL or production.url in the E2E report.
+    If provided, it must match the E2E report production.url.
   --skip-merge-readiness
     Use only if checking a deployed commit that is no longer the current branch.`);
   process.exit(0);
 }
 
 const e2eReportPath = readOption("--e2e-report") || process.env.BROWSER_FIRMWARE_E2E_REPORT;
-const productionUrl = args.find((arg, index) => {
+const requestedProductionUrl = args.find((arg, index) => {
   if (arg.startsWith("--")) return false;
   return args[index - 1] !== "--e2e-report";
 });
 const skipMergeReadiness = args.includes("--skip-merge-readiness");
 const issues = [];
+let report;
 
 if (!process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
   issues.push("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required for the production OAuth release preflight");
@@ -41,6 +43,29 @@ if (!e2eReportPath) {
   issues.push("--e2e-report <report.json> or BROWSER_FIRMWARE_E2E_REPORT is required");
 } else if (!existsSync(e2eReportPath)) {
   issues.push(`${e2eReportPath} does not exist`);
+} else {
+  try {
+    report = JSON.parse(readFileSync(e2eReportPath, "utf8"));
+  } catch (error) {
+    issues.push(`${e2eReportPath} could not be parsed as JSON: ${formatError(error)}`);
+  }
+}
+
+const reportProductionUrl = typeof report?.production?.url === "string" ? report.production.url.trim() : "";
+const envProductionUrl = process.env.BROWSER_FIRMWARE_PRODUCTION_URL?.trim() || "";
+const preflightProductionUrl = requestedProductionUrl || envProductionUrl || reportProductionUrl;
+
+if (report && !reportProductionUrl) {
+  issues.push("e2e report production.url is required so the production preflight checks the same deployed URL");
+}
+if (!preflightProductionUrl) {
+  issues.push("production URL is required via positional argument, BROWSER_FIRMWARE_PRODUCTION_URL, or e2e report production.url");
+}
+if (reportProductionUrl && requestedProductionUrl && !sameUrl(reportProductionUrl, requestedProductionUrl)) {
+  issues.push("production-url argument must match e2e report production.url");
+}
+if (reportProductionUrl && envProductionUrl && !sameUrl(reportProductionUrl, envProductionUrl)) {
+  issues.push("BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url");
 }
 
 if (issues.length > 0) {
@@ -58,7 +83,7 @@ if (!skipMergeReadiness) {
 run("node", [
   "scripts/check-browser-firmware-production-preflight.mjs",
   "--require-oauth",
-  ...(productionUrl ? [productionUrl] : []),
+  preflightProductionUrl,
 ]);
 run("node", ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
 
@@ -70,6 +95,18 @@ function readOption(name) {
     return undefined;
   }
   return args[index + 1] && !args[index + 1].startsWith("--") ? args[index + 1] : undefined;
+}
+
+function sameUrl(left, right) {
+  try {
+    return new URL(left).href === new URL(right).href;
+  } catch {
+    return left === right;
+  }
+}
+
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function run(command, commandArgs) {

@@ -583,14 +583,17 @@ const checks = [
       allIncludes(files.publicReleaseCheck, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
         "--e2e-report <report.json>",
+        "production.url in the E2E report",
+        "production-url argument must match e2e report production.url",
+        "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "--require-oauth",
         "scripts/check-browser-firmware-external-evidence.mjs",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
