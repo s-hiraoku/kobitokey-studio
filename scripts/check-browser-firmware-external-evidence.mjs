@@ -29,6 +29,8 @@ requireValue(report.production?.securityHeadersChecked === true, "production.sec
 requireValue(report.production?.apiSecurityHeadersChecked === true, "production.apiSecurityHeadersChecked must be true");
 
 requireHttpsUrl(report.ci?.runUrl, "ci.runUrl must be an https URL");
+requireSha(report.ci?.appCommitSha, "ci.appCommitSha must be a 40-character SHA");
+requireNonPlaceholderHash(report.ci?.appCommitSha, "ci.appCommitSha must not be a placeholder SHA");
 requireValue(report.ci?.browserFirmwareReleaseCheckPassed === true, "ci.browserFirmwareReleaseCheckPassed must be true");
 
 requireValue(isRepoSlug(report.github?.repository), "github.repository must be owner/repo");

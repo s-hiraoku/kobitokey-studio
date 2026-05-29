@@ -190,8 +190,8 @@ const checks = [
         "adding a combo should increase the combo count",
         "added combo should default to ESC",
         "added combo should show all-layer scope",
-        "combo binding picker should use a clear input action label",
-        "combo save button should identify that it updates the combo",
+        "combo binding picker should identify that it sets the combo action",
+        "combo save button should identify that it saves the combo",
         "combo list delete button should be enabled for the selected combo",
         "deleting the selected combo from the list should restore the original combo count",
         "selectedComboLayerScope",
@@ -243,17 +243,22 @@ const checks = [
     name: "firmware edit action labels use consistent user-facing terminology",
     pass: () =>
       allIncludes(files.main, [
-        'actionLabel="キーに適用"',
-        'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーに適用"}',
-        'saveLabel = "Combo を更新"',
-        'actionLabel="選択したキー動作を入力"',
-        "トラックボール設定を更新",
+        'actionLabel="このキーに設定"',
+        'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "下書きに設定"}',
+        'saveLabel = "Combo を保存"',
+        'actionLabel="Combo 動作に設定"',
+        "トラックボール設定を保存",
+        "Firmware へ取り込む",
       ]) &&
       allIncludes(files.uiSmoke, [
-        'getByRole("button", { name: "キーに適用" })',
-        'getByRole("button", { name: "トラックボール設定を更新" })',
+        'getByRole("button", { name: "このキーに設定" })',
+        'getByRole("button", { name: "トラックボール設定を保存" })',
       ]) &&
       [
+        "キーに適用",
+        "選択したキー動作を入力",
+        "Combo を更新",
+        "トラックボール設定を更新",
         "Binding に反映",
         "Binding を入力欄に反映",
         "設定に反映",
@@ -589,7 +594,7 @@ const checks = [
         "production.url in the E2E report",
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
-        "e2e report commit.sha must match the current git HEAD",
+        "e2e report ci.appCommitSha must match the current git HEAD",
         "--skip-current-head",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
@@ -600,12 +605,12 @@ const checks = [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
-        "e2e report commit.sha must match the current git HEAD",
+        "e2e report ci.appCommitSha must match the current git HEAD",
         "OK browser firmware public release self-test passed",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "`commit.sha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "`commit.sha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "must match the current git `HEAD`"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "report `ci.appCommitSha` must match the current git `HEAD`"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -654,6 +659,7 @@ const checks = [
         "production.workerUnsupportedScopeRejected must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
+        "ci.appCommitSha must not be a placeholder SHA",
         "securityHeadersChecked must be true",
         "apiSecurityHeadersChecked must be true",
         "ci.browserFirmwareReleaseCheckPassed must be true",
@@ -726,6 +732,7 @@ const checks = [
       allIncludes(files.evidenceCollector, [
         "BROWSER_FIRMWARE_E2E_PRODUCTION_URL",
         "BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID",
+        "BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA",
         "BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL",
         "BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL",
         "BROWSER_FIRMWARE_E2E_COMMIT_SHA",
@@ -793,6 +800,7 @@ const checks = [
         "right UF2 was not proven against GitHub artifact zip",
         "production security headers were not collected",
         "production API security headers were not collected",
+        "app commit sha was not collected from environment",
         "OAuth device flow was not started through production Worker",
         "frontend OAuth client id was not collected from production bundle",
         "collector should fail when OAuth client id is only present in a cross-origin frontend asset",
@@ -814,6 +822,7 @@ const checks = [
       allIncludes(files.externalEvidenceTemplate, [
         '"verifiedAt"',
         '"tester"',
+        '"appCommitSha"',
         '"securityHeadersChecked"',
         '"apiSecurityHeadersChecked"',
         '"browserFirmwareReleaseCheckPassed"',

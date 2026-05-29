@@ -25,7 +25,7 @@ Optional:
   --skip-merge-readiness
     Use only if checking a deployed commit that is no longer the current branch.
   --skip-current-head
-    Use only if the E2E report intentionally targets a deployed commit that is
+    Use only if the E2E report intentionally targets an app deployment that is
     not the current git HEAD.`);
   process.exit(0);
 }
@@ -72,14 +72,14 @@ if (reportProductionUrl && envProductionUrl && !sameUrl(reportProductionUrl, env
   issues.push("BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url");
 }
 if (report && !skipCurrentHead) {
-  const reportCommitSha = typeof report.commit?.sha === "string" ? report.commit.sha.trim() : "";
+  const reportAppCommitSha = typeof report.ci?.appCommitSha === "string" ? report.ci.appCommitSha.trim() : "";
   const currentHeadSha = readGitHeadSha();
-  if (!reportCommitSha) {
-    issues.push("e2e report commit.sha is required so public-release can prove the current commit");
+  if (!reportAppCommitSha) {
+    issues.push("e2e report ci.appCommitSha is required so public-release can prove the current app commit");
   } else if (!currentHeadSha) {
     issues.push("current git HEAD could not be read; use --skip-current-head only when checking a deployed commit intentionally");
-  } else if (reportCommitSha !== currentHeadSha) {
-    issues.push("e2e report commit.sha must match the current git HEAD");
+  } else if (reportAppCommitSha !== currentHeadSha) {
+    issues.push("e2e report ci.appCommitSha must match the current git HEAD");
   }
 }
 

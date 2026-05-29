@@ -19,6 +19,7 @@ const token = process.env.GITHUB_TOKEN || process.env.BROWSER_FIRMWARE_E2E_GITHU
 const productionUrl = requireEnv("BROWSER_FIRMWARE_E2E_PRODUCTION_URL");
 const productionFetchUrl = process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL || productionUrl;
 const oauthClientId = requireEnv("BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID");
+const appCommitSha = process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA || readGitHeadSha();
 const repository = requireEnv("BROWSER_FIRMWARE_E2E_REPOSITORY");
 const branch = requireEnv("BROWSER_FIRMWARE_E2E_BRANCH");
 const commitSha = requireEnv("BROWSER_FIRMWARE_E2E_COMMIT_SHA");
@@ -44,6 +45,7 @@ const report = {
   production,
   ci: {
     runUrl: requireEnv("BROWSER_FIRMWARE_E2E_CI_RUN_URL"),
+    appCommitSha,
     browserFirmwareReleaseCheckPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_CI_PASSED"),
   },
   github: {
@@ -150,6 +152,7 @@ Required environment:
   BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID
   BROWSER_FIRMWARE_E2E_TESTER
   BROWSER_FIRMWARE_E2E_CI_RUN_URL
+  BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA (optional when git HEAD is available)
   BROWSER_FIRMWARE_E2E_CI_PASSED=true
   BROWSER_FIRMWARE_E2E_REPOSITORY=owner/repo
   BROWSER_FIRMWARE_E2E_BRANCH
@@ -615,4 +618,15 @@ function readOptionalBooleanEnv(name) {
     return undefined;
   }
   return readBooleanEnv(name);
+}
+
+function readGitHeadSha() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (result.status !== 0 || !result.stdout.trim()) {
+    throw new Error("BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA is required when git HEAD cannot be read");
+  }
+  return result.stdout.trim();
 }

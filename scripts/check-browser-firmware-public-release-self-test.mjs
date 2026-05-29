@@ -41,7 +41,7 @@ const mismatchedHead = await runPublicRelease(
 );
 expectFailure(
   mismatchedHead,
-  ["e2e report commit.sha must match the current git HEAD"],
+  ["e2e report ci.appCommitSha must match the current git HEAD"],
   "Expected public release gate to reject E2E evidence from a different commit",
 );
 

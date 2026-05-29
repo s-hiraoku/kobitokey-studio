@@ -896,7 +896,7 @@ function App() {
     const message =
       trimmedBinding === from
         ? `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の下書きを取り消しました`
-        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を下書きに反映しました`;
+        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を下書きに設定しました`;
     setDirectKeyWriteFeedback({ kind: "idle", message });
     showToast(trimmedBinding === from ? "info" : "success", message);
     setStatus(message);
@@ -911,7 +911,7 @@ function App() {
       ...files,
       keymap: applyDirectFirmwareKeyDiffsToSource(files.keymap, targetDiffs),
     });
-    setStatus(`Direct keymap の差分 ${targetDiffs.length} keys を firmware keymap に反映しました`);
+    setStatus(`Direct keymap の差分 ${targetDiffs.length} keys を firmware keymap に取り込みました`);
   }
 
   function createLayer() {
@@ -996,7 +996,7 @@ function App() {
       ...files,
       keymap: applyDirectFirmwareComboDiffsToSource(files.keymap, targetDiffs),
     });
-    setStatus(`Direct Combo の差分 ${targetDiffs.length} 件を firmware keymap に反映しました`);
+    setStatus(`Direct Combo の差分 ${targetDiffs.length} 件を firmware keymap に取り込みました`);
   }
 
   async function detectStudioPorts() {
@@ -1509,7 +1509,7 @@ function App() {
     });
     setSelectedComboId(combo.id);
     if (!options.silent) {
-      setStatus(`${combo.id} の編集内容を表示に反映しました`);
+      setStatus(`${combo.id} の編集内容を下書きに設定しました`);
     }
   }
 
@@ -1618,7 +1618,7 @@ function App() {
       }),
     });
     setSelectedComboId(combo.id);
-    setStatus(`${combo.id} を更新しました`);
+    setStatus(`${combo.id} を保存しました`);
   }
 
   function createCombo() {
@@ -1707,7 +1707,7 @@ function App() {
     leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
 
     setFiles({ ...files, leftOverlay, rightOverlay });
-    setStatus("トラックボール設定を更新しました");
+    setStatus("トラックボール設定を保存しました");
   }
 
   async function triggerBuild() {
@@ -3372,7 +3372,7 @@ function DirectFirmwareDiffPanel({
           onClick={() => onApplyFirmwareDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Firmware に反映
+          Firmware へ取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3380,7 +3380,7 @@ function DirectFirmwareDiffPanel({
       ) : (
         <>
           <p className="direct-firmware-note">
-            Direct 側の binding を firmware keymap に反映します。保存または書き出しは Firmware モードで実行します。
+            Direct 側の binding を firmware keymap に取り込みます。保存または書き出しは Firmware モードで実行します。
           </p>
           <div className="direct-firmware-diff-list">
             {diffs.map((diff) => (
@@ -3394,7 +3394,7 @@ function DirectFirmwareDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareDiffs([diff])}>
                     <UploadCloud size={14} />
-                    反映
+                    取り込む
                   </button>
                 </header>
                 <dl>
@@ -3431,7 +3431,7 @@ function DirectFirmwareComboDiffPanel({
           onClick={() => onApplyFirmwareComboDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Combo を反映
+          Combo を取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3439,7 +3439,7 @@ function DirectFirmwareComboDiffPanel({
       ) : (
         <>
           <p className="direct-firmware-note">
-            Direct 側の Combo を firmware keymap に反映します。既存 firmware combo の id は保持します。
+            Direct 側の Combo を firmware keymap に取り込みます。既存 firmware combo の id は保持します。
           </p>
           <div className="direct-firmware-diff-list">
             {diffs.map((diff) => (
@@ -3453,7 +3453,7 @@ function DirectFirmwareComboDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareComboDiffs([diff])}>
                     <UploadCloud size={14} />
-                    反映
+                    取り込む
                   </button>
                 </header>
                 <dl>
@@ -3684,7 +3684,7 @@ function DirectPendingChangesBar({
             ? `選択中: Layer ${selectedDraft.layerIndex} / Key ${selectedDraft.keyIndex + 1}`
             : hasChanges
               ? "色付きのキーが下書き変更です"
-              : "キー編集は下書きに反映され、まとめて書き込めます"}
+              : "キー編集は下書きに入り、まとめて書き込めます"}
         </strong>
         {hasChanges ? (
           <small>
@@ -3861,7 +3861,7 @@ function DirectWelcome({
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config で下書きに反映してからまとめて書き込みます。</span>
+            <span>読み込み後に key を選び、右側の Key Config で下書きに設定してからまとめて書き込みます。</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -3995,7 +3995,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="キーに適用" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="このキーに設定" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -4085,7 +4085,7 @@ function DirectInspectorTabs({
             </div>
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーに適用"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "下書きに設定"}
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -5171,7 +5171,7 @@ function ComboEditor({
   onSave,
   onSelect,
   readOnly = false,
-  saveLabel = "Combo を更新",
+  saveLabel = "Combo を保存",
 }: {
   combo?: KeymapCombo;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
@@ -5244,7 +5244,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="選択したキー動作を入力"
+            actionLabel="Combo 動作に設定"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -5255,7 +5255,7 @@ function ComboEditor({
           />
           <div className="binding-review combo-binding-target" aria-label="Combo binding update target">
             <div className={combo.binding === form.binding ? "" : "changed"}>
-              <span>Update target</span>
+              <span>変更後の動作</span>
               <BindingSummary binding={form.binding} />
             </div>
           </div>
@@ -5363,17 +5363,17 @@ function BindingEditor({
       {currentBinding !== undefined ? (
         <div className="binding-review" aria-label="Direct key write preview">
           <div>
-            <span>Current</span>
+            <span>現在の動作</span>
             <BindingSummary binding={currentBinding} />
           </div>
           <div className={currentBinding === builtBinding ? "" : "changed"}>
-            <span>Write target</span>
+            <span>変更後の動作</span>
             <BindingSummary binding={builtBinding} />
           </div>
         </div>
       ) : (
         <div className="binding-preview">
-          <span>Write target</span>
+          <span>設定予定</span>
           <BindingSummary binding={builtBinding} />
         </div>
       )}
@@ -6055,7 +6055,7 @@ function TrackballEditor({
           ))}
         </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
-          トラックボール設定を更新
+          トラックボール設定を保存
         </button>
       </div>
     </section>

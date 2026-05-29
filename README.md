@@ -153,7 +153,7 @@ For the final public-release decision, use the combined gate with the validated
 external E2E report. This command fails unless merge readiness, the OAuth
 production preflight, and the evidence validator all pass. The production URL
 used for preflight must match `production.url` in the E2E report, and the
-report `commit.sha` must match the current git `HEAD`:
+report `ci.appCommitSha` must match the current git `HEAD`:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json

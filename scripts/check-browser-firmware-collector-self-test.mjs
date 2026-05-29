@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { zipSync } from "fflate";
 
 const commitSha = "0123456789abcdef0123456789abcdef01234567";
+const appCommitSha = "89abcdef0123456789abcdef0123456789abcdef";
 const repository = "juichi50iii/KobitoKey_QWERTY";
 const runId = 123;
 const dir = mkdtempSync(join(tmpdir(), "browser-firmware-collector-"));
@@ -211,6 +212,7 @@ try {
   assert(report.production.workerOAuthDeviceFlowStarted === true, "OAuth device flow was not started through production Worker");
   assert(report.production.frontendOAuthClientIdPresent === true, "frontend OAuth client id was not collected from production bundle");
   assert(report.production.workerArtifactRouteChecked === true, "artifact route was not checked");
+  assert(report.ci.appCommitSha === appCommitSha, "app commit sha was not collected from environment");
   assert(report.commit.sha === commitSha, "commit sha was not collected from GitHub API");
   assert(report.commit.managedFiles.length === 3, "commit managed files were not collected from GitHub API");
   assert(report.commit.managedFiles.includes("config/KobitoKey.keymap"), "keymap managed file missing from report");
@@ -332,6 +334,7 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_GITHUB_TOKEN: "collector-secret",
         BROWSER_FIRMWARE_E2E_TESTER: "release-qa",
         BROWSER_FIRMWARE_E2E_CI_RUN_URL: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123456789",
+        BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA: appCommitSha,
         BROWSER_FIRMWARE_E2E_CI_PASSED: "true",
         BROWSER_FIRMWARE_E2E_REPOSITORY: repository,
         BROWSER_FIRMWARE_E2E_BRANCH: "browser-firmware-release-test",

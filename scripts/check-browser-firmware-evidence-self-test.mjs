@@ -34,6 +34,7 @@ try {
     "production.apiSecurityHeadersChecked must be true",
     "production.workerOAuthDeviceFlowStarted must be true",
     "production.frontendOAuthClientIdPresent must be true",
+    "ci.appCommitSha must not be a placeholder SHA",
     "github.repository must not be the template owner/repo placeholder",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
@@ -110,6 +111,7 @@ function createValidReport() {
     },
     ci: {
       runUrl: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123456789",
+      appCommitSha: "89abcdef0123456789abcdef0123456789abcdef",
       browserFirmwareReleaseCheckPassed: true,
     },
     github: {
@@ -235,6 +237,10 @@ function createInvalidReport() {
       workerArtifactRouteChecked: true,
       securityHeadersChecked: true,
       apiSecurityHeadersChecked: false,
+    },
+    ci: {
+      ...createValidReport().ci,
+      appCommitSha: "0000000000000000000000000000000000000000",
     },
     github: {
       repository: "owner/repo",
