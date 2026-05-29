@@ -185,6 +185,8 @@ const checks = [
         "adding a combo should increase the combo count",
         "added combo should default to ESC",
         "added combo should show all-layer scope",
+        "combo binding picker should use a clear input action label",
+        "combo save button should identify that it updates the combo",
         "combo list delete button should be enabled for the selected combo",
         "deleting the selected combo from the list should restore the original combo count",
         "selectedComboLayerScope",
@@ -231,6 +233,27 @@ const checks = [
         "全 layer",
       ]) &&
       allIncludes(files.packageJson, ['"playwright-core"']),
+  },
+  {
+    name: "firmware edit action labels use consistent user-facing terminology",
+    pass: () =>
+      allIncludes(files.main, [
+        'actionLabel="キーに適用"',
+        'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーに適用"}',
+        'saveLabel = "Combo を更新"',
+        'actionLabel="選択したキー動作を入力"',
+        "トラックボール設定を更新",
+      ]) &&
+      allIncludes(files.uiSmoke, [
+        'getByRole("button", { name: "キーに適用" })',
+        'getByRole("button", { name: "トラックボール設定を更新" })',
+      ]) &&
+      [
+        "Binding に反映",
+        "Binding を入力欄に反映",
+        "設定に反映",
+        'saveLabel = "更新"',
+      ].every((label) => !files.main.includes(label)),
   },
   {
     name: "browser firmware layer structure editing is limited to safe operations",

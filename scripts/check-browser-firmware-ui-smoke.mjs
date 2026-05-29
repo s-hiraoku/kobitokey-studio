@@ -174,7 +174,7 @@ async function setSelectedKeyRawBinding(page, binding) {
     details.setAttribute("open", "");
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
-  await page.getByRole("button", { name: "Binding に反映" }).click();
+  await page.getByRole("button", { name: "キーに適用" }).click();
 }
 
 async function inspectKeyBindingEditActions(page, label) {
@@ -191,7 +191,7 @@ async function inspectKeyBindingEditActions(page, label) {
   }
 
   await page.locator('.choice-grid button[title="B"]').click();
-  await page.getByRole("button", { name: "Binding に反映" }).click();
+  await page.getByRole("button", { name: "キーに適用" }).click();
 
   const afterApply = await readKeyBindingState(page);
   if (afterApply.selectedBinding !== "&kp B") {
@@ -323,6 +323,13 @@ async function inspectComboEditActions(page, label) {
   }
   if (afterCreate.selectedComboLayerScope !== "全 layer") {
     failures.push(`${label}: added combo should show all-layer scope, got "${afterCreate.selectedComboLayerScope}"`);
+  }
+  const comboEditor = page.locator(".combo-editor");
+  if ((await comboEditor.getByRole("button", { name: "選択したキー動作を入力" }).count()) !== 1) {
+    failures.push(`${label}: combo binding picker should use a clear input action label`);
+  }
+  if ((await comboEditor.getByRole("button", { name: "Combo を更新" }).count()) !== 1) {
+    failures.push(`${label}: combo save button should identify that it updates the combo`);
   }
   if (afterCreate.diffCount < initial.diffCount) {
     failures.push(`${label}: adding a combo should not lose existing diffs`);
@@ -496,7 +503,7 @@ async function inspectTrackballEditActions(page, label) {
   }
 
   await page.locator('input[name="trackball-leftCpi"]').fill(String(nextLeftCpi));
-  await page.getByRole("button", { name: "設定に反映" }).click();
+  await page.getByRole("button", { name: "トラックボール設定を更新" }).click();
 
   const afterApply = await readTrackballState(page);
   if (afterApply.leftCpi !== nextLeftCpi) {

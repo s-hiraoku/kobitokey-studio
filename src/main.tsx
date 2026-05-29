@@ -3995,7 +3995,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="Binding に反映" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="キーに適用" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -4085,7 +4085,7 @@ function DirectInspectorTabs({
             </div>
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "下書きに反映"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーに適用"}
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -5171,7 +5171,7 @@ function ComboEditor({
   onSave,
   onSelect,
   readOnly = false,
-  saveLabel = "更新",
+  saveLabel = "Combo を更新",
 }: {
   combo?: KeymapCombo;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
@@ -5244,7 +5244,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Binding を入力欄に反映"
+            actionLabel="選択したキー動作を入力"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -6055,7 +6055,7 @@ function TrackballEditor({
           ))}
         </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
-          設定に反映
+          トラックボール設定を更新
         </button>
       </div>
     </section>
