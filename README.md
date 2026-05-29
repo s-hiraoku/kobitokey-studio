@@ -122,6 +122,17 @@ missing Worker routes or release security headers before starting hardware QA:
 npm run check:browser-firmware:production-preflight
 ```
 
+For a PR or feature-branch Workers preview, pass the preview URL explicitly:
+
+```sh
+BROWSER_FIRMWARE_PRODUCTION_URL=https://feature-firmware-mode-kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware npm run check:browser-firmware:production-preflight
+```
+
+A passing preview preflight is not production release evidence. The default
+production URL must pass after the target commit is deployed; missing release
+security headers or 405 responses from Worker API routes mean production is
+still on an older deployment.
+
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:
 

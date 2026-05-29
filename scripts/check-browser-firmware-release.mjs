@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const files = {
+  readme: read("README.md"),
   packageJson: read("package.json"),
   releaseCheckRunner: read("scripts/run-browser-firmware-check.mjs"),
   evidenceSelfTest: read("scripts/check-browser-firmware-evidence-self-test.mjs"),
@@ -38,6 +39,7 @@ const files = {
   docsUserGuide: read("docs/user-guide.md"),
   docsQuickStart: read("docs/quick-start.md"),
   docsUsageGuide: read("docs/usage-guide.md"),
+  docsDeployment: read("docs/deployment.md"),
   pagesCi: read(".github/workflows/pages.yml"),
   externalEvidenceCheck: read("scripts/check-browser-firmware-external-evidence.mjs"),
   externalEvidenceTemplate: read("docs/browser-firmware-e2e-evidence.template.json"),
@@ -550,8 +552,20 @@ const checks = [
         "Worker proxy の production deploy と artifact download を実 repository で確認する",
         "前回の UF2 bytes と左右 flash 完了状態をメモリから破棄",
         "check:browser-firmware:production-preflight",
+        "preview preflight の成功は production 公開の証跡にしない",
+        "release security headers missing や Worker API の 405",
         "実 repository と実 GitHub Actions で end-to-end QA を行う",
         "Flash E2E",
+      ]) &&
+      allIncludes(files.docsDeployment, [
+        "PR / feature branch の Workers preview",
+        "preview preflight の成功は production 公開の証跡にしない",
+        "release security headers missing や Worker API の 405",
+      ]) &&
+      allIncludes(files.readme, [
+        "A passing preview preflight is not production release evidence",
+        "missing release",
+        "405 responses from Worker API routes",
       ]),
   },
   {
