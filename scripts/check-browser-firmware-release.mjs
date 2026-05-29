@@ -594,6 +594,9 @@ const checks = [
         "production.url in the E2E report",
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
+        "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
+        "e2e report production.url must use the expected public production origin",
+        "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
         "--skip-current-head",
         "scripts/check-browser-firmware-merge-readiness.mjs",
@@ -605,12 +608,15 @@ const checks = [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
+        "feature preview URLs as production evidence",
+        "e2e report production.url must use the expected public production origin",
+        "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
         "OK browser firmware public release self-test passed",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "report `ci.appCommitSha` must match the current git `HEAD`"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "report `ci.appCommitSha` must match the current git `HEAD`"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -653,7 +659,10 @@ const checks = [
         "tester is required",
         "production.url must not be a placeholder URL",
         "production.url must open browser Firmware Mode with mode=firmware",
+        "production.url must use the expected public production origin",
+        "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "requireFirmwareModeUrl",
+        "requireExpectedProductionOrigin",
         "isGitHubPath",
         "production.workerAccessTokenRouteChecked must be true",
         "production.workerUnsupportedScopeRejected must be true",
@@ -710,10 +719,13 @@ const checks = [
         "Expected ambiguous filename-classified external evidence report to fail",
         "Expected ambiguous filename report to reject the left UF2 name",
         "Expected placeholder external evidence report to fail",
+        "Expected preview URL external evidence report to fail",
+        "Expected preview URL report to reject the production origin",
         "kobitokey_l.uf2",
         "kobitokey_r.uf2",
         "kobitokey_left_right.uf2",
         "production.url must not be a placeholder URL",
+        "production.url must use the expected public production origin",
         "production.apiSecurityHeadersChecked must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
@@ -733,6 +745,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_PRODUCTION_URL",
         "BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID",
         "BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA",
+        "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL",
         "BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL",
         "BROWSER_FIRMWARE_E2E_COMMIT_SHA",

@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 
+const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
+const expectedProductionOrigin =
+  process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
 const reportPath = process.argv[2];
 
 if (!reportPath || reportPath === "--help" || reportPath === "-h") {
@@ -19,6 +22,7 @@ requireNonPlaceholderString(report.tester, "tester is required");
 requireHttpsUrl(report.production?.url, "production.url must be an https URL");
 requireNoPlaceholderUrl(report.production?.url, "production.url must not be a placeholder URL");
 requireFirmwareModeUrl(report.production?.url, "production.url must open browser Firmware Mode with mode=firmware");
+requireExpectedProductionOrigin(report.production?.url, "production.url must use the expected public production origin");
 requireValue(report.production?.workerDeviceCodeRouteChecked === true, "production.workerDeviceCodeRouteChecked must be true");
 requireValue(report.production?.workerAccessTokenRouteChecked === true, "production.workerAccessTokenRouteChecked must be true");
 requireValue(report.production?.workerUnsupportedScopeRejected === true, "production.workerUnsupportedScopeRejected must be true");
@@ -167,6 +171,16 @@ function requireFirmwareModeUrl(value, message) {
     } catch {
       ok = false;
     }
+  }
+  requireValue(ok, message);
+}
+
+function requireExpectedProductionOrigin(value, message) {
+  let ok = false;
+  try {
+    ok = typeof value === "string" && new URL(value).origin === new URL(expectedProductionOrigin).origin;
+  } catch {
+    ok = false;
   }
   requireValue(ok, message);
 }

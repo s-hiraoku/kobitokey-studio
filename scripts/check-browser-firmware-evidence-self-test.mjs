@@ -8,10 +8,12 @@ const dir = mkdtempSync(join(tmpdir(), "browser-firmware-evidence-"));
 try {
   const validReportPath = join(dir, "valid.json");
   const invalidReportPath = join(dir, "invalid.json");
+  const previewReportPath = join(dir, "preview.json");
   const filenameReportPath = join(dir, "filename.json");
   const ambiguousFilenameReportPath = join(dir, "ambiguous-filename.json");
   writeFileSync(validReportPath, JSON.stringify(createValidReport(), null, 2));
   writeFileSync(invalidReportPath, JSON.stringify(createInvalidReport(), null, 2));
+  writeFileSync(previewReportPath, JSON.stringify(createPreviewReport(), null, 2));
   writeFileSync(filenameReportPath, JSON.stringify(createFilenameReport(), null, 2));
   writeFileSync(ambiguousFilenameReportPath, JSON.stringify(createAmbiguousFilenameReport(), null, 2));
 
@@ -31,6 +33,7 @@ try {
   const requiredErrors = [
     "production.url must not be a placeholder URL",
     "production.url must open browser Firmware Mode with mode=firmware",
+    "production.url must use the expected public production origin",
     "production.apiSecurityHeadersChecked must be true",
     "production.workerOAuthDeviceFlowStarted must be true",
     "production.frontendOAuthClientIdPresent must be true",
@@ -60,6 +63,17 @@ try {
       process.stderr.write(invalid.stderr);
       process.exit(1);
     }
+  }
+
+  const preview = runValidator(previewReportPath);
+  if (preview.status === 0) {
+    console.error("Expected preview URL external evidence report to fail");
+    process.exit(1);
+  }
+  if (!preview.stderr.includes("production.url must use the expected public production origin")) {
+    console.error("Expected preview URL report to reject the production origin");
+    process.stderr.write(preview.stderr);
+    process.exit(1);
   }
 
   const filename = runValidator(filenameReportPath);
@@ -290,6 +304,16 @@ function createInvalidReport() {
       tokenClearWorks: false,
       referencedLayerDeleteBlocked: false,
       smokeCommand: "manual",
+    },
+  };
+}
+
+function createPreviewReport() {
+  return {
+    ...createValidReport(),
+    production: {
+      ...createValidReport().production,
+      url: "https://feature-firmware-mode-kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
     },
   };
 }

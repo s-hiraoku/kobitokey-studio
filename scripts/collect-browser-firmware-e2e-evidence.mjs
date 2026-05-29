@@ -194,6 +194,7 @@ Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
   BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL for collector tests
   BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL for collector tests
+  BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN for a future custom domain
   BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE=true
   BROWSER_FIRMWARE_SMOKE_URL=https://kobitokey-studio.s-hiraoku.workers.dev
   BROWSER_FIRMWARE_E2E_CLASSIFICATION_SOURCE=manifest|filename
