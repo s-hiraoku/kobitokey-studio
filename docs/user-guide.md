@@ -33,12 +33,12 @@ Firmware Mode は keymap、Combo、Trackball、build、UF2 書き込みまでを
 
 ## Direct Mode の基本
 
-Direct Mode は ZMK Studio 対応 firmware が入った実機に接続して、キー binding を素早く試すモードです。Combo と Trackball は参照のみです。
+Direct Mode は ZMK Studio 対応 firmware が入った実機に接続して、キー動作を素早く試すモードです。Combo と Trackball は参照のみです。
 
 1. [Direct Mode](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct) を開きます。
 2. USB を推奨します。Bluetooth はブラウザから見える場合のみ使えます。
 3. 実機を接続し、layer と key を選びます。
-4. 右側の `Key Config` で binding を選び、`実機へ書き込み` を押します。
+4. 右側の `Key Config` でキー動作を選び、`キーを書き込み予定に追加`、`実機へ書き込み` の順に押します。
 
 ## 参照
 

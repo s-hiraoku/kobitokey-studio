@@ -3599,6 +3599,37 @@ select:focus-visible {
   background: var(--pine-wash);
   color: var(--pine-deep);
 }
+.flash-download-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+.flash-download-actions button {
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  min-inline-size: 0;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  overflow: hidden;
+}
+.flash-download-actions button svg {
+  flex: 0 0 auto;
+}
+.flash-download-actions button .button-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: nowrap;
+}
 .flash-advanced {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);

@@ -686,6 +686,8 @@ async function inspectFirmwareUi(page, label) {
       "Artifact 取得",
       "Left を書き込み",
       "Right を書き込み",
+      "Left UF2 をダウンロード",
+      "Right UF2 をダウンロード",
     ];
     for (const text of requiredLabels) {
       const found = Array.from(document.querySelectorAll(".browser-release-workbench button")).some((button) =>
@@ -697,7 +699,7 @@ async function inspectFirmwareUi(page, label) {
     }
 
     const buttons = Array.from(
-      document.querySelectorAll(".browser-release-workbench .build-actions button, .browser-release-workbench .flash-side-toggle button"),
+      document.querySelectorAll(".browser-release-workbench .build-actions button, .browser-release-workbench .flash-side-toggle button, .browser-release-workbench .flash-download-actions button"),
     );
     for (const button of buttons) {
       const rect = button.getBoundingClientRect();

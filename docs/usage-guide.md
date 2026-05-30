@@ -91,7 +91,7 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | 接続方法 select + Connect ボタン | Direct 接続パネル | USB か Bluetooth を選んでブラウザのデバイス選択ダイアログを開く |
 | `再読み込み` | Direct Mode 上部 (接続済み) | 実機から keymap などを再取得する |
 | `切断` | Direct Mode 上部 (接続済み) | 実機との接続を切る |
-| `実機へ書き込み` | Direct Mode 右側 | 選択中 key の binding を実機へ保存する |
+| `キーを書き込み予定に追加` / `実機へ書き込み` | Direct Mode 右側 | 選択中 key の動作を確認し、実機へ保存する |
 | `UF2 / Volume 更新` | Firmware Mode Build/Flash | Tauri 版で artifact と bootloader volume を再スキャンする |
 
 ## モード早見表
@@ -109,7 +109,7 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 
 1. `Firmware` を選ぶ
 2. `KobitoKey_QWERTY` フォルダを読み込む
-3. layer と key を選んで binding を変更する
+3. layer と key を選んでキー動作を変更する
 4. 必要なら Combo やトラックボールも変更する
 5. `Diff` で変更内容を確認する
 6. `保存` する
@@ -122,8 +122,8 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 2. USB で KobitoKey を接続する(Bluetooth は見つかる場合のみ)
 3. 実機 keymap を読み込む
 4. layer と key を選ぶ
-5. binding を選ぶ
-6. `実機へ書き込み` を押す
+5. キー動作を選ぶ
+6. `キーを書き込み予定に追加`、`実機へ書き込み` の順に押す
 7. 書き込み後に再読み込みされた表示を確認する
 
 Direct Mode でキーを書き込む場合は、ブラウザ版または Tauri デスクトップ版を使えます。Combo と Trackball は参照のみです。ブラウザ版では USB 接続を推奨します。
@@ -143,7 +143,7 @@ Direct Mode でキーを書き込む場合は、ブラウザ版または Tauri �
 
 | 起動方法 | 向いている用途 |
 | --- | --- |
-| ブラウザ版 | Direct Mode の試用と key binding の書き込み、GitHub 連携 Firmware Mode beta |
+| ブラウザ版 | Direct Mode の試用とキー動作の書き込み、GitHub 連携 Firmware Mode beta |
 | Tauri デスクトップ版 | ローカル clone を直接扱う Firmware Mode、`gh` CLI 経由のビルド、bootloader volume 検出、Direct の key 書き込み |
 
 ブラウザ公開版では、Firmware Mode beta を GitHub 経由の安全な commit / build / artifact / UF2 保存フローとして使えます。Tauri デスクトップ版は一部ユーザー向けに配布するローカル作業用です。
@@ -209,7 +209,7 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 | UF2 bootloader copy | bootloader volume へコピー | File System Access API で UF2 bootloader marker を確認して保存 |
 | Direct USB | 対応 | Chrome/Edge の Web Serial で対応 |
 | Direct Bluetooth | 対応環境で利用 | 実験的対応。見つからない場合は USB 推奨 |
-| Direct key binding write | 対応 | 対応 |
+| Direct キー動作 write | 対応 | 対応 |
 | Direct Combo write | 参照のみ | 参照のみ |
 | Direct Trackball write | 参照のみ | 参照のみ |
 
@@ -221,7 +221,7 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 
 | 設定 | Firmware Mode の保存先 | Firmware Mode の反映 | Direct Mode の保存先 | Direct Mode の反映 |
 | --- | --- | --- | --- | --- |
-| key binding | `KobitoKey.keymap` | build + UF2 書き込み | 実機の Studio 設定 | 書き込み直後 |
+| キー動作 | `KobitoKey.keymap` | build + UF2 書き込み | 実機の Studio 設定 | 書き込み直後 |
 | Combo | `KobitoKey.keymap` | build + UF2 書き込み | — | Direct Mode では参照のみ |
 | Trackball | 左右 overlay | build + UF2 書き込み | — | Direct Mode では参照のみ |
 | Timing | 該当 firmware 設定ファイル | build + UF2 書き込み | 現在は保存対象外 | 未対応 |
@@ -249,20 +249,20 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 ブラウザ版では GitHub repository URL を keymap / overlay の読み書き、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。Tauri 版ではローカルフォルダを keymap / overlay の読み書きに使い、Firmware repository URL を Actions 操作に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
 repository は `owner/repo`、`https://github.com/owner/repo`、または `git@github.com:owner/repo.git` の形で入力してください。`tree/main` や `blob/...` 付きの URL、query/hash 付きの URL は対象 repository が曖昧になるため読み込み前に拒否します。branch は `feature/firmware-mode` のように `/` を含む名前でも使えます。
 
-Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer を追加し、copy で選択中 layer を末尾に複製できます。trash は layer 番号参照のずれを避けるため、最後の layer を選んでいるときだけ有効になります。key binding や Combo の binding / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
+Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer を追加し、copy で選択中 layer を末尾に複製できます。trash は layer 番号参照のずれを避けるため、最後の layer を選んでいるときだけ有効になります。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
 
-### 3.2 キー binding を編集する
+### 3.2 キー動作を編集する
 
 1. 左側の layer 一覧から編集したい layer を選びます。
 2. 中央のキーボード図で変更したい key をクリックします。
-3. 右側の `Binding` panel で binding type を選びます。
+3. 右側の動作エディタで動作タイプを選びます。
 4. on-screen picker から keycode、layer、modifier、mouse button、Bluetooth action などを選びます。
 5. `キーの動作に設定` を押します。
 6. 中央の表示と右側の preview が変わったことを確認します。
 
 Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `保存` を押してください。
 
-変更後は、対象 key の表示と右側の preview が意図した binding になっているか確認します。複雑な binding は label が短縮表示されることがありますが、tooltip や inspector では full binding を確認できます。
+変更後は、対象 key の表示と右側の preview が意図した動作になっているか確認します。複雑な ZMK binding は label が短縮表示されることがありますが、tooltip や inspector では full binding を確認できます。
 
 ### 3.3 Binding picker の使い分け
 
@@ -298,10 +298,10 @@ Raw は、KobitoKey Studio がまだ構造化 UI を持たない binding を扱�
 
 1. Firmware Mode で中央下部の `Combos` tab を開きます。
 2. 既存 Combo を選ぶか、`追加` を押します。
-3. `binding` に発火させたい binding を設定します。
+3. `binding` には発火させたい Combo の動作を設定します。
 4. key grid で 2 つ以上の key position を選びます。
 5. `timeoutMs` を設定します。
-6. binding は `Combo の動作に設定`、Combo 全体は `Combo を保存` で編集内容に保存します。
+6. Combo の動作は `Combo の動作に設定`、Combo 全体は `Combo を保存` で編集内容に保存します。
 
 Combo の key position は、手入力ではなく画面上の 1-40 の key grid から選べます。実際に押す組み合わせに対応する位置を選び、中央の Combo overlay で位置関係を確認してください。
 
@@ -410,7 +410,7 @@ KobitoKey の firmware は左右別々に書き込みます。
 4. 右側を bootloader mode に入れます。
 5. ブラウザ版では `Right を書き込み` を押し、確認ダイアログで接続中の half が Right 側であることにチェックしてから、bootloader volume を選びます。Tauri 版では `Right UF2 を bootloader にコピー` を押します。
 
-ブラウザで folder picker が使える場合、Studio はコピー直前に side と UF2 ファイル名を確認し、接続中の keyboard half が正しい side であることをチェックしない限り続行できません。folder picker が使えない場合も、Studio は同じ確認を通してから該当 side の UF2 を download します。download した UF2 を bootloader volume に手動コピーした後、同じ side のボタンをもう一度押すと確認を表示し、その side を完了として記録して次の side へ進みます。
+ブラウザで folder picker が使える場合、Studio はコピー直前に side と UF2 ファイル名を確認し、接続中の keyboard half が正しい side であることをチェックしない限り続行できません。folder picker が使えない場合や直接コピーがうまくいかない場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。Studio は同じ確認を通してから該当 side の UF2 を download します。download した UF2 を bootloader volume に手動コピーした後、同じ side の書き込みボタンをもう一度押すと確認を表示し、その side を完了として記録して次の side へ進みます。
 
 左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合や、left / right が別パスでも同じ UF2 ファイル名になる場合は、書き込みボタンが有効になりません。
 
@@ -438,7 +438,7 @@ Direct Mode は、接続中の device へ設定を保存します。左右分割
 
 Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻るわけではありません。長期的に管理したい設定は、あとで Firmware Mode のファイルにも反映しておくと、次回 firmware を作り直したときに差分が消えにくくなります。
 
-Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap の key binding 差分を Direct summary で確認できます。差分行の `取り込む` またはパネル上部の `Firmware へ取り込む` を押すと、Direct 側の差分を firmware keymap に取り込めます。ファイルへの保存または書き出しは Firmware Mode で実行します。Combo は Direct Mode では参照のみです。
+Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap のキー動作差分を Direct summary で確認できます。差分行の `取り込む` またはパネル上部の `Firmware へ取り込む` を押すと、Direct 側の差分を firmware keymap に取り込めます。ファイルへの保存または書き出しは Firmware Mode で実行します。Combo は Direct Mode では参照のみです。
 
 Direct Mode の key 書き込みは、成功時に device へ自動保存します。Combo、Trackball、Timing は参照または未対応表示のみです。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 
@@ -455,16 +455,16 @@ Direct Mode の key 書き込みは、成功時に device へ自動保存しま�
 
 Bluetooth Direct は実験的対応です。試す場合は「接続方法」で `Bluetooth` を選び、通常のキーボード接続ではなく ZMK Studio 用として表示される device を選びます。ZMK Studio 用の device が見えない、接続が不安定、または書き込みが失敗する場合は USB Direct を使ってください。設定作業では USB のほうが切り分けしやすくなります。
 
-### 5.3 Direct Mode でキー binding を書き込む
+### 5.3 Direct Mode でキー動作を書き込む
 
 1. Direct Mode で device を読み込みます。
 2. layer を選びます。
 3. 中央の keyboard で key を選びます。
-4. 右側の `Key Config` tab で現在値と書き込み予定の binding を確認します。
+4. 右側の `Key Config` tab で現在の動作と書き込み予定の動作を確認します。
 5. `実機へ書き込み` を押します。
 6. 書き込み後、device から keymap が再読み込みされます。
 
-Direct Mode で対応している主な binding は次です。
+Direct Mode で対応している主なキー動作は次です。
 
 | Binding | 用途 |
 | --- | --- |
@@ -491,7 +491,7 @@ Direct Mode で対応している主な binding は次です。
 | `&soft_off` | soft off |
 | `&gresc` | grave escape |
 
-ここにない binding や、独自 behavior を含む binding は Firmware Mode で編集してください。
+ここにないキー動作や、独自 behavior を含む ZMK binding は Firmware Mode で編集してください。
 
 書き込み後は device から keymap を再読み込みします。表示が戻った、または変わらないように見える場合は、書き込み対象 layer と key position が正しいか、Direct Mode 対応 binding かを確認してください。
 
@@ -531,10 +531,10 @@ Direct Mode が使えるなら Direct Mode で device を読み込み、対象 k
 2. USB で接続して読み込みます。
 3. layer を選びます。
 4. 中央の key を選びます。
-5. 右側で `&kp` などの binding を選びます。
+5. 右側で `&kp` などのキー動作を選びます。
 6. `実機へ書き込み` を押します。
 
-ZMK Studio 対応 firmware がない、または Direct Mode で未対応の binding を使う場合は Firmware Mode で変更してから build + flash します。
+ZMK Studio 対応 firmware がない、または Direct Mode で未対応のキー動作を使う場合は Firmware Mode で変更してから build + flash します。
 
 ### Combo を追加したい
 
@@ -600,11 +600,11 @@ Tauri 版では Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で 
 
 | 用語 | 意味 |
 | --- | --- |
-| keymap | layer ごとの key binding と Combo を含む設定 |
+| keymap | layer ごとのキー動作と Combo を含む設定 |
 | layer | キーボードの面。通常 layer、記号 layer、数字 layer などを切り替えて使う |
 | binding | key に割り当てる動作。例: `&kp A`、`&mo 1` |
 | behavior | ZMK の動作種別。`&kp`、`&lt`、`&mt` など |
-| Combo | 複数 key の同時押しで別の binding を発火する設定 |
+| Combo | 複数 key の同時押しで別の動作を発火する設定 |
 | overlay | hardware や左右 half ごとの設定を書くファイル |
 | CPI | トラックボール sensor の基本感度 |
 | UF2 | bootloader volume にコピーして firmware を書き込むファイル |
@@ -653,7 +653,7 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 - device を読み込んでから書き込んでいるか確認します。
 - 選択中 layer と key position が正しいか確認します。
 - Direct Mode 対応 binding か確認します。
-- 独自 behavior や未対応 binding は Firmware Mode で編集します。
+- 独自 behavior や未対応キー動作は Firmware Mode で編集します。
 
 ### Combo が Direct Mode で編集できない
 

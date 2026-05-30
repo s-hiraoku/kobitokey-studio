@@ -195,7 +195,7 @@ type BrowserFirmwareOperation =
   | "refresh-run"
   | "download-artifact"
   | "flash";
-type FlashConfirmationKind = "write" | "manual-complete";
+type FlashConfirmationKind = "write" | "download" | "manual-complete";
 type FlashConfirmationRequest = {
   id: number;
   side: FlashSide;
@@ -2133,8 +2133,7 @@ function App() {
         return;
       }
 
-      const targetName = browserFirmwareArtifacts?.targets[side];
-      const target = targetName ? browserFirmwareArtifacts?.files.find((file) => file.name === targetName) : null;
+      const target = browserFirmwareUf2Target(side);
       if (!target) {
         setBuildStatus(`${sideLabel(side)} UF2 が見つかりません`);
         return;
@@ -2152,14 +2151,14 @@ function App() {
         return;
       }
 
-      if (!(await confirmBrowserFirmwareFlashWrite(side, target.name))) {
+      if (!(await confirmBrowserFirmwareFlashDownload(side, target.name))) {
         setBuildStatus(`${sideLabel(side)} UF2 ダウンロードをキャンセルしました`);
         return;
       }
       downloadBytes(target.name.split("/").pop() ?? target.name, target.bytes);
       setBrowserFirmwareDownloadedSide(side);
       setBuildStatus(
-        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じボタンを押して完了として記録してください`,
+        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じ side の書き込みボタンで完了として記録してください`,
       );
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
@@ -2167,6 +2166,40 @@ function App() {
     } finally {
       endBrowserFirmwareOperation("flash");
     }
+  }
+
+  async function downloadBrowserFirmwareUf2(side: FlashSide) {
+    if (!canFlashFirmwareSide(browserFirmwareReadiness, side)) {
+      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側の UF2 を取得する条件が揃っていません`);
+      return;
+    }
+    if (!beginBrowserFirmwareOperation("flash")) return;
+
+    try {
+      const target = browserFirmwareUf2Target(side);
+      if (!target) {
+        setBuildStatus(`${sideLabel(side)} UF2 が見つかりません`);
+        return;
+      }
+      if (!(await confirmBrowserFirmwareFlashDownload(side, target.name))) {
+        setBuildStatus(`${sideLabel(side)} UF2 ダウンロードをキャンセルしました`);
+        return;
+      }
+      downloadBytes(target.name.split("/").pop() ?? target.name, target.bytes);
+      setBrowserFirmwareDownloadedSide(side);
+      setBuildStatus(
+        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じ side の書き込みボタンで完了として記録してください`,
+      );
+    } catch (error) {
+      setBuildStatus(`${sideLabel(side)} UF2 ダウンロード失敗: ${formatError(error)}`);
+    } finally {
+      endBrowserFirmwareOperation("flash");
+    }
+  }
+
+  function browserFirmwareUf2Target(side: FlashSide) {
+    const targetName = browserFirmwareArtifacts?.targets[side];
+    return targetName ? browserFirmwareArtifacts?.files.find((file) => file.name === targetName) ?? null : null;
   }
 
   function markBrowserFirmwareSideFlashed(side: FlashSide) {
@@ -2199,6 +2232,10 @@ function App() {
 
   function confirmBrowserFirmwareFlashWrite(side: FlashSide, uf2Name: string): Promise<boolean> {
     return requestFlashConfirmation({ kind: "write", side, uf2Name });
+  }
+
+  function confirmBrowserFirmwareFlashDownload(side: FlashSide, uf2Name: string): Promise<boolean> {
+    return requestFlashConfirmation({ kind: "download", side, uf2Name });
   }
 
   function confirmBrowserFirmwareManualFlashComplete(side: FlashSide, uf2Name: string): Promise<boolean> {
@@ -2605,6 +2642,7 @@ function App() {
                   onCopyUf2={copyBrowserFirmwareUf2}
                   onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
                   onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
+                  onDownloadUf2={downloadBrowserFirmwareUf2}
                   onLoadProject={loadBrowserFirmwareProject}
                   onRefreshRun={refreshBrowserFirmwareBuildRun}
                   onRepoUrlChange={setFirmwareRepoUrl}
@@ -2749,6 +2787,7 @@ function FlashConfirmationDialog({
   const titleId = `flash-confirm-title-${request.id}`;
   const descriptionId = `flash-confirm-description-${request.id}`;
   const isManualCompletion = request.kind === "manual-complete";
+  const isDownload = request.kind === "download";
 
   return (
     <dialog
@@ -2770,7 +2809,9 @@ function FlashConfirmationDialog({
         <p id={descriptionId}>
           {isManualCompletion
             ? `${request.uf2Name} を ${side} 側の bootloader volume に手動コピー済みなら、完了として記録します。`
-            : `${request.uf2Name} を ${side} 側の bootloader volume にコピーします。`}
+            : isDownload
+              ? `${request.uf2Name} をダウンロードします。ダウンロード後、${side} 側の bootloader volume に手動コピーしてください。`
+              : `${request.uf2Name} を ${side} 側の bootloader volume にコピーします。`}
         </p>
         {request.volumeName ? (
           <dl className="flash-confirm-targets">
@@ -2798,7 +2839,7 @@ function FlashConfirmationDialog({
             キャンセル
           </button>
           <button type="button" className="primary" disabled={!keyboardHalfChecked} onClick={() => onResolve(true)}>
-            {isManualCompletion ? "完了として記録" : "確認して続行"}
+            {isManualCompletion ? "完了として記録" : isDownload ? "確認してダウンロード" : "確認して続行"}
           </button>
         </div>
       </div>
@@ -3376,11 +3417,11 @@ function DirectFirmwareDiffPanel({
         </button>
       </div>
       {diffs.length === 0 ? (
-        <p className="diff-empty compact-empty">Direct keymap と firmware keymap の key binding は一致しています。</p>
+        <p className="diff-empty compact-empty">Direct keymap と firmware keymap のキー動作は一致しています。</p>
       ) : (
         <>
           <p className="direct-firmware-note">
-            Direct 側の binding を firmware keymap に取り込みます。保存または書き出しは Firmware モードで実行します。
+            Direct 側のキー動作を firmware keymap に取り込みます。保存または書き出しは Firmware モードで実行します。
           </p>
           <div className="direct-firmware-diff-list">
             {diffs.map((diff) => (
@@ -3861,7 +3902,7 @@ function DirectWelcome({
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config で書き込み予定に追加してからまとめて書き込みます。</span>
+            <span>読み込み後に key を選び、右側の Key Config でキーを書き込み予定に追加してからまとめて書き込みます。</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -4085,7 +4126,7 @@ function DirectInspectorTabs({
             </div>
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーを書き込み予定に追加"}
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -4279,7 +4320,7 @@ function ComboReferencePanel({ combo }: { combo?: KeymapCombo }) {
             <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
           </div>
 	          <div>
-	            <span>Binding</span>
+	            <span>動作</span>
 	            <strong>{combo.binding}</strong>
 	          </div>
 	          <div>
@@ -4387,7 +4428,7 @@ function DirectModeNote({ onFirmwareMode }: { onFirmwareMode: () => void }) {
       <p className="eyebrow">Direct Mode</p>
       <h2>実機 keymap 書き込み</h2>
       <p>
-        キー binding は USB 接続した ZMK Studio 対応 device に直接保存されます。combo とトラックボール設定は
+        キー動作は USB 接続した ZMK Studio 対応 device に直接保存されます。combo とトラックボール設定は
         Firmware Mode で編集して build / flash してください。
       </p>
       <button type="button" className="wide-action" onClick={onFirmwareMode}>
@@ -4542,6 +4583,7 @@ function BrowserFirmwareReleaseWorkbench({
   onCopyUf2,
   onDiffReviewed,
   onDownloadArtifacts,
+  onDownloadUf2,
   onLoadProject,
   onRefreshRun,
   onRepoUrlChange,
@@ -4573,6 +4615,7 @@ function BrowserFirmwareReleaseWorkbench({
   onCopyUf2: (side: FlashSide) => void;
   onDiffReviewed: () => void;
   onDownloadArtifacts: () => void;
+  onDownloadUf2: (side: FlashSide) => void;
   onLoadProject: () => void;
   onRefreshRun: () => void;
   onRepoUrlChange: (value: string) => void;
@@ -4747,6 +4790,19 @@ function BrowserFirmwareReleaseWorkbench({
                 <span className="button-label">
                   {downloadedSide === side ? `${sideLabel(side)} コピー完了を記録` : `${sideLabel(side)} を書き込み`}
                 </span>
+              </button>
+            ))}
+          </div>
+          <div className="flash-download-actions" role="group" aria-label="UF2 download fallback">
+            {(["left", "right"] as FlashSide[]).map((side) => (
+              <button
+                type="button"
+                key={side}
+                disabled={isBusy || (side === "left" ? !readiness.canFlashLeft : !readiness.canFlashRight)}
+                onClick={() => onDownloadUf2(side)}
+              >
+                <Download size={14} />
+                <span className="button-label">{sideLabel(side)} UF2 をダウンロード</span>
               </button>
             ))}
           </div>
@@ -5220,13 +5276,13 @@ function ComboEditor({
       </div>
       {combo ? (
         <div className="combo-editor">
-          <div className="combo-editor-summary" aria-label="Combo edit target">
+          <div className="combo-editor-summary" aria-label="Combo 編集対象">
             <div>
               <span>Keys</span>
               <strong>{combo.keyPositions.map((position) => position + 1).join(" + ")}</strong>
             </div>
 	            <div>
-	              <span>Binding</span>
+	              <span>動作</span>
 	              <BindingChip binding={combo.binding} compact />
 	            </div>
 	            <div>
@@ -5253,7 +5309,7 @@ function ComboEditor({
               setForm({ ...form, binding });
             }}
           />
-          <div className="binding-review combo-binding-target" aria-label="Combo binding update target">
+          <div className="binding-review combo-binding-target" aria-label="Combo 動作の変更予定">
             <div className={combo.binding === form.binding ? "" : "changed"}>
               <span>変更後の動作</span>
               <BindingSummary binding={form.binding} />
@@ -5361,7 +5417,7 @@ function BindingEditor({
   return (
     <div className="binding-editor">
       {currentBinding !== undefined ? (
-        <div className="binding-review" aria-label="Direct key write preview">
+        <div className="binding-review" aria-label="キー動作の書き込みプレビュー">
           <div>
             <span>現在の動作</span>
             <BindingSummary binding={currentBinding} />
@@ -5390,7 +5446,7 @@ function BindingEditor({
       <details className="advanced-binding">
         <summary>ZMK 詳細編集</summary>
         <label>
-          ZMK binding
+          ZMK 動作
           <input
             name="zmkBinding"
             value={form.raw || builtBinding}

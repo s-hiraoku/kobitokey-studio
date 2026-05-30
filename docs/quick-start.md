@@ -62,13 +62,13 @@ npm run tauri dev
 3. Tauri 版では `読み込み` を押します。
 4. 左側で layer を選びます。
 5. 中央のキーボード図で変更したい key を選びます。
-6. 右側の `Binding` で新しい binding を選びます。
+6. 右側の動作エディタで新しいキー動作を選びます。
 7. `キーの動作に設定` を押します。
 8. `Diff` で変更内容を確認します。
 9. ブラウザ版では `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。Tauri 版では `保存` を押します。
 10. build 成功後に artifact を取得し、left / right UF2 を順番に書き込みます。
 
-Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。key binding や Combo の binding / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
+Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
 
 よく使う binding 例:
 
@@ -95,7 +95,7 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 7. Tauri 版では `Left UF2 を bootloader にコピー` を押します。
 8. `Right` 側も同じように進めます。
 
-ブラウザで bootloader folder を直接選べない場合は、UF2 が download されます。download した UF2 を bootloader volume に手動コピーしてから同じボタンをもう一度押すと、次の side へ進みます。
+ブラウザで bootloader folder を直接選べない場合や、手動コピーのほうが確実な場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。download した UF2 を bootloader volume に手動コピーしてから同じ side の書き込みボタンをもう一度押すと、完了として記録して次の side へ進みます。
 
 ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。Tauri 版の `保存してBuild` は、ローカル保存、commit / push、GitHub Actions 起動をまとめて行います。
 
@@ -109,15 +109,15 @@ artifact に `manifest.json` または `firmware-manifest.json` がある場合�
 
 ## 4. Direct Mode でキーをすぐ書き込む
 
-ZMK Studio 対応 firmware が入っている場合は、build せずに対応済み binding を実機へ保存できます。ブラウザ版・デスクトップ版どちらでも使えます。
+ZMK Studio 対応 firmware が入っている場合は、build せずに対応済みキー動作を実機へ保存できます。ブラウザ版・デスクトップ版どちらでも使えます。
 
 1. 上部の `Direct` を選びます(ブラウザ版は最初から Direct です)。
 2. まず USB data cable で KobitoKey を接続します。
 3. 接続パネルの「接続方法」で `USB` を選び、`USB で接続` を押します。ブラウザのデバイス選択ダイアログが開くので、KobitoKey を選びます。
 4. 接続後、ヘッダにデバイス名のチップ、保存状態、`再読み込み` / `切断` ボタンが表示されます。
 5. layer と key を選びます。
-6. 右側の `Key Config` で現在値と書き込み予定の binding を確認します。
-7. `実機へ書き込み` を押します。
+6. 右側の `Key Config` で現在の動作と書き込み予定の動作を確認します。
+7. `キーを書き込み予定に追加`、`実機へ書き込み` の順に押します。
 
 Direct Mode で書いた変更は、`KobitoKey_QWERTY` ファイルへ自動では戻りません。次回 build でも同じ状態を残したい場合は、Firmware Mode 側にも同じ設定を入れてください。
 
