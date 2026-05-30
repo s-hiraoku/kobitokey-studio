@@ -279,11 +279,11 @@ function MobileUnsupportedScreen() {
           <Smartphone size={24} />
         </div>
         <p className="eyebrow">KobitoKey Studio</p>
-        <h1 id="mobile-unsupported-title">スマホは未対応でーす</h1>
+        <h1 id="mobile-unsupported-title">PC ブラウザでご利用ください</h1>
         <p>
-          このエディタはキーボード接続と広い編集画面が必要なため、初版ではPCブラウザからの利用を想定しています。
+          このエディタはキーボード接続と広い編集画面が必要なため、初版では PC ブラウザからの利用を想定しています。
         </p>
-        <p className="mobile-unsupported-note">PCのChromeまたはEdgeでアクセスしてください。</p>
+        <p className="mobile-unsupported-note">PC の Chrome または Edge でアクセスしてください。</p>
       </section>
     </main>
   );

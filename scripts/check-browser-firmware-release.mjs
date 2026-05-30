@@ -121,6 +121,18 @@ const checks = [
       ]),
   },
   {
+    name: "mobile unsupported screen uses public-release copy",
+    pass: () =>
+      allIncludes(files.main, [
+        "PC ブラウザでご利用ください",
+        "PC の Chrome または Edge でアクセスしてください。",
+      ]) &&
+      allIncludes(files.docsDeployment, ["PC ブラウザでご利用ください"]) &&
+      !["スマホは未対応でーす", "PCのChrome", "初版ではPC"].some(
+        (text) => files.main.includes(text) || files.docsDeployment.includes(text),
+      ),
+  },
+  {
     name: "GitHub Pages user guide links to app entry points by setting area",
     pass: () =>
       allIncludes(files.docsConfig, ["user-guide.md"]) &&
