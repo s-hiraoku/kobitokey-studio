@@ -27,6 +27,12 @@ on:
       - "vitest.config.ts"
       - "wrangler.jsonc"
   workflow_dispatch:
+    inputs:
+      deploy_browser_firmware_worker:
+        description: "Deploy browser Firmware Mode production Worker after release gates pass"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -89,3 +95,36 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-browser-firmware-worker:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_browser_firmware_worker
+    needs: release-check
+    environment:
+      name: browser-firmware-production
+      url: https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware
+    runs-on: ubuntu-latest
+    env:
+      BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: ${{ secrets.VITE_GITHUB_OAUTH_CLIENT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/kobitokey-playwright-browsers
+      VITE_GITHUB_OAUTH_CLIENT_ID: ${{ secrets.VITE_GITHUB_OAUTH_CLIENT_ID }}
+      WRANGLER_LOG_PATH: /tmp/kobitokey-wrangler-logs
+      WRANGLER_REGISTRY_PATH: /tmp/kobitokey-wrangler-registry
+      XDG_CONFIG_HOME: /tmp/kobitokey-xdg-config
+      npm_config_cache: /tmp/kobitokey-npm-cache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Deploy browser Firmware Mode Worker
+        run: npm run deploy:browser-firmware

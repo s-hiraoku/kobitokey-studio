@@ -480,6 +480,28 @@ const checks = [
       ]),
   },
   {
+    name: "production Worker deploy can run from guarded GitHub Actions dispatch",
+    pass: () =>
+      allIncludes(files.pagesCi, [
+        "deploy_browser_firmware_worker",
+        "deploy-browser-firmware-worker",
+        "browser-firmware-production",
+        "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: ${{ secrets.VITE_GITHUB_OAUTH_CLIENT_ID }}",
+        "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+        "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
+        "VITE_GITHUB_OAUTH_CLIENT_ID: ${{ secrets.VITE_GITHUB_OAUTH_CLIENT_ID }}",
+        "fetch-depth: 0",
+        "npm run deploy:browser-firmware",
+      ]) &&
+      allIncludes(files.docsDeployment, [
+        "deploy_browser_firmware_worker",
+        "VITE_GITHUB_OAUTH_CLIENT_ID",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_TOKEN",
+        "browser-firmware-production",
+      ]),
+  },
+  {
     name: "GitHub OAuth and artifact zip are same-origin Worker APIs",
     pass: () =>
       allIncludes(files.worker, [
