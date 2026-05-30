@@ -45,7 +45,7 @@ Cloudflare 認証済みの端末から production Worker を更新する場合�
 npm run deploy:browser-firmware
 ```
 
-この wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。GitHub OAuth device flow も本番確認する場合は、公開 OAuth App の client id を渡して OAuth 必須にします。
+この wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。非 dry-run の production deploy では dirty worktree を拒否し、未 commit の差分が current git HEAD として公開済み証跡に混ざらないようにします。GitHub OAuth device flow も本番確認する場合は、公開 OAuth App の client id を渡して OAuth 必須にします。
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run deploy:browser-firmware -- --require-oauth

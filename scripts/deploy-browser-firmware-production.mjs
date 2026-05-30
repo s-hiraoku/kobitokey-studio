@@ -92,6 +92,10 @@ if (productionUrlIssues.length > 0) {
   }
   process.exit(1);
 }
+if (!dryRun && isGitWorktreeDirty()) {
+  console.error("working tree is dirty; commit or stash changes before production deploy.");
+  process.exit(1);
+}
 
 if (!skipMergeReadiness) {
   runNode("scripts/check-browser-firmware-merge-readiness.mjs");
@@ -125,6 +129,14 @@ function readGitHeadSha() {
     stdio: ["ignore", "pipe", "ignore"],
   });
   return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function isGitWorktreeDirty() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status !== 0 || result.stdout.trim().length > 0;
 }
 
 function runNode(script, ...args) {
