@@ -70,9 +70,9 @@ npm run tauri dev
 
 Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
 
-よく使う binding 例:
+よく使うキー動作例:
 
-| やりたいこと | binding |
+| やりたいこと | ZMK binding |
 | --- | --- |
 | `A` を入力する | `&kp A` |
 | 押している間だけ layer 1 | `&mo 1` |

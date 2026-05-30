@@ -22,7 +22,7 @@ KobitoKey Studio supports two editing workflows.
 | Direct Mode | Browser app and Tauri desktop app | Writes supported ZMK Studio settings directly to a connected keyboard. USB is recommended; Bluetooth is experimental and only works when the ZMK Studio device appears |
 | Firmware Mode | Browser app beta and Tauri desktop app | Browser beta edits `KobitoKey_QWERTY` through GitHub API, triggers Actions builds, downloads artifacts, and classifies left/right UF2 files. Tauri edits a local clone and helps copy UF2 files |
 
-Use Direct Mode for quick supported key-binding edits. Use Firmware Mode when
+Use Direct Mode for quick supported key action edits. Use Firmware Mode when
 the change must stay in the firmware repository, needs Combo or Trackball file
 editing, or requires a build and UF2 flash workflow.
 
@@ -132,6 +132,23 @@ A passing preview preflight is not production release evidence. The default
 production URL must pass after the target commit is deployed; missing release
 security headers, missing `/api/release-metadata`, or 405 responses from Worker
 API routes mean production is still on an older deployment.
+
+To deploy the current commit to the production Worker from an authenticated
+machine, use the browser Firmware Mode deploy wrapper. It runs merge readiness,
+the full local browser Firmware Mode check, a production build, Wrangler deploy,
+and then production preflight with `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA`
+set to the current git `HEAD`:
+
+```sh
+npm run deploy:browser-firmware
+```
+
+For the final OAuth release preflight, pass the public GitHub OAuth app client
+id and require OAuth verification during the post-deploy check:
+
+```sh
+BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware -- --require-oauth
+```
 
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:

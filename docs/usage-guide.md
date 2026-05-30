@@ -461,8 +461,9 @@ Bluetooth Direct は実験的対応です。試す場合は「接続方法」で
 2. layer を選びます。
 3. 中央の keyboard で key を選びます。
 4. 右側の `Key Config` tab で現在の動作と書き込み予定の動作を確認します。
-5. `実機へ書き込み` を押します。
-6. 書き込み後、device から keymap が再読み込みされます。
+5. `キーを書き込み予定に追加` を押します。
+6. `実機へ書き込み` を押します。
+7. 書き込み後、device から keymap が再読み込みされます。
 
 Direct Mode で対応している主なキー動作は次です。
 
@@ -493,7 +494,7 @@ Direct Mode で対応している主なキー動作は次です。
 
 ここにないキー動作や、独自 behavior を含む ZMK binding は Firmware Mode で編集してください。
 
-書き込み後は device から keymap を再読み込みします。表示が戻った、または変わらないように見える場合は、書き込み対象 layer と key position が正しいか、Direct Mode 対応 binding かを確認してください。
+書き込み後は device から keymap を再読み込みします。表示が戻った、または変わらないように見える場合は、書き込み対象 layer と key position が正しいか、Direct Mode 対応キー動作かを確認してください。
 
 ### 5.4 Direct Mode で Combo を参照する
 
@@ -532,7 +533,8 @@ Direct Mode が使えるなら Direct Mode で device を読み込み、対象 k
 3. layer を選びます。
 4. 中央の key を選びます。
 5. 右側で `&kp` などのキー動作を選びます。
-6. `実機へ書き込み` を押します。
+6. `キーを書き込み予定に追加` を押します。
+7. `実機へ書き込み` を押します。
 
 ZMK Studio 対応 firmware がない、または Direct Mode で未対応のキー動作を使う場合は Firmware Mode で変更してから build + flash します。
 
@@ -602,7 +604,7 @@ Tauri 版では Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で 
 | --- | --- |
 | keymap | layer ごとのキー動作と Combo を含む設定 |
 | layer | キーボードの面。通常 layer、記号 layer、数字 layer などを切り替えて使う |
-| binding | key に割り当てる動作。例: `&kp A`、`&mo 1` |
+| キー動作(ZMK binding) | key に割り当てる動作。例: `&kp A`、`&mo 1` |
 | behavior | ZMK の動作種別。`&kp`、`&lt`、`&mt` など |
 | Combo | 複数 key の同時押しで別の動作を発火する設定 |
 | overlay | hardware や左右 half ごとの設定を書くファイル |
@@ -652,7 +654,7 @@ config/boards/shields/KobitoKey/KobitoKey_right.overlay
 
 - device を読み込んでから書き込んでいるか確認します。
 - 選択中 layer と key position が正しいか確認します。
-- Direct Mode 対応 binding か確認します。
+- Direct Mode 対応キー動作か確認します。
 - 独自 behavior や未対応キー動作は Firmware Mode で編集します。
 
 ### Combo が Direct Mode で編集できない

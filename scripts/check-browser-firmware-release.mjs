@@ -10,6 +10,7 @@ const files = {
   evidenceCollector: read("scripts/collect-browser-firmware-e2e-evidence.mjs"),
   mergeReadiness: read("scripts/check-browser-firmware-merge-readiness.mjs"),
   mergeReadinessSelfTest: read("scripts/check-browser-firmware-merge-readiness-self-test.mjs"),
+  productionDeploy: read("scripts/deploy-browser-firmware-production.mjs"),
   productionPreflight: read("scripts/check-browser-firmware-production-preflight.mjs"),
   publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
@@ -67,10 +68,35 @@ const checks = [
         "scripts/check-browser-firmware-merge-readiness-self-test.mjs",
         "scripts/check-browser-firmware-production-preflight-self-test.mjs",
         "scripts/check-browser-firmware-public-release-self-test.mjs",
+        'scripts/deploy-browser-firmware-production.mjs", "--help"',
         "scripts/collect-browser-firmware-e2e-evidence.mjs",
         'run(npmCommand, ["test"])',
         'run(npmCommand, ["run", "build"])',
         'run(npxCommand, ["wrangler", "deploy", "--dry-run", "--outdir", workerDryRunOutDir])',
+      ]),
+  },
+  {
+    name: "production deploy wrapper verifies deployed app commit before release",
+    pass: () =>
+      scriptIncludes("deploy:browser-firmware", "node scripts/deploy-browser-firmware-production.mjs") &&
+      allIncludes(files.productionDeploy, [
+        "scripts/check-browser-firmware-merge-readiness.mjs",
+        'run(npmCommand, ["run", "check:browser-firmware"])',
+        'run(npmCommand, ["run", "build"])',
+        'run(npxCommand, ["wrangler", "deploy"])',
+        "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
+        "scripts/check-browser-firmware-production-preflight.mjs",
+        "WRANGLER_LOG_PATH",
+        "--require-oauth",
+        "--dry-run",
+      ]) &&
+      allIncludes(files.readme, [
+        "npm run deploy:browser-firmware",
+        "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
+      ]) &&
+      allIncludes(files.docsDeployment, [
+        "npm run deploy:browser-firmware",
+        "current git HEAD",
       ]),
   },
   {
