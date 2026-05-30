@@ -865,6 +865,7 @@ function App() {
       keymap: updateLayerBinding(files.keymap, activeLayer, selectedKeyIndex, nextBinding),
     });
     setBindingDraft(nextBinding);
+    setStatus(`Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の編集を保存しました`);
   }
 
   function stageDirectBinding(nextBinding: string) {
@@ -1618,7 +1619,7 @@ function App() {
       }),
     });
     setSelectedComboId(combo.id);
-    setStatus(`${combo.id} を保存しました`);
+    setStatus(`${combo.id} の編集を保存しました`);
   }
 
   function createCombo() {
@@ -1707,7 +1708,7 @@ function App() {
     leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
 
     setFiles({ ...files, leftOverlay, rightOverlay });
-    setStatus("トラックボール設定を保存しました");
+    setStatus("トラックボール編集を保存しました");
   }
 
   async function triggerBuild() {
@@ -4036,7 +4037,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="選択キーに設定" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="選択キーの編集を保存" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -5258,7 +5259,7 @@ function ComboEditor({
   onSave,
   onSelect,
   readOnly = false,
-  saveLabel = "Combo を保存",
+  saveLabel = "Combo の編集を保存",
 }: {
   combo?: KeymapCombo;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
@@ -5331,8 +5332,8 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo の動作に設定"
-            applyOnChange={Boolean(onPreview)}
+            actionLabel="Combo 動作を編集"
+            applyOnChange
             binding={form.binding}
             currentBinding={combo.binding}
             onApply={(binding) => {
@@ -6142,7 +6143,7 @@ function TrackballEditor({
           ))}
         </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
-          トラックボール設定を保存
+          トラックボール編集を保存
         </button>
       </div>
     </section>

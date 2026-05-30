@@ -178,7 +178,7 @@ async function setSelectedKeyRawBinding(page, binding) {
     details.setAttribute("open", "");
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
-  await page.getByRole("button", { name: "選択キーに設定" }).click();
+  await page.getByRole("button", { name: "選択キーの編集を保存" }).click();
 }
 
 async function inspectKeyBindingEditActions(page, label) {
@@ -195,7 +195,7 @@ async function inspectKeyBindingEditActions(page, label) {
   }
 
   await page.locator('.choice-grid button[title="B"]').click();
-  await page.getByRole("button", { name: "選択キーに設定" }).click();
+  await page.getByRole("button", { name: "選択キーの編集を保存" }).click();
 
   const afterApply = await readKeyBindingState(page);
   if (afterApply.selectedBinding !== "&kp B") {
@@ -312,7 +312,7 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
 
   await page.getByRole("button", { name: "Diff 確認済み" }).click();
   await page.getByRole("button", { name: "Commit & Build" }).click();
-  await waitForBuildStatusText(page, commitSha.slice(0, 7));
+  await waitForCommitLink(page, commitSha);
   await page.getByRole("button", { name: "最新 run" }).click();
   await waitForBuildStatusText(page, `run ${runId}`);
   await page.getByRole("button", { name: "Artifact 取得" }).click();
@@ -539,6 +539,19 @@ async function waitForBuildStatusText(page, expectedText, timeout = 30_000) {
   }
 }
 
+async function waitForCommitLink(page, commitSha, timeout = 30_000) {
+  const shortSha = commitSha.slice(0, 7);
+  try {
+    await page.getByRole("link", { name: `commit ${shortSha}` }).waitFor({ timeout });
+  } catch (error) {
+    const currentMeta = (await page.locator(".browser-release-meta").textContent().catch(() => "")) ?? "";
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Timed out waiting for Build & Flash commit link "${shortSha}". Current metadata: "${currentMeta.trim() || "-"}". ${reason}`,
+    );
+  }
+}
+
 async function readReleaseWizardState(page) {
   return page.evaluate(() => {
     const buttonByText = (text) =>
@@ -595,11 +608,11 @@ async function inspectComboEditActions(page, label) {
     failures.push(`${label}: added combo should show all-layer scope, got "${afterCreate.selectedComboLayerScope}"`);
   }
   const comboEditor = page.locator(".combo-editor");
-  if ((await comboEditor.getByRole("button", { name: "Combo の動作に設定" }).count()) !== 1) {
-    failures.push(`${label}: combo binding picker should identify that it sets the combo action`);
+  if ((await comboEditor.getByRole("button", { name: "Combo 動作を編集" }).count()) !== 0) {
+    failures.push(`${label}: combo binding editor should update the draft without an extra action button`);
   }
-  if ((await comboEditor.getByRole("button", { name: "Combo を保存" }).count()) !== 1) {
-    failures.push(`${label}: combo save button should identify that it saves the combo`);
+  if ((await comboEditor.getByRole("button", { name: "Combo の編集を保存" }).count()) !== 1) {
+    failures.push(`${label}: combo save button should identify that it saves the combo edit`);
   }
   if (afterCreate.diffCount < initial.diffCount) {
     failures.push(`${label}: adding a combo should not lose existing diffs`);
@@ -773,7 +786,7 @@ async function inspectTrackballEditActions(page, label) {
   }
 
   await page.locator('input[name="trackball-leftCpi"]').fill(String(nextLeftCpi));
-  await page.getByRole("button", { name: "トラックボール設定を保存" }).click();
+  await page.getByRole("button", { name: "トラックボール編集を保存" }).click();
 
   const afterApply = await readTrackballState(page);
   if (afterApply.leftCpi !== nextLeftCpi) {
