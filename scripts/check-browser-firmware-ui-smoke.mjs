@@ -68,10 +68,10 @@ async function runSmoke() {
         await page.setViewportSize(viewport);
       }
       failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
-      failures.push(...(await inspectArtifactProvenanceAfterDownload(page, viewport.name)));
       failures.push(...(await inspectFirmwareUi(page, viewport.name)));
       failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
       failures.push(...(await inspectFirmwareResetAction(page, viewport.name)));
+      failures.push(...(await inspectArtifactProvenanceAfterDownload(page, viewport.name)));
       await page.close();
     }
   } finally {
@@ -291,6 +291,11 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   });
 
   await installGitHubArtifactRouteMocks(page, { artifactId, artifactName, artifactZip, commitSha, runId });
+
+  if ((await page.locator(".browser-release-workbench").count()) === 0) {
+    await page.getByRole("button", { name: "Build & Flash" }).click();
+    await page.getByText("GitHub Commit & Build").waitFor();
+  }
 
   await page.locator("#browser-firmware-token").fill("release-smoke-token");
   await page.getByRole("button", { name: "GitHub から読み込み" }).click();
