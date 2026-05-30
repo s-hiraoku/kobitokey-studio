@@ -213,6 +213,7 @@ const checks = [
         "BROWSER_FIRMWARE_TMP_DIR",
         "process.env.RUNNER_TEMP",
         "tmpdir()",
+        'spawn(process.execPath, ["node_modules/vite/bin/vite.js"',
         'page.goto(`${BASE_URL}/?mode=firmware`',
         'getByRole("button", { name: "Build & Flash" })',
         "GitHub Commit & Build",
@@ -336,6 +337,7 @@ const checks = [
       ]) &&
       allIncludes(files.uiSmoke, [
         'getByRole("button", { name: "選択キーの動作を変更" })',
+        'getByRole("button", { name: "Combo の動作を変更" })',
         'getByRole("button", { name: "トラックボール編集を保存" })',
       ]) &&
       [

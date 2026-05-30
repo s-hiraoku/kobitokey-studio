@@ -12,8 +12,6 @@ const DEFAULT_PLAYWRIGHT_BROWSERS_PATH = join(browserFirmwareTmpDir, "kobitokey-
 const DEFAULT_WRANGLER_LOG_PATH = join(browserFirmwareTmpDir, "kobitokey-wrangler-logs");
 const DEFAULT_WRANGLER_REGISTRY_PATH = join(browserFirmwareTmpDir, "kobitokey-wrangler-registry");
 const DEFAULT_XDG_CONFIG_HOME = join(browserFirmwareTmpDir, "kobitokey-xdg-config");
-const DEFAULT_NPM_CACHE = join(browserFirmwareTmpDir, "kobitokey-npm-cache");
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const require = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = require("playwright-core/package.json").version;
 const { zipSync } = require("fflate");
@@ -25,7 +23,7 @@ if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(DEFAULT_PLAYWRIGHT_BROWS
   process.env.PLAYWRIGHT_BROWSERS_PATH = DEFAULT_PLAYWRIGHT_BROWSERS_PATH;
 }
 
-for (const path of [DEFAULT_WRANGLER_LOG_PATH, DEFAULT_WRANGLER_REGISTRY_PATH, DEFAULT_XDG_CONFIG_HOME, DEFAULT_NPM_CACHE]) {
+for (const path of [DEFAULT_WRANGLER_LOG_PATH, DEFAULT_WRANGLER_REGISTRY_PATH, DEFAULT_XDG_CONFIG_HOME]) {
   mkdirSync(path, { recursive: true });
 }
 
@@ -585,7 +583,7 @@ async function inspectComboEditActions(page, label) {
     failures.push(`${label}: added combo should show all-layer scope, got "${afterCreate.selectedComboLayerScope}"`);
   }
   const comboEditor = page.locator(".combo-editor");
-  if ((await comboEditor.getByRole("button", { name: "Combo 動作を変更" }).count()) !== 1) {
+  if ((await comboEditor.getByRole("button", { name: "Combo の動作を変更" }).count()) !== 1) {
     failures.push(`${label}: combo binding picker should identify that it sets the combo action`);
   }
   if ((await comboEditor.getByRole("button", { name: "Combo の編集を保存" }).count()) !== 1) {
@@ -989,7 +987,7 @@ async function inspectFirmwareUi(page, label) {
 }
 
 function startDevServer() {
-  const child = spawn(npmCommand, ["run", "dev", "--", "--host", HOST, "--port", String(PORT)], {
+  const child = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", HOST, "--port", String(PORT)], {
     cwd: process.cwd(),
     detached: process.platform !== "win32",
     env: {
@@ -998,7 +996,6 @@ function startDevServer() {
       WRANGLER_LOG_PATH: process.env.WRANGLER_LOG_PATH || DEFAULT_WRANGLER_LOG_PATH,
       WRANGLER_REGISTRY_PATH: process.env.WRANGLER_REGISTRY_PATH || DEFAULT_WRANGLER_REGISTRY_PATH,
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || DEFAULT_XDG_CONFIG_HOME,
-      npm_config_cache: process.env.npm_config_cache || DEFAULT_NPM_CACHE,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
