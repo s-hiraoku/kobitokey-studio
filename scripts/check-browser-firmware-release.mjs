@@ -214,6 +214,7 @@ const checks = [
         "process.env.RUNNER_TEMP",
         "tmpdir()",
         'spawn(process.execPath, ["node_modules/vite/bin/vite.js"',
+        "browser.newContext({ viewport })",
         'page.goto(`${BASE_URL}/?mode=firmware`',
         'getByRole("button", { name: "Build & Flash" })',
         "GitHub Commit & Build",

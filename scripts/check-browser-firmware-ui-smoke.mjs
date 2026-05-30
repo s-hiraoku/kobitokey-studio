@@ -48,29 +48,33 @@ async function runSmoke() {
       { name: "desktop", width: 1440, height: 1000 },
       { name: "narrow-desktop", width: 1024, height: 900 },
     ]) {
-      const page = await browser.newPage({ viewport });
-      page.on("pageerror", (error) => failures.push(`${viewport.name}: page error: ${error.message}`));
-      await page.goto(`${BASE_URL}/?mode=firmware`, { waitUntil: "networkidle" });
-      failures.push(...(await inspectLayerStructureActions(page, viewport.name)));
-      failures.push(...(await resetFirmwareEditsIfEnabled(page, viewport.name, "layer structure smoke")));
-      failures.push(...(await inspectKeyBindingEditActions(page, viewport.name)));
-      failures.push(...(await inspectComboEditActions(page, viewport.name)));
-      failures.push(...(await inspectTrackballEditActions(page, viewport.name)));
-      failures.push(...(await inspectFirmwareActionButtons(page, viewport.name)));
-      await page.getByRole("button", { name: "Build & Flash" }).click();
-      await page.getByText("GitHub Commit & Build").waitFor();
-      failures.push(...(await inspectBuildFlashScrollArea(page, viewport.name)));
-      if (viewport.name === "narrow-desktop") {
-        await page.setViewportSize({ width: 1024, height: 640 });
-        failures.push(...(await inspectBuildFlashScrollArea(page, "short-desktop")));
-        await page.setViewportSize(viewport);
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      try {
+        page.on("pageerror", (error) => failures.push(`${viewport.name}: page error: ${error.message}`));
+        await page.goto(`${BASE_URL}/?mode=firmware`, { waitUntil: "networkidle" });
+        failures.push(...(await inspectLayerStructureActions(page, viewport.name)));
+        failures.push(...(await resetFirmwareEditsIfEnabled(page, viewport.name, "layer structure smoke")));
+        failures.push(...(await inspectKeyBindingEditActions(page, viewport.name)));
+        failures.push(...(await inspectComboEditActions(page, viewport.name)));
+        failures.push(...(await inspectTrackballEditActions(page, viewport.name)));
+        failures.push(...(await inspectFirmwareActionButtons(page, viewport.name)));
+        await page.getByRole("button", { name: "Build & Flash" }).click();
+        await page.getByText("GitHub Commit & Build").waitFor();
+        failures.push(...(await inspectBuildFlashScrollArea(page, viewport.name)));
+        if (viewport.name === "narrow-desktop") {
+          await page.setViewportSize({ width: 1024, height: 640 });
+          failures.push(...(await inspectBuildFlashScrollArea(page, "short-desktop")));
+          await page.setViewportSize(viewport);
+        }
+        failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
+        failures.push(...(await inspectFirmwareUi(page, viewport.name)));
+        failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
+        failures.push(...(await inspectFirmwareResetAction(page, viewport.name)));
+        failures.push(...(await inspectArtifactProvenanceAfterDownload(page, viewport.name)));
+      } finally {
+        await context.close();
       }
-      failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
-      failures.push(...(await inspectFirmwareUi(page, viewport.name)));
-      failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
-      failures.push(...(await inspectFirmwareResetAction(page, viewport.name)));
-      failures.push(...(await inspectArtifactProvenanceAfterDownload(page, viewport.name)));
-      await page.close();
     }
   } finally {
     await browser.close();
