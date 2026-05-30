@@ -124,6 +124,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Validate production Worker secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in VITE_GITHUB_OAUTH_CLIENT_ID CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret ${name} is required for browser Firmware Mode production Worker deploy"
+              missing=1
+            fi
+          done
+          exit "$missing"
       - name: Install dependencies
         run: npm ci
       - name: Deploy browser Firmware Mode Worker

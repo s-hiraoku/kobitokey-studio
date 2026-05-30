@@ -502,6 +502,8 @@ const checks = [
         "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
         "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
         "VITE_GITHUB_OAUTH_CLIENT_ID: ${{ secrets.VITE_GITHUB_OAUTH_CLIENT_ID }}",
+        "Validate production Worker secrets",
+        "Repository secret ${name} is required for browser Firmware Mode production Worker deploy",
         "fetch-depth: 0",
         "npm run deploy:browser-firmware",
       ]) &&
@@ -510,6 +512,7 @@ const checks = [
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "CLOUDFLARE_ACCOUNT_ID",
         "CLOUDFLARE_API_TOKEN",
+        "Validate production Worker secrets",
         "browser-firmware-production",
       ]),
   },

@@ -55,7 +55,7 @@ Repository secrets には次を設定します。
 | `CLOUDFLARE_ACCOUNT_ID` | Wrangler deploy の Cloudflare account id |
 | `CLOUDFLARE_API_TOKEN` | Wrangler deploy の API token |
 
-この手動 deploy path でも deploy wrapper が merge readiness、local release check、production build、Wrangler deploy、OAuth production preflight を順に実行します。GitHub Actions 上の checkout は `fetch-depth: 0` を使い、current commit と `origin/main` の照合ができる状態で実行します。
+この手動 deploy path は `Validate production Worker secrets` で必須 secret の有無を値を出さずに検査してから進みます。その後、deploy wrapper が merge readiness、local release check、production build、Wrangler deploy、OAuth production preflight を順に実行します。GitHub Actions 上の checkout は `fetch-depth: 0` を使い、current commit と `origin/main` の照合ができる状態で実行します。
 
 公開直前に足りない証跡や本番更新状態だけを確認したい場合は、deploy せずに次を実行します。
 
