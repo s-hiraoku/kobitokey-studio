@@ -44,6 +44,7 @@ try {
     "production.workerOAuthDeviceFlowStarted must be true",
     "production.frontendOAuthClientIdPresent must be true",
     "ci.appCommitSha must not be a placeholder SHA",
+    "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
     "github.repository must not be the template owner/repo placeholder",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
@@ -305,6 +306,7 @@ function createInvalidReport() {
     },
     ci: {
       ...createValidReport().ci,
+      runUrl: "https://github.com/juichi50iii/KobitoKey_QWERTY/actions/runs/123",
       appCommitSha: "0000000000000000000000000000000000000000",
     },
     github: {

@@ -751,9 +751,9 @@ const checks = [
         "OK browser firmware public release self-test passed",
       ]) &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
-      allIncludes(files.docsDeployment, ["`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
+      allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -821,11 +821,13 @@ const checks = [
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "requireFirmwareModeUrl",
         "requireExpectedProductionOrigin",
+        "isGitHubActionsRunUrl",
         "isGitHubPath",
         "production.workerAccessTokenRouteChecked must be true",
         "production.workerUnsupportedScopeRejected must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
+        "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
         "ci.appCommitSha must not be a placeholder SHA",
         "securityHeadersChecked must be true",
         "apiSecurityHeadersChecked must be true",
@@ -907,6 +909,7 @@ const checks = [
         "production.apiSecurityHeadersChecked must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
+        "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
         "github.repository must not be the template owner/repo placeholder",
         "commit.managedFiles must not contain duplicate paths",
         "commit.managedFiles must contain only managed firmware files",

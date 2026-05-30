@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 
 const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
+const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
 const expectedProductionOrigin =
   process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
 const reportPath = process.argv[2];
@@ -37,6 +38,10 @@ requireValue(report.production?.securityHeadersChecked === true, "production.sec
 requireValue(report.production?.apiSecurityHeadersChecked === true, "production.apiSecurityHeadersChecked must be true");
 
 requireHttpsUrl(report.ci?.runUrl, "ci.runUrl must be an https URL");
+requireValue(
+  isGitHubActionsRunUrl(report.ci?.runUrl, APP_REPOSITORY),
+  "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
+);
 requireSha(report.ci?.appCommitSha, "ci.appCommitSha must be a 40-character SHA");
 requireNonPlaceholderHash(report.ci?.appCommitSha, "ci.appCommitSha must not be a placeholder SHA");
 requireValue(report.production?.appCommitSha === report.ci?.appCommitSha, "production.appCommitSha must match ci.appCommitSha");
@@ -232,6 +237,29 @@ function isGitHubPath(value, repository, suffix) {
     const [owner, repo] = repository.split("/");
     const expected = ["", owner, repo, ...suffix].map(String);
     return url.protocol === "https:" && url.hostname === "github.com" && url.pathname === expected.join("/");
+  } catch {
+    return false;
+  }
+}
+
+function isGitHubActionsRunUrl(value, repository) {
+  if (typeof value !== "string" || !isRepoSlug(repository)) {
+    return false;
+  }
+  try {
+    const url = new URL(value);
+    const [owner, repo] = repository.split("/");
+    const parts = url.pathname.split("/").filter(Boolean);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "github.com" &&
+      parts.length === 5 &&
+      parts[0] === owner &&
+      parts[1] === repo &&
+      parts[2] === "actions" &&
+      parts[3] === "runs" &&
+      /^[1-9]\d*$/.test(parts[4])
+    );
   } catch {
     return false;
   }
