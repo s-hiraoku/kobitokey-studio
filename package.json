@@ -16,6 +16,7 @@
     "check:browser-firmware:production-preflight": "node scripts/check-browser-firmware-production-preflight.mjs",
     "check:browser-firmware:production-release-preflight": "node scripts/check-browser-firmware-production-preflight.mjs --require-oauth",
     "check:browser-firmware:public-release": "node scripts/check-browser-firmware-public-release.mjs",
+    "check:browser-firmware:release-status": "node scripts/check-browser-firmware-release-status.mjs",
     "check:browser-firmware:public-release-self-test": "node scripts/check-browser-firmware-public-release-self-test.mjs",
     "check:browser-firmware:production-preflight-self-test": "node scripts/check-browser-firmware-production-preflight-self-test.mjs",
     "collect:browser-firmware:e2e-report": "node scripts/collect-browser-firmware-e2e-evidence.mjs",

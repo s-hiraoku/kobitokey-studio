@@ -14,6 +14,7 @@ const files = {
   productionDeploySelfTest: read("scripts/deploy-browser-firmware-production-self-test.mjs"),
   productionPreflight: read("scripts/check-browser-firmware-production-preflight.mjs"),
   publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
+  releaseStatus: read("scripts/check-browser-firmware-release-status.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
   productionPreflightSelfTest: read("scripts/check-browser-firmware-production-preflight-self-test.mjs"),
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
@@ -137,6 +138,23 @@ const checks = [
         "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
         "/api/release-metadata",
       ]),
+  },
+  {
+    name: "release status command summarizes public release blockers",
+    pass: () =>
+      scriptIncludes("check:browser-firmware:release-status", "node scripts/check-browser-firmware-release-status.mjs") &&
+      allIncludes(files.releaseStatus, [
+        "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
+        "CLOUDFLARE_API_TOKEN",
+        "scripts/check-browser-firmware-merge-readiness.mjs",
+        "scripts/check-browser-firmware-production-preflight.mjs",
+        "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
+        "scripts/check-browser-firmware-external-evidence.mjs",
+        "Browser firmware release gates",
+        "Summary:",
+      ]) &&
+      allIncludes(files.readme, ["check:browser-firmware:release-status"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status"]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",

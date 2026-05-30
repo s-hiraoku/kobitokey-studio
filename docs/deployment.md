@@ -45,6 +45,12 @@ Cloudflare 認証済みの端末から production Worker を更新する場合�
 npm run deploy:browser-firmware
 ```
 
+公開直前に足りない証跡や本番更新状態だけを確認したい場合は、deploy せずに次を実行します。
+
+```sh
+npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
+```
+
 この wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。非 dry-run の production deploy では dirty worktree と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` 未設定を拒否し、未 commit の差分や OAuth なしの token 手入力専用 UI が current git HEAD の公開済み証跡に混ざらないようにします。
 
 ```sh

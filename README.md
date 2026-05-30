@@ -118,6 +118,13 @@ artifact/build provenance match proof, or missing layer structure action proof:
 npm run check:browser-firmware:e2e-report -- path/to/report.json
 ```
 
+To see the current public-release blockers without deploying or printing
+secrets, run:
+
+```sh
+npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
+```
+
 After a production deployment, run the lightweight preflight first to catch
 missing Worker routes, missing artifact proxy input validation, or release
 security headers before starting hardware QA:
