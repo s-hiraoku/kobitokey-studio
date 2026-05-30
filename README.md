@@ -98,8 +98,10 @@ npm run check:browser-firmware
 This uses `scripts/run-browser-firmware-check.mjs` to run the browser firmware
 release audit, unit tests, production build, and Wrangler dry-run deploy
 packaging. The runner sets `WRANGLER_LOG_PATH` under
-`BROWSER_FIRMWARE_TMP_DIR`, `RUNNER_TEMP`, or the OS temp directory so local
-sandboxed runs and GitHub Actions do not depend on user preference directories.
+`BROWSER_FIRMWARE_TMP_DIR`, `RUNNER_TEMP`, or the OS temp directory, and invokes
+the local `node_modules` test/build/Wrangler tools directly so local sandboxed
+runs and GitHub Actions do not depend on user preference directories or a
+global `npm` / `npx` binary on `PATH`.
 
 Before treating browser Firmware Mode as public-release ready, fill an external
 E2E evidence report from `docs/browser-firmware-e2e-evidence.template.json` and

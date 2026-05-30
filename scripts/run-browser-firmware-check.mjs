@@ -15,21 +15,29 @@ const env = {
   WRANGLER_LOG_PATH: wranglerLogPath,
 };
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+env.WRANGLER_REGISTRY_PATH ??= join(browserFirmwareTmpDir, "kobitokey-wrangler-registry");
+env.XDG_CONFIG_HOME ??= join(browserFirmwareTmpDir, "kobitokey-xdg-config");
 
-run("node", ["scripts/check-browser-firmware-release.mjs"]);
-run("node", ["scripts/check-browser-firmware-evidence-self-test.mjs"]);
-run("node", ["scripts/check-browser-firmware-collector-self-test.mjs"]);
-run("node", ["scripts/check-browser-firmware-merge-readiness-self-test.mjs"]);
-run("node", ["scripts/check-browser-firmware-production-preflight-self-test.mjs"]);
-run("node", ["scripts/check-browser-firmware-public-release-self-test.mjs"]);
-run("node", ["scripts/deploy-browser-firmware-production-self-test.mjs"]);
-run("node", ["scripts/deploy-browser-firmware-production.mjs", "--help"]);
-run("node", ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--help"]);
-run(npmCommand, ["test"]);
-run(npmCommand, ["run", "build"]);
-run(npxCommand, ["wrangler", "deploy", "--dry-run", "--outdir", workerDryRunOutDir]);
+mkdirSync(env.WRANGLER_REGISTRY_PATH, { recursive: true });
+mkdirSync(env.XDG_CONFIG_HOME, { recursive: true });
+
+runNode("scripts/check-browser-firmware-release.mjs");
+runNode("scripts/check-browser-firmware-evidence-self-test.mjs");
+runNode("scripts/check-browser-firmware-collector-self-test.mjs");
+runNode("scripts/check-browser-firmware-merge-readiness-self-test.mjs");
+runNode("scripts/check-browser-firmware-production-preflight-self-test.mjs");
+runNode("scripts/check-browser-firmware-public-release-self-test.mjs");
+runNode("scripts/deploy-browser-firmware-production-self-test.mjs");
+runNode("scripts/deploy-browser-firmware-production.mjs", "--help");
+runNode("scripts/collect-browser-firmware-e2e-evidence.mjs", "--help");
+runNode("node_modules/vitest/vitest.mjs", "run");
+runNode("node_modules/typescript/bin/tsc");
+runNode("node_modules/vite/bin/vite.js", "build");
+runNode("node_modules/wrangler/bin/wrangler.js", "deploy", "--dry-run", "--outdir", workerDryRunOutDir);
+
+function runNode(script, ...args) {
+  run(process.execPath, [script, ...args]);
+}
 
 function run(command, args) {
   const label = [command, ...args].join(" ");

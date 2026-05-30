@@ -51,8 +51,8 @@ Options:
     Run the local checks, build, and Wrangler dry-run packaging without changing
     production. Post-deploy preflight is skipped.
   --skip-local-check
-    Skip npm run check:browser-firmware. Use only after it passed on the same
-    commit.
+    Skip the integrated browser Firmware Mode local check. Use only after it
+    passed on the same commit.
   --skip-merge-readiness
     Skip origin/main merge-readiness check. Use only for intentional emergency
     deploys.`);
@@ -67,12 +67,13 @@ const env = {
   ...process.env,
   WRANGLER_LOG_PATH: wranglerLogPath,
 };
+env.WRANGLER_REGISTRY_PATH ??= join(browserFirmwareTmpDir, "kobitokey-wrangler-registry");
+env.XDG_CONFIG_HOME ??= join(browserFirmwareTmpDir, "kobitokey-xdg-config");
 
 mkdirSync(wranglerLogPath, { recursive: true });
 mkdirSync(workerDryRunOutDir, { recursive: true });
-
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+mkdirSync(env.WRANGLER_REGISTRY_PATH, { recursive: true });
+mkdirSync(env.XDG_CONFIG_HOME, { recursive: true });
 const headSha = readGitHeadSha();
 
 if (!headSha) {
@@ -93,27 +94,28 @@ if (productionUrlIssues.length > 0) {
 }
 
 if (!skipMergeReadiness) {
-  run("node", ["scripts/check-browser-firmware-merge-readiness.mjs"]);
+  runNode("scripts/check-browser-firmware-merge-readiness.mjs");
 }
 if (!skipLocalCheck) {
-  run(npmCommand, ["run", "check:browser-firmware"]);
+  runNode("scripts/run-browser-firmware-check.mjs");
 }
-run(npmCommand, ["run", "build"]);
+runNode("node_modules/typescript/bin/tsc");
+runNode("node_modules/vite/bin/vite.js", "build");
 
 if (dryRun) {
-  run(npxCommand, ["wrangler", "deploy", "--dry-run", "--outdir", workerDryRunOutDir]);
+  runNode("node_modules/wrangler/bin/wrangler.js", "deploy", "--dry-run", "--outdir", workerDryRunOutDir);
   console.log(`OK browser Firmware Mode production deploy dry-run passed for ${headSha}`);
   process.exit(0);
 }
 
-run(npxCommand, ["wrangler", "deploy"]);
+runNode("node_modules/wrangler/bin/wrangler.js", "deploy");
 
 const preflightArgs = ["scripts/check-browser-firmware-production-preflight.mjs"];
 if (requireOAuth || process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
   preflightArgs.push("--require-oauth");
 }
 preflightArgs.push(productionUrl);
-run("node", preflightArgs, { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: headSha });
+run(process.execPath, preflightArgs, { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: headSha });
 
 console.log(`OK browser Firmware Mode production deploy verified at ${productionUrl} for ${headSha}`);
 
@@ -123,6 +125,10 @@ function readGitHeadSha() {
     stdio: ["ignore", "pipe", "ignore"],
   });
   return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function runNode(script, ...args) {
+  run(process.execPath, [script, ...args]);
 }
 
 function validateProductionUrl(rawUrl) {

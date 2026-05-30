@@ -109,7 +109,7 @@ permalink: /browser-firmware-release-plan/
 
 ### 1. ローカル検証
 
-1. `npm run check:browser-firmware` が通る。このコマンドは `scripts/run-browser-firmware-check.mjs` から `scripts/check-browser-firmware-release.mjs` の release audit、unit tests、production build、Wrangler dry-run deploy packaging を順に実行する。Wrangler dry-run のログと output は `BROWSER_FIRMWARE_TMP_DIR`、`RUNNER_TEMP`、または OS の一時ディレクトリ配下に逃がし、sandbox や CI のユーザー設定ディレクトリ権限に依存しない。
+1. `npm run check:browser-firmware` が通る。このコマンドは `scripts/run-browser-firmware-check.mjs` から `scripts/check-browser-firmware-release.mjs` の release audit、unit tests、production build、Wrangler dry-run deploy packaging を順に実行する。Runner は local `node_modules` の test/build/Wrangler tools を直接呼び、Wrangler dry-run のログ、registry、config、output は `BROWSER_FIRMWARE_TMP_DIR`、`RUNNER_TEMP`、または OS の一時ディレクトリ配下に逃がすため、sandbox や CI のユーザー設定ディレクトリ権限、global `npm` / `npx` の PATH に依存しない。
 2. `npm test`、`npm run build`、`wrangler deploy --dry-run` が順に通り、Worker と static assets が同じ deploy bundle に入る。
 3. Wrangler が local sandbox 上で log file の EPERM を出しても、command exit code が 0 で assets directory を読めていれば dry-run は成功扱いにできる。
 4. `npm run check:browser-firmware:merge-readiness` が通り、作業ツリーが clean で、branch が `origin/main` に遅れておらず、non-destructive merge check で conflict が出ないことを確認する。

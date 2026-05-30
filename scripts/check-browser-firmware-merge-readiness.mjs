@@ -39,13 +39,16 @@ if (behind > 0) {
   issues.push(`current branch is behind ${mainRef} by ${behind} commit(s); merge or rebase main before release`);
 }
 
-const merge = spawnGit(["merge-tree", "--write-tree", "--quiet", "HEAD", mainRef]);
+const mergeBase = git(["merge-base", "HEAD", mainRef], `find merge base with ${mainRef}`).stdout.trim();
+const merge = spawnGit(["merge-tree", mergeBase, "HEAD", mainRef]);
 if (merge.status !== 0) {
   const detail = merge.stderr.trim() || merge.stdout.trim() || `exit status ${merge.status}`;
   issues.push(`non-destructive merge check failed for ${mainRef}: ${detail}`);
+} else if (merge.stdout.includes("<<<<<<< .our") || merge.stdout.includes("changed in both")) {
+  const detail = merge.stdout.split(/\r?\n/).slice(0, 12).join("\n").trim();
+  issues.push(`non-destructive merge check failed for ${mainRef}: ${detail}`);
 }
 
-const mergeBase = git(["merge-base", "HEAD", mainRef], `find merge base with ${mainRef}`).stdout.trim();
 const ourFiles = new Set(changedFiles(`${mergeBase}..HEAD`));
 const theirFiles = new Set(changedFiles(`${mergeBase}..${mainRef}`));
 const overlappingFiles = [...ourFiles].filter((file) => theirFiles.has(file)).sort();
