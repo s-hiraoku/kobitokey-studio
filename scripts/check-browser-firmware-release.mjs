@@ -565,6 +565,7 @@ const checks = [
       ]) &&
       allIncludes(files.releaseFlowTest, [
         "allows commit only after files are changed and diff is reviewed",
+        "closes both flash gates when files change after a partial flash",
         "requires a verified successful run before either side can be flashed",
         "forces left flash before right flash",
         "blocks flash when left and right artifact basenames are the same",

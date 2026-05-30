@@ -140,6 +140,34 @@ describe("deriveFirmwareReleaseReadiness", () => {
     });
   });
 
+  it("closes both flash gates when files change after a partial flash", () => {
+    const readiness = deriveFirmwareReleaseReadiness({
+      ...baseState,
+      authenticated: true,
+      branchSelected: true,
+      repositorySelected: true,
+      filesLoaded: true,
+      hasLocalChanges: true,
+      diffReviewed: false,
+      commitSha: "old123",
+      buildRunId: "987",
+      buildStatus: "success",
+      artifactFiles: ["KobitoKey_left.uf2", "KobitoKey_right.uf2"],
+      leftFlashed: true,
+    });
+
+    expect(readiness).toMatchObject({
+      step: "review-diff",
+      canBuild: false,
+      canDownloadArtifact: false,
+      canFlashLeft: false,
+      canFlashRight: false,
+      complete: false,
+    });
+    expect(canFlashFirmwareSide(readiness, "left")).toBe(false);
+    expect(canFlashFirmwareSide(readiness, "right")).toBe(false);
+  });
+
   it("requires a successful build before artifact download", () => {
     expect(
       deriveFirmwareReleaseReadiness({
