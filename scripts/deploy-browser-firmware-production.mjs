@@ -7,7 +7,7 @@ const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?
 const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
-const requireOAuth = args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";
+const requireOAuth = !dryRun || args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";
 const skipLocalCheck = args.includes("--skip-local-check");
 const skipMergeReadiness = args.includes("--skip-merge-readiness");
 const skipReason = process.env.BROWSER_FIRMWARE_DEPLOY_SKIP_REASON?.trim() || "";
@@ -34,8 +34,9 @@ Environment:
     Expected public production origin. Defaults to
     ${DEFAULT_EXPECTED_PRODUCTION_ORIGIN}.
   BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID
-    When set, the post-deploy preflight also verifies the deployed Worker can
-    start GitHub OAuth device flow and the frontend bundle embeds the client id.
+    Required for non-dry-run production deploys. The post-deploy preflight
+    verifies the deployed Worker can start GitHub OAuth device flow and the
+    frontend bundle embeds the client id.
   BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH=true
     Same as --require-oauth.
   BROWSER_FIRMWARE_TMP_DIR or RUNNER_TEMP
@@ -46,7 +47,8 @@ Environment:
 Options:
   --require-oauth
     Fail post-deploy preflight unless BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID
-    is set and works against production.
+    is set and works against production. Non-dry-run deploys always require
+    this check.
   --dry-run
     Run the local checks, build, and Wrangler dry-run packaging without changing
     production. Post-deploy preflight is skipped.
@@ -94,6 +96,10 @@ if (productionUrlIssues.length > 0) {
 }
 if (!dryRun && isGitWorktreeDirty()) {
   console.error("working tree is dirty; commit or stash changes before production deploy.");
+  process.exit(1);
+}
+if (!dryRun && !process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
+  console.error("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy.");
   process.exit(1);
 }
 

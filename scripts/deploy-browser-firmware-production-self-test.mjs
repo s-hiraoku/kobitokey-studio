@@ -75,6 +75,18 @@ if (!dirtyDeploy.stderr.includes("working tree is dirty; commit or stash changes
   throw new Error("Expected production deploy wrapper to explain dirty worktree rejection");
 }
 
+const missingOAuthDeploy = runMissingOAuthDeploySelfTest();
+if (missingOAuthDeploy.status === 0) {
+  process.stdout.write(missingOAuthDeploy.stdout);
+  process.stderr.write(missingOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to require an OAuth client id before deploy");
+}
+if (!missingOAuthDeploy.stderr.includes("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy")) {
+  process.stdout.write(missingOAuthDeploy.stdout);
+  process.stderr.write(missingOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to explain missing OAuth client id rejection");
+}
+
 console.log("OK browser firmware production deploy self-test passed");
 
 function runDirtyDeploySelfTest() {
@@ -96,6 +108,36 @@ function runDirtyDeploySelfTest() {
         env: {
           ...process.env,
           BROWSER_FIRMWARE_DEPLOY_SKIP_REASON: "self-test dirty deploy",
+        },
+        encoding: "utf8",
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function runMissingOAuthDeploySelfTest() {
+  const dir = mkdtempSync(join(tmpdir(), "browser-firmware-oauth-deploy-"));
+  try {
+    runGit(dir, ["init"]);
+    runGit(dir, ["config", "user.email", "self-test@example.com"]);
+    runGit(dir, ["config", "user.name", "Browser Firmware Self Test"]);
+    writeFileSync(join(dir, "README.md"), "clean\n");
+    runGit(dir, ["add", "README.md"]);
+    runGit(dir, ["commit", "-m", "initial"]);
+
+    const env = { ...process.env };
+    delete env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID;
+    delete env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH;
+    return spawnSync(
+      process.execPath,
+      [deployScript, "--skip-local-check", "--skip-merge-readiness"],
+      {
+        cwd: dir,
+        env: {
+          ...env,
+          BROWSER_FIRMWARE_DEPLOY_SKIP_REASON: "self-test missing oauth",
         },
         encoding: "utf8",
       },

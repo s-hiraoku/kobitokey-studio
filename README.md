@@ -138,20 +138,21 @@ security headers, missing `/api/release-metadata`, or 405 responses from Worker
 API routes mean production is still on an older deployment.
 
 To deploy the current commit to the production Worker from an authenticated
-machine, use the browser Firmware Mode deploy wrapper. It runs merge readiness,
-the full local browser Firmware Mode check, a production build, Wrangler deploy,
-and then production preflight with `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA`
-set to the current git `HEAD`:
+machine, use the browser Firmware Mode deploy wrapper. It requires the public
+GitHub OAuth app client id for non-dry-run deploys, runs merge readiness, the
+full local browser Firmware Mode check, a production build, Wrangler deploy,
+and then OAuth production preflight with
+`BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` set to the current git `HEAD`:
 
 ```sh
-npm run deploy:browser-firmware
+BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
 ```
 
-For the final OAuth release preflight, pass the public GitHub OAuth app client
-id and require OAuth verification during the post-deploy check:
+The plain `npm run deploy` command also routes through the same OAuth-required
+wrapper:
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware -- --require-oauth
+npm run deploy
 ```
 
 Before merging or opening the release PR, check whether the branch is dirty,

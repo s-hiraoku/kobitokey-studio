@@ -86,9 +86,10 @@ const checks = [
     name: "production deploy wrapper verifies deployed app commit before release",
     pass: () =>
       scriptIncludes("deploy:browser-firmware", "node scripts/deploy-browser-firmware-production.mjs") &&
-      scriptIncludes("deploy", "npm run deploy:browser-firmware") &&
+      scriptIncludes("deploy", "npm run deploy:browser-firmware -- --require-oauth") &&
       !scriptIncludes("deploy", "wrangler deploy") &&
       allIncludes(files.productionDeploy, [
+        "const requireOAuth = !dryRun",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         'runNode("scripts/run-browser-firmware-check.mjs")',
         'runNode("node_modules/typescript/bin/tsc")',
@@ -105,6 +106,7 @@ const checks = [
         "production URL must use the expected public production origin",
         "isGitWorktreeDirty()",
         "working tree is dirty; commit or stash changes before production deploy",
+        "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
         "--require-oauth",
@@ -117,8 +119,11 @@ const checks = [
         "Expected deploy wrapper to reject invalid production URLs before deploy",
         "Expected production deploy wrapper to reject dirty worktrees before deploy",
         "Expected production deploy wrapper to explain dirty worktree rejection",
+        "Expected production deploy wrapper to require an OAuth client id before deploy",
+        "Expected production deploy wrapper to explain missing OAuth client id rejection",
         "production URL must use the expected public production origin",
         "working tree is dirty; commit or stash changes before production deploy",
+        "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
         "OK browser firmware production deploy self-test passed",
       ]) &&
