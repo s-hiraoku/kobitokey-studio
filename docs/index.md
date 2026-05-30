@@ -59,7 +59,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 2. `Direct` を選ぶ
 3. USB で接続する(Bluetooth は見つかる場合のみ)
 4. layer と key を選ぶ
-5. キー動作を選び、`キーを書き込み予定に追加`、`実機へ書き込み` の順に押す
+5. キー動作を選び、`書き込み予定に追加`、`実機へ書き込み` の順に押す
 
 ### Combo やトラックボールを確実に変える
 
@@ -100,7 +100,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 3. 実機の keymap を読み込む
 4. 対象 layer と key を選ぶ
 5. キー動作を選ぶ
-6. `キーを書き込み予定に追加`、`実機へ書き込み` の順に押す
+6. `書き込み予定に追加`、`実機へ書き込み` の順に押す
 
 ## よく使う用語
 
@@ -108,7 +108,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 | --- | --- |
 | keymap | layer ごとのキー動作と Combo を含む設定ファイル |
 | layer | キーボードの面。`&mo` や `&lt` で一時的に切り替える |
-| キー動作(ZMK binding) | key に割り当てる動作。例: `&kp A`、`&lt 1 SPACE` |
+| キー動作(ZMK 構文) | key に割り当てる動作。例: `&kp A`、`&lt 1 SPACE` |
 | Combo | 複数 key の同時押しで別の動作を発火する設定 |
 | overlay | トラックボールなど、左右 half ごとの hardware 寄り設定 |
 | UF2 | bootloader volume にコピーして書き込む firmware ファイル |

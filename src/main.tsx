@@ -1707,7 +1707,7 @@ function App() {
     leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
 
     setFiles({ ...files, leftOverlay, rightOverlay });
-    setStatus("トラックボール設定を保存しました");
+    setStatus("トラックボール編集を保存しました");
   }
 
   async function triggerBuild() {
@@ -3413,7 +3413,7 @@ function DirectFirmwareDiffPanel({
           onClick={() => onApplyFirmwareDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Firmware へ取り込む
+          キー差分を Firmware へ取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3435,7 +3435,7 @@ function DirectFirmwareDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareDiffs([diff])}>
                     <UploadCloud size={14} />
-                    取り込む
+                    このキーを取り込む
                   </button>
                 </header>
                 <dl>
@@ -3472,7 +3472,7 @@ function DirectFirmwareComboDiffPanel({
           onClick={() => onApplyFirmwareComboDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Combo を取り込む
+          Combo 差分を Firmware へ取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3494,7 +3494,7 @@ function DirectFirmwareComboDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareComboDiffs([diff])}>
                     <UploadCloud size={14} />
-                    取り込む
+                    この Combo を取り込む
                   </button>
                 </header>
                 <dl>
@@ -3902,7 +3902,7 @@ function DirectWelcome({
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config でキーを書き込み予定に追加してからまとめて書き込みます。</span>
+            <span>読み込み後に key を選び、右側の Key Config で書き込み予定に追加してからまとめて書き込みます。</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -4036,7 +4036,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="キーの動作を設定" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="選択キーの動作を変更" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -4126,7 +4126,7 @@ function DirectInspectorTabs({
             </div>
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーを書き込み予定に追加"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -5258,7 +5258,7 @@ function ComboEditor({
   onSave,
   onSelect,
   readOnly = false,
-  saveLabel = "Combo を保存",
+  saveLabel = "Combo の編集を保存",
 }: {
   combo?: KeymapCombo;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
@@ -5331,7 +5331,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo の動作を選択"
+            actionLabel="Combo 動作を変更"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -5460,7 +5460,7 @@ function BindingEditor({
         </div>
       ) : (
         <div className="binding-preview">
-          <span>設定予定</span>
+          <span>設定後の動作</span>
           <BindingSummary binding={builtBinding} />
         </div>
       )}
@@ -5477,7 +5477,7 @@ function BindingEditor({
       <details className="advanced-binding">
         <summary>ZMK 詳細編集</summary>
         <label>
-          ZMK 動作
+          ZMK 構文
           <input
             name="zmkBinding"
             value={form.raw || builtBinding}
@@ -6142,7 +6142,7 @@ function TrackballEditor({
           ))}
         </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
-          トラックボール設定を保存
+          トラックボール編集を保存
         </button>
       </div>
     </section>

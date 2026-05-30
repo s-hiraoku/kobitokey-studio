@@ -38,7 +38,7 @@ Direct Mode は ZMK Studio 対応 firmware が入った実機に接続して、�
 1. [Direct Mode](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct) を開きます。
 2. USB を推奨します。Bluetooth はブラウザから見える場合のみ使えます。
 3. 実機を接続し、layer と key を選びます。
-4. 右側の `Key Config` でキー動作を選び、`キーを書き込み予定に追加`、`実機へ書き込み` の順に押します。
+4. 右側の `Key Config` でキー動作を選び、`書き込み予定に追加`、`実機へ書き込み` の順に押します。
 
 ## 参照
 

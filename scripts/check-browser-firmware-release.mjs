@@ -287,7 +287,7 @@ const checks = [
         "comboLayerMaskScope(combo)",
         "全 layer",
         "<span>動作</span>",
-        "ZMK 動作",
+        "ZMK 構文",
       ]) &&
       allIncludes(files.packageJson, ['"playwright-core"']),
   },
@@ -295,16 +295,17 @@ const checks = [
     name: "firmware edit action labels use consistent user-facing terminology",
     pass: () =>
       allIncludes(files.main, [
-        'actionLabel="キーの動作を設定"',
-        'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーを書き込み予定に追加"}',
-        'saveLabel = "Combo を保存"',
-        'actionLabel="Combo の動作を選択"',
-        "トラックボール設定を保存",
-        "Firmware へ取り込む",
+        'actionLabel="選択キーの動作を変更"',
+        'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}',
+        'saveLabel = "Combo の編集を保存"',
+        'actionLabel="Combo 動作を変更"',
+        "トラックボール編集を保存",
+        "キー差分を Firmware へ取り込む",
+        "Combo 差分を Firmware へ取り込む",
       ]) &&
       allIncludes(files.uiSmoke, [
-        'getByRole("button", { name: "キーの動作を設定" })',
-        'getByRole("button", { name: "トラックボール設定を保存" })',
+        'getByRole("button", { name: "選択キーの動作を変更" })',
+        'getByRole("button", { name: "トラックボール編集を保存" })',
       ]) &&
       [
         "キーの動作に設定",
