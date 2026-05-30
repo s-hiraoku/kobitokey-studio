@@ -9,6 +9,7 @@ const dryRun = args.includes("--dry-run");
 const requireOAuth = args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";
 const skipLocalCheck = args.includes("--skip-local-check");
 const skipMergeReadiness = args.includes("--skip-merge-readiness");
+const skipReason = process.env.BROWSER_FIRMWARE_DEPLOY_SKIP_REASON?.trim() || "";
 const productionUrl =
   args.find((arg) => !arg.startsWith("--")) || process.env.BROWSER_FIRMWARE_PRODUCTION_URL || DEFAULT_PRODUCTION_URL;
 
@@ -33,6 +34,8 @@ Environment:
     Same as --require-oauth.
   BROWSER_FIRMWARE_TMP_DIR or RUNNER_TEMP
     Directory used for Wrangler logs and dry-run output.
+  BROWSER_FIRMWARE_DEPLOY_SKIP_REASON
+    Required when using --skip-local-check or --skip-merge-readiness.
 
 Options:
   --require-oauth
@@ -68,6 +71,10 @@ const headSha = readGitHeadSha();
 
 if (!headSha) {
   console.error("Current git HEAD could not be read; refusing to deploy without a commit SHA.");
+  process.exit(1);
+}
+if ((skipLocalCheck || skipMergeReadiness) && !skipReason) {
+  console.error("BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags.");
   process.exit(1);
 }
 

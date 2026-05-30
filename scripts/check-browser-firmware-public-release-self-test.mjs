@@ -24,7 +24,10 @@ try {
 
   const mismatchedArgumentUrl = await runPublicRelease(
     ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", templateReport, "https://different.example.com/?mode=firmware"],
-    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+    {
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test mismatch URL",
+    },
   );
   expectFailure(
     mismatchedArgumentUrl,
@@ -37,6 +40,7 @@ try {
     {
       BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
       BROWSER_FIRMWARE_PRODUCTION_URL: "https://different.example.com/?mode=firmware",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test mismatch URL",
     },
   );
   expectFailure(
@@ -47,7 +51,10 @@ try {
 
   const previewUrl = await runPublicRelease(
     ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", previewReport],
-    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+    {
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test preview URL",
+    },
   );
   expectFailure(
     previewUrl,
@@ -60,7 +67,10 @@ try {
 
   const mismatchedHead = await runPublicRelease(
     ["--skip-merge-readiness", "--e2e-report", templateReport],
-    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+    {
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test mismatched head",
+    },
   );
   expectFailure(
     mismatchedHead,
@@ -70,7 +80,10 @@ try {
 
   const invalidEvidence = await runPublicRelease(
     ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", invalidPublicOriginReport],
-    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+    {
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test invalid evidence",
+    },
   );
   expectFailure(
     invalidEvidence,
@@ -81,6 +94,16 @@ try {
     invalidEvidence,
     ["production page is missing release security headers"],
     "Expected invalid external evidence to stop before production preflight",
+  );
+
+  const missingSkipReason = await runPublicRelease(
+    ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", templateReport],
+    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+  );
+  expectFailure(
+    missingSkipReason,
+    ["BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags"],
+    "Expected public release gate to require an explicit reason for skip flags",
   );
 
   console.log("OK browser firmware public release self-test passed");

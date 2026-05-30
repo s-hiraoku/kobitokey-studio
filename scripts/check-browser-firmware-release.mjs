@@ -11,6 +11,7 @@ const files = {
   mergeReadiness: read("scripts/check-browser-firmware-merge-readiness.mjs"),
   mergeReadinessSelfTest: read("scripts/check-browser-firmware-merge-readiness-self-test.mjs"),
   productionDeploy: read("scripts/deploy-browser-firmware-production.mjs"),
+  productionDeploySelfTest: read("scripts/deploy-browser-firmware-production-self-test.mjs"),
   productionPreflight: read("scripts/check-browser-firmware-production-preflight.mjs"),
   publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
@@ -68,6 +69,7 @@ const checks = [
         "scripts/check-browser-firmware-merge-readiness-self-test.mjs",
         "scripts/check-browser-firmware-production-preflight-self-test.mjs",
         "scripts/check-browser-firmware-public-release-self-test.mjs",
+        "scripts/deploy-browser-firmware-production-self-test.mjs",
         'scripts/deploy-browser-firmware-production.mjs", "--help"',
         "scripts/collect-browser-firmware-e2e-evidence.mjs",
         'run(npmCommand, ["test"])',
@@ -87,8 +89,17 @@ const checks = [
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "WRANGLER_LOG_PATH",
+        "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON",
+        "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
         "--require-oauth",
         "--dry-run",
+      ]) &&
+      allIncludes(files.productionDeploySelfTest, [
+        "--skip-local-check",
+        "--skip-merge-readiness",
+        "Expected deploy wrapper to require an explicit reason for skip flags",
+        "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
+        "OK browser firmware production deploy self-test passed",
       ]) &&
       allIncludes(files.readme, [
         "npm run deploy:browser-firmware",
@@ -646,6 +657,8 @@ const checks = [
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
+        "BROWSER_FIRMWARE_RELEASE_SKIP_REASON",
+        "BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags",
         "external E2E evidence validation",
         "e2e report production.url must use the expected public production origin",
         "production preflight URL must use the expected public production origin",
@@ -667,6 +680,8 @@ const checks = [
         "e2e report ci.appCommitSha must match the current git HEAD",
         "Expected public release gate to validate external evidence before production preflight",
         "Expected invalid external evidence to stop before production preflight",
+        "Expected public release gate to require an explicit reason for skip flags",
+        "BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags",
         "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&

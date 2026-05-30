@@ -23,6 +23,8 @@ Required:
   BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN
     Optional override for the public production origin. Defaults to
     ${DEFAULT_EXPECTED_PRODUCTION_ORIGIN}.
+  BROWSER_FIRMWARE_RELEASE_SKIP_REASON
+    Required when using --skip-merge-readiness or --skip-current-head.
 
 Optional:
   production-url
@@ -43,12 +45,16 @@ const requestedProductionUrl = args.find((arg, index) => {
 });
 const skipMergeReadiness = args.includes("--skip-merge-readiness");
 const skipCurrentHead = args.includes("--skip-current-head");
+const skipReason = process.env.BROWSER_FIRMWARE_RELEASE_SKIP_REASON?.trim() || "";
 const issues = [];
 let report;
 let reportAppCommitSha = "";
 
 if (!process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
   issues.push("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required for the production OAuth release preflight");
+}
+if ((skipMergeReadiness || skipCurrentHead) && !skipReason) {
+  issues.push("BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags");
 }
 if (!e2eReportPath) {
   issues.push("--e2e-report <report.json> or BROWSER_FIRMWARE_E2E_REPORT is required");
