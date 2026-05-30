@@ -11,11 +11,13 @@ try {
   const previewReportPath = join(dir, "preview.json");
   const filenameReportPath = join(dir, "filename.json");
   const ambiguousFilenameReportPath = join(dir, "ambiguous-filename.json");
+  const artifactMismatchReportPath = join(dir, "artifact-mismatch.json");
   writeFileSync(validReportPath, JSON.stringify(createValidReport(), null, 2));
   writeFileSync(invalidReportPath, JSON.stringify(createInvalidReport(), null, 2));
   writeFileSync(previewReportPath, JSON.stringify(createPreviewReport(), null, 2));
   writeFileSync(filenameReportPath, JSON.stringify(createFilenameReport(), null, 2));
   writeFileSync(ambiguousFilenameReportPath, JSON.stringify(createAmbiguousFilenameReport(), null, 2));
+  writeFileSync(artifactMismatchReportPath, JSON.stringify(createArtifactMismatchReport(), null, 2));
 
   const valid = runValidator(validReportPath);
   if (valid.status !== 0) {
@@ -97,6 +99,22 @@ try {
     console.error("Expected ambiguous filename report to reject the left UF2 name");
     process.stderr.write(ambiguousFilename.stderr);
     process.exit(1);
+  }
+
+  const artifactMismatch = runValidator(artifactMismatchReportPath);
+  if (artifactMismatch.status === 0) {
+    console.error("Expected artifact mismatch external evidence report to fail");
+    process.exit(1);
+  }
+  for (const error of [
+    "build.githubArtifactUf2Files[].artifactName must match build.githubArtifacts[].name for artifactId",
+    "build.githubArtifactManifests[].artifactName must match build.githubArtifacts[].name for artifactId",
+  ]) {
+    if (!artifactMismatch.stderr.includes(error)) {
+      console.error(`Expected artifact mismatch report to include: ${error}`);
+      process.stderr.write(artifactMismatch.stderr);
+      process.exit(1);
+    }
   }
 
   console.log("OK browser firmware external evidence validator self-test passed");
@@ -396,6 +414,24 @@ function createAmbiguousFilenameReport() {
         ...report.flash.left,
         uf2Name: "kobitokey_left_right.uf2",
       },
+    },
+  };
+}
+
+function createArtifactMismatchReport() {
+  const report = createValidReport();
+  return {
+    ...report,
+    build: {
+      ...report.build,
+      githubArtifactUf2Files: report.build.githubArtifactUf2Files.map((file) => ({
+        ...file,
+        artifactName: "wrong-artifact",
+      })),
+      githubArtifactManifests: report.build.githubArtifactManifests.map((manifest) => ({
+        ...manifest,
+        artifactName: "wrong-artifact",
+      })),
     },
   };
 }

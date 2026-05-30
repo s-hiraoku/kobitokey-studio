@@ -263,21 +263,30 @@ function requireArtifactNames(value) {
 function requireGitHubArtifacts(value, artifactNames) {
   requireValue(Array.isArray(value), "build.githubArtifacts must be an array");
   if (!Array.isArray(value)) {
-    return;
+    return new Map();
   }
   requireValue(value.length > 0, "build.githubArtifacts must not be empty");
   if (Array.isArray(artifactNames)) {
     requireValue(value.length === artifactNames.length, "build.githubArtifacts must match build.artifactNames length");
   }
+  const ids = value.map((artifact) => artifact?.id);
+  const names = value.map((artifact) => artifact?.name).filter((name) => typeof name === "string");
+  requireValue(new Set(ids).size === ids.length, "build.githubArtifacts[].id must be unique");
+  requireValue(new Set(names).size === names.length, "build.githubArtifacts[].name must be unique");
+  const artifactNameById = new Map();
   for (const artifact of value) {
     requirePositiveInteger(artifact?.id, "build.githubArtifacts[].id must be a positive integer");
     requireNonPlaceholderString(artifact?.name, "build.githubArtifacts[].name must be a non-placeholder name");
     requirePositiveInteger(artifact?.sizeInBytes, "build.githubArtifacts[].sizeInBytes must be a positive integer");
     requireValue(artifact?.expired === false, "build.githubArtifacts[].expired must be false");
+    if (Number.isInteger(artifact?.id) && typeof artifact?.name === "string") {
+      artifactNameById.set(artifact.id, artifact.name);
+    }
     if (Array.isArray(artifactNames) && typeof artifact?.name === "string") {
       requireValue(artifactNames.includes(artifact.name), "build.githubArtifacts[].name must be listed in build.artifactNames");
     }
   }
+  return artifactNameById;
 }
 
 function requireGitHubArtifactUf2Files(value, githubArtifacts) {
@@ -287,6 +296,7 @@ function requireGitHubArtifactUf2Files(value, githubArtifacts) {
   }
   requireValue(value.length > 0, "build.githubArtifactUf2Files must not be empty");
   const artifactIds = Array.isArray(githubArtifacts) ? githubArtifacts.map((artifact) => artifact?.id) : [];
+  const artifactNameById = buildArtifactNameById(githubArtifacts);
   for (const uf2 of value) {
     requirePositiveInteger(uf2?.artifactId, "build.githubArtifactUf2Files[].artifactId must be a positive integer");
     requireNonPlaceholderString(uf2?.artifactName, "build.githubArtifactUf2Files[].artifactName must be a non-placeholder name");
@@ -298,6 +308,9 @@ function requireGitHubArtifactUf2Files(value, githubArtifacts) {
     if (artifactIds.length > 0) {
       requireValue(artifactIds.includes(uf2?.artifactId), "build.githubArtifactUf2Files[].artifactId must match build.githubArtifacts[].id");
     }
+    if (artifactNameById.has(uf2?.artifactId)) {
+      requireValue(artifactNameById.get(uf2.artifactId) === uf2?.artifactName, "build.githubArtifactUf2Files[].artifactName must match build.githubArtifacts[].name for artifactId");
+    }
   }
   return value;
 }
@@ -308,6 +321,7 @@ function requireGitHubArtifactManifests(value, githubArtifacts) {
     return [];
   }
   const artifactIds = Array.isArray(githubArtifacts) ? githubArtifacts.map((artifact) => artifact?.id) : [];
+  const artifactNameById = buildArtifactNameById(githubArtifacts);
   for (const manifest of value) {
     requirePositiveInteger(manifest?.artifactId, "build.githubArtifactManifests[].artifactId must be a positive integer");
     requireNonPlaceholderString(manifest?.artifactName, "build.githubArtifactManifests[].artifactName must be a non-placeholder name");
@@ -334,8 +348,24 @@ function requireGitHubArtifactManifests(value, githubArtifacts) {
     if (artifactIds.length > 0) {
       requireValue(manifest?.artifactId && artifactIds.includes(manifest.artifactId), "build.githubArtifactManifests[].artifactId must match build.githubArtifacts[].id");
     }
+    if (artifactNameById.has(manifest?.artifactId)) {
+      requireValue(artifactNameById.get(manifest.artifactId) === manifest?.artifactName, "build.githubArtifactManifests[].artifactName must match build.githubArtifacts[].name for artifactId");
+    }
   }
   return value;
+}
+
+function buildArtifactNameById(githubArtifacts) {
+  const artifactNameById = new Map();
+  if (!Array.isArray(githubArtifacts)) {
+    return artifactNameById;
+  }
+  for (const artifact of githubArtifacts) {
+    if (Number.isInteger(artifact?.id) && typeof artifact?.name === "string") {
+      artifactNameById.set(artifact.id, artifact.name);
+    }
+  }
+  return artifactNameById;
 }
 
 function requireArtifactSide(value, side) {
