@@ -63,7 +63,7 @@ Repository secrets には次を設定します。
 npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
 ```
 
-CI や手元の script で判定する場合は、`--json` を付けると `ready`、`blockerCount`、`warningCount`、`nextActions`、各 check の status を含む JSON を出力できます。secret 値は含めません。
+CI や手元の script で判定する場合は、`--json` を付けると `ready`、`blockerCount`、`warningCount`、`nextActions`、current HEAD の release gate と production Worker deploy workflow、各 check の status を含む JSON を出力できます。secret 値は含めません。
 
 ```sh
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json

@@ -45,6 +45,14 @@ const server = createServer((request, response) => {
           status: "completed",
           conclusion: "success",
         },
+        {
+          id: 67890,
+          event: "workflow_dispatch",
+          head_sha: appCommitSha,
+          jobs_url: `${origin(request)}/repos/s-hiraoku/kobitokey-studio/actions/runs/67890/jobs`,
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     return;
@@ -56,6 +64,20 @@ const server = createServer((request, response) => {
       jobs: [
         {
           name: "Browser firmware release gates",
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/repos/s-hiraoku/kobitokey-studio/actions/runs/67890/jobs") {
+    seenAuthorizations.push(request.headers.authorization ?? "");
+    writeJson(response, 200, {
+      jobs: [
+        {
+          name: "deploy-browser-firmware-worker",
           status: "completed",
           conclusion: "success",
         },
@@ -108,6 +130,7 @@ try {
   }
 
   expectIncludes(result.stdout, "PASS GitHub Actions release gate");
+  expectIncludes(result.stdout, "PASS production Worker deploy workflow");
   expectIncludes(result.stdout, "PASS production preflight");
   expectIncludes(result.stdout, "BLOCKER external E2E evidence");
   expectIncludes(result.stdout, "Next actions:");
@@ -141,6 +164,10 @@ try {
   if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production preflight" && check.status === "pass")) {
     process.stdout.write(jsonResult.stdout);
     throw new Error("Expected release status --json to include passing production preflight check");
+  }
+  if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production Worker deploy workflow" && check.status === "pass")) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include passing production Worker deploy workflow check");
   }
   if (
     !Array.isArray(json.nextActions) ||

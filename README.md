@@ -129,7 +129,8 @@ npm run check:browser-firmware:release-status -- --e2e-report path/to/report.jso
 ```
 
 For automation, add `--json` after `--` to get a machine-readable result with
-`ready`, `blockerCount`, `warningCount`, `nextActions`, and per-check statuses:
+`ready`, `blockerCount`, `warningCount`, `nextActions`, the current-head release
+gate and production Worker deploy workflow status, and per-check statuses:
 
 ```sh
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json

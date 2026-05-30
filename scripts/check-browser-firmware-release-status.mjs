@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 
 const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
 const RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
+const DEPLOY_WORKER_JOB_NAME = "deploy-browser-firmware-worker";
 const args = process.argv.slice(2);
 const githubApiBaseUrl =
   process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
@@ -19,6 +20,7 @@ Checks:
   - current git HEAD and worktree cleanliness
   - merge readiness against origin/main
   - latest GitHub Actions release-gate job for current HEAD
+  - GitHub Actions production Worker deploy job evidence for current HEAD
   - production preflight against the given URL/current HEAD
   - OAuth client id and external E2E evidence availability
 
@@ -109,7 +111,7 @@ record(
     : "Merge or rebase origin/main into the branch, resolve conflicts if any, then rerun release-status from a clean worktree.",
 );
 
-await checkReleaseGateCi({ branch, headSha });
+await checkGitHubActionsStatus({ branch, headSha });
 checkProductionPreflight({ headSha, productionUrl });
 checkExternalEvidence(e2eReportPath);
 
@@ -166,7 +168,7 @@ function readOption(name) {
   return index >= 0 && args[index + 1] && !args[index + 1].startsWith("--") ? args[index + 1] : "";
 }
 
-async function checkReleaseGateCi({ branch, headSha }) {
+async function checkGitHubActionsStatus({ branch, headSha }) {
   const runsUrl = `${githubApiBaseUrl.replace(/\/$/, "")}/repos/s-hiraoku/kobitokey-studio/actions/runs?branch=${encodeURIComponent(branch)}&per_page=20`;
   let runs;
   try {
@@ -182,6 +184,7 @@ async function checkReleaseGateCi({ branch, headSha }) {
   }
 
   const headRuns = (runs.workflow_runs ?? []).filter((run) => run.head_sha === headSha);
+  const headRunJobs = [];
   for (const run of headRuns) {
     let jobs;
     try {
@@ -195,17 +198,56 @@ async function checkReleaseGateCi({ branch, headSha }) {
       );
       return;
     }
-    const releaseGateJob = (jobs.jobs ?? []).find((job) => job.name === RELEASE_GATE_JOB_NAME);
-    if (releaseGateJob?.status === "completed" && releaseGateJob.conclusion === "success") {
-      record("GitHub Actions release gate", "pass", `${run.event} run ${run.id} completed with ${RELEASE_GATE_JOB_NAME}=success`);
-      return;
-    }
+    headRunJobs.push({ run, jobs: jobs.jobs ?? [] });
   }
 
-  const runSummary =
-    headRuns.map((run) => `${run.event} run ${run.id} ${run.status}/${run.conclusion ?? "pending"}`).join("; ") ||
-    "no workflow run found for current HEAD";
-  record("GitHub Actions release gate", "blocker", runSummary, "Wait for the current HEAD's Browser firmware release gates job to complete successfully, then rerun release-status.");
+  const releaseGateRun = headRunJobs.find(({ jobs }) =>
+    jobs.some((job) => job.name === RELEASE_GATE_JOB_NAME && job.status === "completed" && job.conclusion === "success"),
+  );
+  if (releaseGateRun) {
+    record(
+      "GitHub Actions release gate",
+      "pass",
+      `${releaseGateRun.run.event} run ${releaseGateRun.run.id} completed with ${RELEASE_GATE_JOB_NAME}=success`,
+    );
+  } else {
+    const runSummary =
+      headRuns.map((run) => `${run.event} run ${run.id} ${run.status}/${run.conclusion ?? "pending"}`).join("; ") ||
+      "no workflow run found for current HEAD";
+    record(
+      "GitHub Actions release gate",
+      "blocker",
+      runSummary,
+      "Wait for the current HEAD's Browser firmware release gates job to complete successfully, then rerun release-status.",
+    );
+  }
+
+  const deployRun = headRunJobs.find(({ jobs }) =>
+    jobs.some((job) => job.name === DEPLOY_WORKER_JOB_NAME && job.status === "completed" && job.conclusion === "success"),
+  );
+  if (deployRun) {
+    record(
+      "production Worker deploy workflow",
+      "pass",
+      `${deployRun.run.event} run ${deployRun.run.id} completed with ${DEPLOY_WORKER_JOB_NAME}=success`,
+    );
+    return;
+  }
+
+  const deploySummary =
+    headRunJobs
+      .flatMap(({ run, jobs }) =>
+        jobs
+          .filter((job) => job.name === DEPLOY_WORKER_JOB_NAME)
+          .map((job) => `${run.event} run ${run.id} ${job.status}/${job.conclusion ?? "pending"}`),
+      )
+      .join("; ") || "no production Worker deploy job found for current HEAD";
+  record(
+    "production Worker deploy workflow",
+    "warn",
+    deploySummary,
+    "If deploying through GitHub Actions, run Deploy GitHub Pages manually with deploy_browser_firmware_worker enabled. Production preflight remains the source of truth for local deploys.",
+  );
 }
 
 function checkProductionPreflight({ headSha, productionUrl }) {
