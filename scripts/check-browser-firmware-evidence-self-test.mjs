@@ -12,12 +12,14 @@ try {
   const filenameReportPath = join(dir, "filename.json");
   const ambiguousFilenameReportPath = join(dir, "ambiguous-filename.json");
   const artifactMismatchReportPath = join(dir, "artifact-mismatch.json");
+  const manifestArtifactMismatchReportPath = join(dir, "manifest-artifact-mismatch.json");
   writeFileSync(validReportPath, JSON.stringify(createValidReport(), null, 2));
   writeFileSync(invalidReportPath, JSON.stringify(createInvalidReport(), null, 2));
   writeFileSync(previewReportPath, JSON.stringify(createPreviewReport(), null, 2));
   writeFileSync(filenameReportPath, JSON.stringify(createFilenameReport(), null, 2));
   writeFileSync(ambiguousFilenameReportPath, JSON.stringify(createAmbiguousFilenameReport(), null, 2));
   writeFileSync(artifactMismatchReportPath, JSON.stringify(createArtifactMismatchReport(), null, 2));
+  writeFileSync(manifestArtifactMismatchReportPath, JSON.stringify(createManifestArtifactMismatchReport(), null, 2));
 
   const valid = runValidator(validReportPath);
   if (valid.status !== 0) {
@@ -115,6 +117,21 @@ try {
       process.stderr.write(artifactMismatch.stderr);
       process.exit(1);
     }
+  }
+
+  const manifestArtifactMismatch = runValidator(manifestArtifactMismatchReportPath);
+  if (manifestArtifactMismatch.status === 0) {
+    console.error("Expected manifest artifact mismatch external evidence report to fail");
+    process.exit(1);
+  }
+  if (
+    !manifestArtifactMismatch.stderr.includes(
+      "artifacts.classificationSource manifest requires manifest targets to match UF2 entries from the same GitHub artifact",
+    )
+  ) {
+    console.error("Expected manifest artifact mismatch report to reject cross-artifact manifest proof");
+    process.stderr.write(manifestArtifactMismatch.stderr);
+    process.exit(1);
   }
 
   console.log("OK browser firmware external evidence validator self-test passed");
@@ -431,6 +448,26 @@ function createArtifactMismatchReport() {
       githubArtifactManifests: report.build.githubArtifactManifests.map((manifest) => ({
         ...manifest,
         artifactName: "wrong-artifact",
+      })),
+    },
+  };
+}
+
+function createManifestArtifactMismatchReport() {
+  const report = createValidReport();
+  return {
+    ...report,
+    build: {
+      ...report.build,
+      artifactNames: ["firmware", "manifest"],
+      githubArtifacts: [
+        ...report.build.githubArtifacts,
+        { id: 789, name: "manifest", sizeInBytes: 1000, expired: false },
+      ],
+      githubArtifactManifests: report.build.githubArtifactManifests.map((manifest) => ({
+        ...manifest,
+        artifactId: 789,
+        artifactName: "manifest",
       })),
     },
   };

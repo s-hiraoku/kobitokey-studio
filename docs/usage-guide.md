@@ -392,7 +392,7 @@ Firmware repository URL を設定している場合、KobitoKey Studio は対象
 1. GitHub Actions の build が成功したことを確認します。
 2. `Artifact 取得` を押します。
 3. ブラウザ版では、表示中 commit と一致する成功 run であることを GitHub API で再確認してから artifact zip を取得し、画面内で展開します。Tauri 版では、最新の成功 run から artifact を取得し、`KobitoKey_QWERTY/.kobitokey-studio/artifacts/` に保存します。
-4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。
+4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。公開判定の証跡では、manifest が指す UF2 が同じ GitHub artifact 内にあることも確認します。
 
 左右それぞれの UF2 が生成されていることを確認してください。ファイル名で left / right を取り違えないようにします。
 

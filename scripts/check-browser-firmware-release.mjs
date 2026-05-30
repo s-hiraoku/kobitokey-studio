@@ -685,10 +685,10 @@ const checks = [
         "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
       allIncludes(files.docsDeployment, ["`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`production.appCommitSha`", "`ci.appCommitSha` must"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -774,6 +774,8 @@ const checks = [
         "build.githubArtifactManifests must be an array",
         "artifacts.classificationSource manifest requires build.githubArtifactManifests",
         "artifacts.classificationSource manifest requires manifest targets to match left and right UF2 names",
+        "artifacts.classificationSource manifest requires manifest targets to match UF2 entries from the same GitHub artifact",
+        "manifestTargetMatchesUf2",
         "artifacts.left.uf2Name must include a left token when classificationSource is filename",
         "inferredUf2Side(value) === side",
         'tokens.includes("left") || tokens.includes("l")',
@@ -809,6 +811,8 @@ const checks = [
         "Expected ambiguous filename report to reject the left UF2 name",
         "Expected artifact mismatch external evidence report to fail",
         "Expected artifact mismatch report to include",
+        "Expected manifest artifact mismatch external evidence report to fail",
+        "Expected manifest artifact mismatch report to reject cross-artifact manifest proof",
         "Expected placeholder external evidence report to fail",
         "Expected preview URL external evidence report to fail",
         "Expected preview URL report to reject the production origin",
@@ -832,6 +836,7 @@ const checks = [
         "build.githubArtifactManifests[].artifactName must match build.githubArtifacts[].name for artifactId",
         "artifacts.classificationSource manifest requires build.githubArtifactManifests",
         "artifacts.classificationSource manifest requires manifest targets to match left and right UF2 names",
+        "artifacts.classificationSource manifest requires manifest targets to match UF2 entries from the same GitHub artifact",
         "artifacts.left must match a UF2 entry from build.githubArtifactUf2Files",
         "left and right artifact UF2 basenames must differ",
         "flash.left.method must be direct-copy or download-copy",

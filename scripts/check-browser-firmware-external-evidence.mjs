@@ -98,7 +98,7 @@ requireValue(
   report.artifacts?.classificationSource === "manifest" || report.artifacts?.classificationSource === "filename",
   "artifacts.classificationSource must be manifest or filename",
 );
-requireClassificationProof(report.artifacts, githubArtifactManifests);
+requireClassificationProof(report.artifacts, githubArtifactManifests, githubArtifactUf2Files);
 
 requireFlashSide(report.flash?.left, "left", report.artifacts?.left?.uf2Name);
 requireFlashSide(report.flash?.right, "right", report.artifacts?.right?.uf2Name);
@@ -375,7 +375,7 @@ function requireArtifactSide(value, side) {
   requireNonPlaceholderHash(value?.sha256, `artifacts.${side}.sha256 must not be a placeholder hash`);
 }
 
-function requireClassificationProof(artifacts, manifests) {
+function requireClassificationProof(artifacts, manifests, uf2Files) {
   if (artifacts?.classificationSource === "manifest") {
     requireValue(Array.isArray(manifests) && manifests.length > 0, "artifacts.classificationSource manifest requires build.githubArtifactManifests");
     requireValue(
@@ -388,12 +388,35 @@ function requireClassificationProof(artifacts, manifests) {
         ),
       "artifacts.classificationSource manifest requires manifest targets to match left and right UF2 names",
     );
+    requireValue(
+      Array.isArray(manifests) &&
+        manifests.some(
+          (manifest) =>
+            isRecord(manifest?.targets) &&
+            manifestTargetMatchesUf2(manifest.artifactId, manifest.targets.left, artifacts?.left, uf2Files) &&
+            manifestTargetMatchesUf2(manifest.artifactId, manifest.targets.right, artifacts?.right, uf2Files),
+        ),
+      "artifacts.classificationSource manifest requires manifest targets to match UF2 entries from the same GitHub artifact",
+    );
     return;
   }
   if (artifacts?.classificationSource === "filename") {
     requireValue(sideTokenMatches(artifacts?.left?.uf2Name, "left"), "artifacts.left.uf2Name must include a left token when classificationSource is filename");
     requireValue(sideTokenMatches(artifacts?.right?.uf2Name, "right"), "artifacts.right.uf2Name must include a right token when classificationSource is filename");
   }
+}
+
+function manifestTargetMatchesUf2(artifactId, targetName, artifactSide, uf2Files) {
+  if (!Array.isArray(uf2Files) || !Number.isInteger(artifactId) || typeof targetName !== "string") {
+    return false;
+  }
+  return uf2Files.some(
+    (uf2) =>
+      uf2?.artifactId === artifactId &&
+      artifactBasename(uf2?.name) === artifactBasename(targetName) &&
+      artifactBasename(artifactSide?.uf2Name) === artifactBasename(targetName) &&
+      uf2?.sha256 === artifactSide?.sha256,
+  );
 }
 
 function requireArtifactUf2Proof(githubArtifactUf2Files, value, side) {
