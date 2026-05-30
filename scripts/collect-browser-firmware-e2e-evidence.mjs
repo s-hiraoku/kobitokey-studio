@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { unzipSync } from "fflate";
 
 const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
+const APP_RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
 const UI_SMOKE_SCRIPT = "scripts/check-browser-firmware-ui-smoke.mjs";
 const UI_SMOKE_COMMAND = "node scripts/check-browser-firmware-ui-smoke.mjs";
 const args = process.argv.slice(2);
@@ -45,7 +46,10 @@ const ciRunUrl = requireEnv("BROWSER_FIRMWARE_E2E_CI_RUN_URL");
 
 const production = await collectProductionEvidence(productionUrl, productionFetchUrl, oauthClientId);
 const appCommitSha = process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA || production.appCommitSha || readGitHeadSha();
-const appCiRun = await fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY)}`, token);
+const appCiRunId = actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY);
+const appCiRun = await fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${appCiRunId}`, token);
+const appCiJobs = await fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${appCiRunId}/jobs`, token);
+const appReleaseGateJob = collectSuccessfulReleaseGateJob(appCiJobs);
 const commit = await fetchGitHubJson(`/repos/${repository}/commits/${commitSha}`, token);
 const run = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}`, token);
 const actionsArtifacts = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}/artifacts`, token);
@@ -71,7 +75,9 @@ const report = {
     status: appCiRun.status || "",
     conclusion: appCiRun.conclusion || "",
     appCommitSha,
-    browserFirmwareReleaseCheckPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_CI_PASSED"),
+    releaseGateJobName: appReleaseGateJob?.name || "",
+    releaseGateJobConclusion: appReleaseGateJob?.conclusion || "",
+    browserFirmwareReleaseCheckPassed: Boolean(appReleaseGateJob),
   },
   github: {
     repository,
@@ -184,7 +190,6 @@ Required environment:
   BROWSER_FIRMWARE_E2E_TESTER
   BROWSER_FIRMWARE_E2E_CI_RUN_URL
   BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA (optional when production metadata or git HEAD is available)
-  BROWSER_FIRMWARE_E2E_CI_PASSED=true
   BROWSER_FIRMWARE_E2E_REPOSITORY=owner/repo
   BROWSER_FIRMWARE_E2E_BRANCH
   BROWSER_FIRMWARE_E2E_COMMIT_SHA
@@ -618,6 +623,20 @@ function collectCommitFilenames(commit) {
     throw new Error("GitHub commit response did not include files[]; cannot prove managed firmware file scope");
   }
   return commit.files.map((file) => file.filename).filter((filename) => typeof filename === "string");
+}
+
+function collectSuccessfulReleaseGateJob(response) {
+  if (!Array.isArray(response?.jobs)) {
+    throw new Error("KobitoKey Studio Actions jobs response did not include jobs[]; cannot prove release gates passed");
+  }
+  return (
+    response.jobs.find(
+      (job) =>
+        job?.name === APP_RELEASE_GATE_JOB_NAME &&
+        job?.status === "completed" &&
+        job?.conclusion === "success",
+    ) ?? null
+  );
 }
 
 function collectGitHubArtifactDetails(response) {

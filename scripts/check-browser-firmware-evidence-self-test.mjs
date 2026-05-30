@@ -48,6 +48,8 @@ try {
     "ci.runHeadSha must match ci.appCommitSha",
     "ci.status must be completed",
     "ci.conclusion must be success",
+    "ci.releaseGateJobName must be Browser firmware release gates",
+    "ci.releaseGateJobConclusion must be success",
     "github.repository must not be the template owner/repo placeholder",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
@@ -179,6 +181,8 @@ function createValidReport() {
       status: "completed",
       conclusion: "success",
       appCommitSha: "89abcdef0123456789abcdef0123456789abcdef",
+      releaseGateJobName: "Browser firmware release gates",
+      releaseGateJobConclusion: "success",
       browserFirmwareReleaseCheckPassed: true,
     },
     github: {
@@ -317,6 +321,8 @@ function createInvalidReport() {
       status: "in_progress",
       conclusion: "failure",
       appCommitSha: "0000000000000000000000000000000000000000",
+      releaseGateJobName: "",
+      releaseGateJobConclusion: "failure",
     },
     github: {
       repository: "owner/repo",

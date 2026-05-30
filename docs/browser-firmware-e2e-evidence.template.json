@@ -21,6 +21,8 @@
     "status": "",
     "conclusion": "",
     "appCommitSha": "0000000000000000000000000000000000000000",
+    "releaseGateJobName": "",
+    "releaseGateJobConclusion": "",
     "browserFirmwareReleaseCheckPassed": false
   },
   "github": {

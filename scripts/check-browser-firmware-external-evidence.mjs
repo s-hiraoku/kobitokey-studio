@@ -50,6 +50,8 @@ requireValue(report.ci?.runHeadSha === report.ci?.appCommitSha, "ci.runHeadSha m
 requireValue(report.ci?.status === "completed", "ci.status must be completed");
 requireValue(report.ci?.conclusion === "success", "ci.conclusion must be success");
 requireValue(report.production?.appCommitSha === report.ci?.appCommitSha, "production.appCommitSha must match ci.appCommitSha");
+requireValue(report.ci?.releaseGateJobName === "Browser firmware release gates", "ci.releaseGateJobName must be Browser firmware release gates");
+requireValue(report.ci?.releaseGateJobConclusion === "success", "ci.releaseGateJobConclusion must be success");
 requireValue(report.ci?.browserFirmwareReleaseCheckPassed === true, "ci.browserFirmwareReleaseCheckPassed must be true");
 
 requireValue(isRepoSlug(report.github?.repository), "github.repository must be owner/repo");

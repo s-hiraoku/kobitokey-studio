@@ -20,8 +20,10 @@ const autoReportPath = join(dir, "auto-report.json");
 const unembeddedClientReportPath = join(dir, "unembedded-client-report.json");
 const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
 const artifactMismatchReportPath = join(dir, "artifact-mismatch-report.json");
+const failedReleaseGateReportPath = join(dir, "failed-release-gate-report.json");
 const fakeUiSmokePath = join(dir, "fake-ui-smoke.mjs");
 let artifactDownloadAuthorization = null;
+let appReleaseGateConclusion = "success";
 const artifactZip = zipSync({
   "firmware/manifest.json": new TextEncoder().encode(
     JSON.stringify({
@@ -116,6 +118,24 @@ const server = createServer((request, response) => {
         head_sha: appCommitSha,
         status: "completed",
         conclusion: "success",
+      }),
+    );
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === `/repos/s-hiraoku/kobitokey-studio/actions/runs/${appCiRunId}/jobs`) {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      JSON.stringify({
+        total_count: 1,
+        jobs: [
+          {
+            id: 987654321,
+            name: "Browser firmware release gates",
+            status: "completed",
+            conclusion: appReleaseGateConclusion,
+          },
+        ],
       }),
     );
     return;
@@ -282,6 +302,9 @@ try {
   assert(report.ci.runHeadSha === appCommitSha, "app CI run head sha was not collected from GitHub API");
   assert(report.ci.status === "completed", "app CI run status was not collected from GitHub API");
   assert(report.ci.conclusion === "success", "app CI run conclusion was not collected from GitHub API");
+  assert(report.ci.releaseGateJobName === "Browser firmware release gates", "release gate job name was not collected from GitHub API");
+  assert(report.ci.releaseGateJobConclusion === "success", "release gate job conclusion was not collected from GitHub API");
+  assert(report.ci.browserFirmwareReleaseCheckPassed === true, "release gate job success was not collected from GitHub API");
   assert(report.commit.sha === commitSha, "commit sha was not collected from GitHub API");
   assert(report.commit.managedFiles.length === 1, "commit changed managed file list was not collected from GitHub API");
   assert(report.commit.managedFiles.includes("config/KobitoKey.keymap"), "keymap managed file missing from report");
@@ -379,6 +402,24 @@ try {
     "collector should record missing frontend OAuth client id evidence when the id is only in a cross-origin asset",
   );
 
+  appReleaseGateConclusion = "failure";
+  const failedGateResult = await runCollector(baseUrl, failedReleaseGateReportPath, {
+    includeManualUiSmoke: true,
+    runUiSmoke: false,
+  });
+  appReleaseGateConclusion = "success";
+  if (failedGateResult.status !== 0) {
+    process.stderr.write(failedGateResult.stderr);
+    process.stdout.write(failedGateResult.stdout);
+    process.exit(failedGateResult.status ?? 1);
+  }
+  const failedGateReport = JSON.parse(readFileSync(failedReleaseGateReportPath, "utf8"));
+  assert(failedGateReport.ci.releaseGateJobConclusion === "", "failed release gate job should not be recorded as release evidence");
+  assert(
+    failedGateReport.ci.browserFirmwareReleaseCheckPassed === false,
+    "collector should not accept a failed Browser firmware release gates job as release evidence",
+  );
+
   console.log("OK browser firmware external evidence collector self-test passed");
 } finally {
   await close(server);
@@ -426,7 +467,6 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_TESTER: "release-qa",
         BROWSER_FIRMWARE_E2E_CI_RUN_URL: `https://github.com/s-hiraoku/kobitokey-studio/actions/runs/${appCiRunId}`,
         BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA: appCommitSha,
-        BROWSER_FIRMWARE_E2E_CI_PASSED: "true",
         BROWSER_FIRMWARE_E2E_REPOSITORY: repository,
         BROWSER_FIRMWARE_E2E_BRANCH: "browser-firmware-release-test",
         BROWSER_FIRMWARE_E2E_COMMIT_SHA: commitSha,

@@ -811,8 +811,8 @@ const checks = [
       ]) &&
       !files.publicReleaseCheck.includes('run("node"') &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
-      allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
+      allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`Browser firmware release gates` job の success", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run と `Browser firmware release gates` job は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "`Browser firmware release gates` job の success", "CI run と `Browser firmware release gates` job は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
       allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact", "clean working tree"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
@@ -892,6 +892,8 @@ const checks = [
         "ci.runHeadSha must match ci.appCommitSha",
         "ci.status must be completed",
         "ci.conclusion must be success",
+        "ci.releaseGateJobName must be Browser firmware release gates",
+        "ci.releaseGateJobConclusion must be success",
         "securityHeadersChecked must be true",
         "apiSecurityHeadersChecked must be true",
         "ci.browserFirmwareReleaseCheckPassed must be true",
@@ -976,6 +978,8 @@ const checks = [
         "ci.runHeadSha must match ci.appCommitSha",
         "ci.status must be completed",
         "ci.conclusion must be success",
+        "ci.releaseGateJobName must be Browser firmware release gates",
+        "ci.releaseGateJobConclusion must be success",
         "github.repository must not be the template owner/repo placeholder",
         "commit.managedFiles must not contain duplicate paths",
         "commit.managedFiles must contain only managed firmware files",
@@ -1059,7 +1063,12 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_${side.toUpperCase()}_UF2 must match a UF2 entry from the GitHub artifact zip",
         "actionsRunIdFromUrl",
         "BROWSER_FIRMWARE_E2E_CI_RUN_URL must point to ${repository} Actions run",
-        "fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY)}`",
+        "const appCiRunId = actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY)",
+        "fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${appCiRunId}`",
+        "fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${appCiRunId}/jobs`",
+        "collectSuccessfulReleaseGateJob",
+        "Browser firmware release gates",
+        "KobitoKey Studio Actions jobs response did not include jobs[]",
         "runHeadSha: appCiRun.head_sha || \"\"",
         "collectCommitFilenames",
         "headBranch: run.head_branch || \"\"",
