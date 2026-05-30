@@ -32,6 +32,7 @@ For end-user steps, start with the published docs:
 
 - [Quick Start](https://s-hiraoku.github.io/kobitokey-studio/quick-start/)
 - [Usage Guide](https://s-hiraoku.github.io/kobitokey-studio/usage-guide/)
+- [Release Checklist](https://s-hiraoku.github.io/kobitokey-studio/release-checklist/)
 - [Deployment](https://s-hiraoku.github.io/kobitokey-studio/deployment/)
 
 ## Current Scope

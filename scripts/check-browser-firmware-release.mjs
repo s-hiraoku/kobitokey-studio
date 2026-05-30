@@ -46,6 +46,7 @@ const files = {
   docsUserGuide: read("docs/user-guide.md"),
   docsQuickStart: read("docs/quick-start.md"),
   docsUsageGuide: read("docs/usage-guide.md"),
+  docsReleaseChecklist: read("docs/release-checklist.md"),
   docsDeployment: read("docs/deployment.md"),
   pagesCi: read(".github/workflows/pages.yml"),
   externalEvidenceCheck: read("scripts/check-browser-firmware-external-evidence.mjs"),
@@ -234,8 +235,8 @@ const checks = [
   {
     name: "GitHub Pages user guide links to app entry points by setting area",
     pass: () =>
-      allIncludes(files.docsConfig, ["user-guide.md"]) &&
-      allIncludes(files.docsIndex, ["./user-guide/", "設定内容ごとのアプリ入口"]) &&
+      allIncludes(files.docsConfig, ["user-guide.md", "release-checklist.md"]) &&
+      allIncludes(files.docsIndex, ["./user-guide/", "./release-checklist/", "設定内容ごとのアプリ入口"]) &&
       allIncludes(files.docsUserGuide, [
         "permalink: /user-guide/",
         "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos",
@@ -246,7 +247,21 @@ const checks = [
         "編集に戻る",
       ]) &&
       allIncludes(files.docsQuickStart, ["../user-guide/", "編集をリセット"]) &&
-      allIncludes(files.docsUsageGuide, ["../user-guide/", "編集に戻る"]),
+      allIncludes(files.docsUsageGuide, ["../user-guide/", "編集に戻る"]) &&
+      allIncludes(files.docsReleaseChecklist, [
+        "permalink: /release-checklist/",
+        "deploy_browser_firmware_worker",
+        "VITE_GITHUB_OAUTH_CLIENT_ID",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_TOKEN",
+        "check:browser-firmware:release-status",
+        "check:browser-firmware:production-release-preflight",
+        "collect:browser-firmware:e2e-report",
+        "check:browser-firmware:public-release",
+        "release-status",
+        "ready",
+        "nextActions",
+      ]),
   },
   {
     name: "browser firmware Build & Flash wizard exposes the release controls",
@@ -837,6 +852,13 @@ const checks = [
         "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
         "release metadata missing",
         "Worker API の 405",
+      ]) &&
+      allIncludes(files.docsReleaseChecklist, [
+        "GitHub Pages の成功だけではブラウザアプリ本体の公開完了とは扱いません",
+        "release security headers missing",
+        "release metadata missing",
+        "Worker API の `405`",
+        "`release-status` の `ready` が `true`",
       ]) &&
       allIncludes(files.readme, [
         "A passing preview preflight is not production release evidence",
