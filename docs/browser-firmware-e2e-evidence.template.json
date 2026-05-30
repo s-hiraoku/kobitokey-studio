@@ -31,9 +31,7 @@
     "sha": "0000000000000000000000000000000000000000",
     "url": "https://github.com/owner/repo/commit/0000000000000000000000000000000000000000",
     "managedFiles": [
-      "config/KobitoKey.keymap",
-      "config/boards/shields/KobitoKey/KobitoKey_left.overlay",
-      "config/boards/shields/KobitoKey/KobitoKey_right.overlay"
+      "config/KobitoKey.keymap"
     ]
   },
   "build": {

@@ -43,6 +43,8 @@ try {
     "github.repository must not be the template owner/repo placeholder",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
+    "commit.managedFiles must not contain duplicate paths",
+    "commit.managedFiles must contain only managed firmware files: README.md",
     "build.runUrl must point to github.repository and build.runId",
     "build.headBranch must match github.branch",
     "build.artifactNames must not be empty",
@@ -143,11 +145,7 @@ function createValidReport() {
     commit: {
       sha: commit,
       url: `https://github.com/juichi50iii/KobitoKey_QWERTY/commit/${commit}`,
-      managedFiles: [
-        "config/KobitoKey.keymap",
-        "config/boards/shields/KobitoKey/KobitoKey_left.overlay",
-        "config/boards/shields/KobitoKey/KobitoKey_right.overlay",
-      ],
+      managedFiles: ["config/KobitoKey.keymap"],
     },
     build: {
       runId: 123,
@@ -275,6 +273,7 @@ function createInvalidReport() {
       ...createValidReport().commit,
       sha: "0000000000000000000000000000000000000000",
       url: `https://github.com/juichi50iii/KobitoKey_QWERTY.evil/commit/${createValidReport().commit.sha}`,
+      managedFiles: ["config/KobitoKey.keymap", "config/KobitoKey.keymap", "README.md"],
     },
     build: {
       ...createValidReport().build,

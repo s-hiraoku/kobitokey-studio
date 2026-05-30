@@ -137,11 +137,7 @@ const server = createServer((request, response) => {
       JSON.stringify({
         sha: commitSha,
         html_url: `https://github.com/${repository}/commit/${commitSha}`,
-        files: [
-          { filename: "config/KobitoKey.keymap" },
-          { filename: "config/boards/shields/KobitoKey/KobitoKey_left.overlay" },
-          { filename: "config/boards/shields/KobitoKey/KobitoKey_right.overlay" },
-        ],
+        files: [{ filename: "config/KobitoKey.keymap" }],
       }),
     );
     return;
@@ -224,7 +220,7 @@ try {
   assert(report.production.workerArtifactRouteChecked === true, "artifact route was not checked");
   assert(report.ci.appCommitSha === appCommitSha, "app commit sha was not collected from environment");
   assert(report.commit.sha === commitSha, "commit sha was not collected from GitHub API");
-  assert(report.commit.managedFiles.length === 3, "commit managed files were not collected from GitHub API");
+  assert(report.commit.managedFiles.length === 1, "commit changed managed file list was not collected from GitHub API");
   assert(report.commit.managedFiles.includes("config/KobitoKey.keymap"), "keymap managed file missing from report");
   assert(report.build.headSha === commitSha, "build head sha was not collected from GitHub API");
   assert(report.build.headBranch === "browser-firmware-release-test", "build head branch was not collected from GitHub API");

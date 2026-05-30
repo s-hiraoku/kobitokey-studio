@@ -233,19 +233,20 @@ function isGitHubPath(value, repository, suffix) {
 }
 
 function requireManagedFiles(value) {
-  const expected = [
+  const allowed = new Set([
     "config/KobitoKey.keymap",
     "config/boards/shields/KobitoKey/KobitoKey_left.overlay",
     "config/boards/shields/KobitoKey/KobitoKey_right.overlay",
-  ];
+  ]);
   requireValue(Array.isArray(value), "commit.managedFiles must be an array");
   if (!Array.isArray(value)) {
     return;
   }
-  for (const path of expected) {
-    requireValue(value.includes(path), `commit.managedFiles must include ${path}`);
+  requireValue(value.length > 0, "commit.managedFiles must include at least one managed firmware file");
+  requireValue(new Set(value).size === value.length, "commit.managedFiles must not contain duplicate paths");
+  for (const path of value) {
+    requireValue(typeof path === "string" && allowed.has(path), `commit.managedFiles must contain only managed firmware files: ${path}`);
   }
-  requireValue(value.length === expected.length, "commit.managedFiles must contain only the managed firmware files");
 }
 
 function requireArtifactNames(value) {

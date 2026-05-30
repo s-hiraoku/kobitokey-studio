@@ -187,12 +187,14 @@ BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browse
 To reduce manual entry, generate the report from production/GitHub/UF2 inputs
 and validate it in one step. The collector reads the GitHub commit file list
 from the API, so a commit touching anything outside the managed firmware files
-fails the final validator. It also records Actions artifact names, IDs, and
-sizes, starts the deployed OAuth device-code flow through the Worker, downloads
-the artifact zip metadata path, and records the UF2 and manifest entry hashes so
-the validator can reject left/right UF2 files or classification claims that are
-not backed by the GitHub artifact. Use the browser Firmware Mode production URL
-with `?mode=firmware` and provide the public OAuth app client id:
+fails the final validator. The list may contain only the file that actually
+changed, such as `config/KobitoKey.keymap` for a key edit. It also records
+Actions artifact names, IDs, and sizes, starts the deployed OAuth device-code
+flow through the Worker, downloads the artifact zip metadata path, and records
+the UF2 and manifest entry hashes so the validator can reject left/right UF2
+files or classification claims that are not backed by the GitHub artifact. Use
+the browser Firmware Mode production URL with `?mode=firmware` and provide the
+public OAuth app client id:
 
 ```sh
 BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json
