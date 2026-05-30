@@ -207,6 +207,7 @@ Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED=true
   BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED=true
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE=true
+  BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS=true
 
 Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
@@ -236,6 +237,7 @@ function readManualUiSmoke() {
     trackballEditActionsPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED"),
     releaseWizardPreconditionsPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED"),
     artifactProvenanceVisible: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE"),
+    artifactProvenanceMatchesBuildArtifacts: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS"),
   };
 }
 
@@ -270,6 +272,7 @@ function runProductionUiSmoke(productionUrlForSmoke) {
     trackballEditActionsPassed: true,
     releaseWizardPreconditionsPassed: true,
     artifactProvenanceVisible: true,
+    artifactProvenanceMatchesBuildArtifacts: true,
   };
 }
 

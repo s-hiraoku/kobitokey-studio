@@ -109,8 +109,8 @@ run head SHA or branch mismatches, placeholder hashes, missing production/API
 security header proof, unconfirmed left/right flash prompts, missing
 keyboard-half checks, missing flash method proof (`direct-copy` or
 `download-copy`), missing CI proof, missing UI smoke evidence, missing key,
-Combo, Trackball, release wizard precondition, or artifact provenance proof,
-and missing layer structure action proof:
+Combo, Trackball, release wizard precondition, artifact provenance proof,
+artifact/build provenance match proof, or missing layer structure action proof:
 
 ```sh
 npm run check:browser-firmware:e2e-report -- path/to/report.json

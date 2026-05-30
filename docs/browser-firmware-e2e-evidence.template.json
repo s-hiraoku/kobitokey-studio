@@ -125,6 +125,7 @@
     "trackballEditActionsPassed": false,
     "releaseWizardPreconditionsPassed": false,
     "artifactProvenanceVisible": false,
+    "artifactProvenanceMatchesBuildArtifacts": false,
     "smokeCommand": "npm run check:browser-firmware:ui",
     "smokeViewportCount": 2
   },

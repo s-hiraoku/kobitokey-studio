@@ -856,6 +856,7 @@ const checks = [
         "ui.trackballEditActionsPassed must be true",
         "ui.releaseWizardPreconditionsPassed must be true",
         "ui.artifactProvenanceVisible must be true",
+        "ui.artifactProvenanceMatchesBuildArtifacts must be true",
       ]) &&
       allIncludes(files.evidenceSelfTest, [
         "Expected valid external evidence report to pass",
@@ -896,6 +897,7 @@ const checks = [
         "ui.tokenClearWorks must be true",
         "ui.referencedLayerDeleteBlocked must be true",
         "ui.artifactProvenanceVisible must be true",
+        "ui.artifactProvenanceMatchesBuildArtifacts must be true",
         "ui.smokeCommand must be npm run check:browser-firmware:ui",
       ]) &&
       allIncludes(files.evidenceCollector, [
@@ -920,6 +922,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE",
+        "BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS",
         "collectProductionEvidence",
         "fetchReleaseMetadata",
         "fetchUrl",
@@ -1000,6 +1003,7 @@ const checks = [
         "trackball edit UI smoke state was not collected",
         "release wizard precondition UI smoke state was not collected",
         "artifact provenance UI smoke state was not collected",
+        "artifact provenance build artifact match state was not collected",
         "OK browser firmware external evidence collector self-test passed",
       ]) &&
       allIncludes(files.externalEvidenceTemplate, [
@@ -1042,6 +1046,7 @@ const checks = [
         '"trackballEditActionsPassed"',
         '"releaseWizardPreconditionsPassed"',
         '"artifactProvenanceVisible"',
+        '"artifactProvenanceMatchesBuildArtifacts"',
       ]),
   },
 ];

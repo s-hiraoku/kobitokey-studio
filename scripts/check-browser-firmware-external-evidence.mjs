@@ -125,6 +125,10 @@ requireValue(report.ui?.comboEditActionsPassed === true, "ui.comboEditActionsPas
 requireValue(report.ui?.trackballEditActionsPassed === true, "ui.trackballEditActionsPassed must be true");
 requireValue(report.ui?.releaseWizardPreconditionsPassed === true, "ui.releaseWizardPreconditionsPassed must be true");
 requireValue(report.ui?.artifactProvenanceVisible === true, "ui.artifactProvenanceVisible must be true");
+requireValue(
+  report.ui?.artifactProvenanceMatchesBuildArtifacts === true,
+  "ui.artifactProvenanceMatchesBuildArtifacts must be true",
+);
 requireValue(report.ui?.smokeCommand === "npm run check:browser-firmware:ui", "ui.smokeCommand must be npm run check:browser-firmware:ui");
 requireValue(Number.isInteger(report.ui?.smokeViewportCount) && report.ui.smokeViewportCount >= 2, "ui.smokeViewportCount must be at least 2");
 
