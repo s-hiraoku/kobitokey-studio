@@ -123,6 +123,7 @@ function runReleaseStatus(productionUrl, githubApiBaseUrl) {
       env: {
         ...process.env,
         BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client",
+        BROWSER_FIRMWARE_MAIN_REF: "HEAD",
         BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY: "true",
         BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL: githubApiBaseUrl,
         CLOUDFLARE_API_TOKEN: "dummy-token",
