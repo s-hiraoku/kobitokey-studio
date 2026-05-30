@@ -1,0 +1,217 @@
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+
+const appCommitSha = readGitHeadSha();
+
+const server = createServer((request, response) => {
+  const url = new URL(request.url ?? "/", "http://127.0.0.1");
+
+  if (request.method === "GET" && url.pathname === "/") {
+    response.writeHead(200, {
+      "Content-Type": "text/html",
+      ...releaseSecurityHeaders(),
+    });
+    response.end('<!doctype html><title>KobitoKey Studio</title><script type="module" src="/assets/app.js"></script>');
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/assets/app.js") {
+    response.writeHead(200, {
+      "Content-Type": "text/javascript",
+      ...releaseSecurityHeaders(),
+    });
+    response.end('const oauthClientId = "preflight-client";');
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/release-metadata") {
+    writeJson(response, 200, {
+      schemaVersion: 1,
+      appCommitSha,
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/repos/s-hiraoku/kobitokey-studio/actions/runs") {
+    writeJson(response, 200, {
+      workflow_runs: [
+        {
+          id: 12345,
+          event: "pull_request",
+          head_sha: appCommitSha,
+          jobs_url: `${origin(request)}/repos/s-hiraoku/kobitokey-studio/actions/runs/12345/jobs`,
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+    });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/repos/s-hiraoku/kobitokey-studio/actions/runs/12345/jobs") {
+    writeJson(response, 200, {
+      jobs: [
+        {
+          name: "Browser firmware release gates",
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+    });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname.startsWith("/api/github/")) {
+    readRequestBody(request, (body) => {
+      try {
+        const json = JSON.parse(body);
+        if (url.pathname === "/api/github/artifact-zip" && json.owner === "owner/name") {
+          writeJson(response, 400, { error: "invalid_owner_or_repo" });
+          return;
+        }
+        if (url.pathname === "/api/github/artifact-zip" && json.artifactId === -1) {
+          writeJson(response, 400, { error: "invalid_artifact_id" });
+          return;
+        }
+        if (url.pathname === "/api/github/device-code" && json.scope === "repo" && json.clientId === "preflight-client") {
+          writeJson(response, 200, {
+            device_code: "device",
+            user_code: "USER-CODE",
+            verification_uri: "https://github.com/login/device",
+            expires_in: 900,
+            interval: 5,
+          });
+          return;
+        }
+        writeJson(response, 400, { error: json.scope === "admin:org" ? "unsupported_oauth_scope" : "unexpected_request" });
+      } catch {
+        writeJson(response, 400, { error: "invalid_json" });
+      }
+    });
+    return;
+  }
+
+  response.writeHead(404);
+  response.end();
+});
+
+try {
+  const baseUrl = await listen(server);
+  const result = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl);
+  if (result.status !== 1) {
+    process.stderr.write(result.stderr);
+    process.stdout.write(result.stdout);
+    throw new Error("Expected release status fixture to fail only because external E2E evidence is missing");
+  }
+
+  expectIncludes(result.stdout, "PASS GitHub Actions release gate");
+  expectIncludes(result.stdout, "PASS production preflight");
+  expectIncludes(result.stdout, "BLOCKER external E2E evidence");
+  expectIncludes(result.stdout, "Summary: 1 blocker(s),");
+  expectExcludes(result.stdout, "preflight-client");
+  expectExcludes(result.stderr, "preflight-client");
+
+  console.log("OK browser firmware release status self-test passed");
+} finally {
+  await new Promise((resolve) => server.close(resolve));
+}
+
+function runReleaseStatus(productionUrl, githubApiBaseUrl) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ["scripts/check-browser-firmware-release-status.mjs", productionUrl], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client",
+        BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY: "true",
+        BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL: githubApiBaseUrl,
+        CLOUDFLARE_API_TOKEN: "dummy-token",
+      },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("close", (status) => {
+      resolve({ status, stdout, stderr });
+    });
+  });
+}
+
+function readGitHeadSha() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || "Could not read git HEAD");
+  }
+  return result.stdout.trim();
+}
+
+function listen(httpServer) {
+  return new Promise((resolve) => {
+    httpServer.listen(0, "127.0.0.1", () => {
+      const address = httpServer.address();
+      if (!address || typeof address === "string") {
+        throw new Error("Expected TCP server address");
+      }
+      resolve(`http://127.0.0.1:${address.port}`);
+    });
+  });
+}
+
+function origin(request) {
+  return `http://${request.headers.host}`;
+}
+
+function writeJson(response, status, body) {
+  response.writeHead(status, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    ...releaseSecurityHeaders(),
+  });
+  response.end(JSON.stringify(body));
+}
+
+function readRequestBody(request, callback) {
+  let body = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk) => {
+    body += chunk;
+  });
+  request.on("end", () => callback(body));
+}
+
+function releaseSecurityHeaders() {
+  return {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.github.com https://github.com;",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(self), serial=(self), bluetooth=(self)",
+  };
+}
+
+function expectIncludes(text, expected) {
+  if (!text.includes(expected)) {
+    process.stdout.write(text);
+    throw new Error(`Expected release status output to include: ${expected}`);
+  }
+}
+
+function expectExcludes(text, unexpected) {
+  if (text.includes(unexpected)) {
+    process.stdout.write(text);
+    throw new Error(`Expected release status output to hide: ${unexpected}`);
+  }
+}

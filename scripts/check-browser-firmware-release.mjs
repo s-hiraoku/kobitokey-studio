@@ -15,6 +15,7 @@ const files = {
   productionPreflight: read("scripts/check-browser-firmware-production-preflight.mjs"),
   publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
   releaseStatus: read("scripts/check-browser-firmware-release-status.mjs"),
+  releaseStatusSelfTest: read("scripts/check-browser-firmware-release-status-self-test.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
   productionPreflightSelfTest: read("scripts/check-browser-firmware-production-preflight-self-test.mjs"),
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
@@ -74,6 +75,7 @@ const checks = [
         "scripts/check-browser-firmware-merge-readiness-self-test.mjs",
         "scripts/check-browser-firmware-production-preflight-self-test.mjs",
         "scripts/check-browser-firmware-public-release-self-test.mjs",
+        "scripts/check-browser-firmware-release-status-self-test.mjs",
         "scripts/deploy-browser-firmware-production-self-test.mjs",
         'scripts/deploy-browser-firmware-production.mjs", "--help"',
         "scripts/collect-browser-firmware-e2e-evidence.mjs",
@@ -143,15 +145,25 @@ const checks = [
     name: "release status command summarizes public release blockers",
     pass: () =>
       scriptIncludes("check:browser-firmware:release-status", "node scripts/check-browser-firmware-release-status.mjs") &&
+      scriptIncludes("check:browser-firmware:release-status-self-test", "node scripts/check-browser-firmware-release-status-self-test.mjs") &&
       allIncludes(files.releaseStatus, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
         "CLOUDFLARE_API_TOKEN",
+        "BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY",
+        "BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "scripts/check-browser-firmware-external-evidence.mjs",
         "Browser firmware release gates",
         "Summary:",
+      ]) &&
+      allIncludes(files.releaseStatusSelfTest, [
+        "PASS GitHub Actions release gate",
+        "PASS production preflight",
+        "BLOCKER external E2E evidence",
+        "Summary: 1 blocker(s),",
+        "OK browser firmware release status self-test passed",
       ]) &&
       allIncludes(files.readme, ["check:browser-firmware:release-status"]) &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:release-status"]),

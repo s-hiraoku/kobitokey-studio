@@ -4,6 +4,9 @@ import { existsSync } from "node:fs";
 const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
 const RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
 const args = process.argv.slice(2);
+const githubApiBaseUrl =
+  process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
+const allowDirty = args.includes("--allow-dirty") || process.env.BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY === "true";
 
 if (args.includes("--help") || args.includes("-h")) {
   console.log(`Usage: node scripts/check-browser-firmware-release-status.mjs [production-url] [--e2e-report <report.json>]
@@ -27,7 +30,12 @@ Environment:
   BROWSER_FIRMWARE_E2E_REPORT
     External E2E evidence report path when --e2e-report is omitted.
   GITHUB_TOKEN
-    Optional, used only to avoid unauthenticated GitHub API rate limits.`);
+    Optional, used only to avoid unauthenticated GitHub API rate limits.
+  BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY=true
+    Reports a dirty worktree as a warning. Use for diagnostics only, not for
+    public release decisions.
+  BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL
+    Test-only GitHub API base URL override.`);
   process.exit(0);
 }
 
@@ -46,8 +54,12 @@ const worktreeStatus = git(["status", "--porcelain"]).stdout.trim();
 record("current git HEAD", "pass", `${shortHead} on ${branch}`);
 record(
   "working tree clean",
-  worktreeStatus ? "blocker" : "pass",
-  worktreeStatus ? "commit or stash changes before deploy/public-release gate" : "clean",
+  worktreeStatus ? (allowDirty ? "warn" : "blocker") : "pass",
+  worktreeStatus
+    ? allowDirty
+      ? "dirty worktree ignored for diagnostic status"
+      : "commit or stash changes before deploy/public-release gate"
+    : "clean",
 );
 record(
   "OAuth client id env",
@@ -64,7 +76,11 @@ record(
     : "CLOUDFLARE_API_TOKEN is not set; an existing wrangler login may still work",
 );
 
-const mergeReadiness = run(process.execPath, ["scripts/check-browser-firmware-merge-readiness.mjs"]);
+const mergeReadinessArgs = ["scripts/check-browser-firmware-merge-readiness.mjs"];
+if (allowDirty) {
+  mergeReadinessArgs.push("--allow-dirty");
+}
+const mergeReadiness = run(process.execPath, mergeReadinessArgs);
 record(
   "merge readiness",
   mergeReadiness.status === 0 ? "pass" : "blocker",
@@ -94,7 +110,7 @@ function readOption(name) {
 }
 
 async function checkReleaseGateCi({ branch, headSha }) {
-  const runsUrl = `https://api.github.com/repos/s-hiraoku/kobitokey-studio/actions/runs?branch=${encodeURIComponent(branch)}&per_page=20`;
+  const runsUrl = `${githubApiBaseUrl.replace(/\/$/, "")}/repos/s-hiraoku/kobitokey-studio/actions/runs?branch=${encodeURIComponent(branch)}&per_page=20`;
   let runs;
   try {
     runs = await fetchGitHubJson(runsUrl);
