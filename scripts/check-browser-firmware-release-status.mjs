@@ -7,9 +7,10 @@ const args = process.argv.slice(2);
 const githubApiBaseUrl =
   process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
 const allowDirty = args.includes("--allow-dirty") || process.env.BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY === "true";
+const outputJson = args.includes("--json");
 
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(`Usage: node scripts/check-browser-firmware-release-status.mjs [production-url] [--e2e-report <report.json>]
+  console.log(`Usage: node scripts/check-browser-firmware-release-status.mjs [production-url] [--e2e-report <report.json>] [--json]
 
 Summarizes the current browser Firmware Mode public-release blockers without
 printing secrets. This is a readiness dashboard, not a deploy command.
@@ -20,6 +21,10 @@ Checks:
   - latest GitHub Actions release-gate job for current HEAD
   - production preflight against the given URL/current HEAD
   - OAuth client id and external E2E evidence availability
+
+Options:
+  --json
+    Print a machine-readable status object. Secrets are not included.
 
 Environment:
   BROWSER_FIRMWARE_PRODUCTION_URL
@@ -97,11 +102,30 @@ checkExternalEvidence(e2eReportPath);
 const blockers = checks.filter((check) => check.status === "blocker");
 const warnings = checks.filter((check) => check.status === "warn");
 
-console.log(`Browser Firmware Mode release status for ${shortHead}`);
-for (const check of checks) {
-  console.log(`${statusLabel(check.status)} ${check.name}: ${check.detail}`);
+if (outputJson) {
+  console.log(
+    JSON.stringify(
+      {
+        ready: blockers.length === 0,
+        headSha,
+        shortHead,
+        branch,
+        productionUrl,
+        blockerCount: blockers.length,
+        warningCount: warnings.length,
+        checks,
+      },
+      null,
+      2,
+    ),
+  );
+} else {
+  console.log(`Browser Firmware Mode release status for ${shortHead}`);
+  for (const check of checks) {
+    console.log(`${statusLabel(check.status)} ${check.name}: ${check.detail}`);
+  }
+  console.log(`Summary: ${blockers.length} blocker(s), ${warnings.length} warning(s)`);
 }
-console.log(`Summary: ${blockers.length} blocker(s), ${warnings.length} warning(s)`);
 
 if (blockers.length > 0) {
   process.exit(1);

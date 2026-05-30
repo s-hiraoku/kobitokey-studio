@@ -119,14 +119,40 @@ try {
     throw new Error("Expected release status to use BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN for GitHub API reads");
   }
 
+  const jsonResult = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"]);
+  if (jsonResult.status !== 1) {
+    process.stderr.write(jsonResult.stderr);
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected JSON release status fixture to fail only because external E2E evidence is missing");
+  }
+  let json;
+  try {
+    json = JSON.parse(jsonResult.stdout);
+  } catch (error) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error(`Expected release status --json output to parse: ${String(error)}`);
+  }
+  if (json.ready !== false || json.blockerCount !== 1 || typeof json.warningCount !== "number") {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to expose ready=false with one blocker and a numeric warning count");
+  }
+  if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production preflight" && check.status === "pass")) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include passing production preflight check");
+  }
+  expectExcludes(jsonResult.stdout, "preflight-client");
+  expectExcludes(jsonResult.stdout, "release-status-token");
+  expectExcludes(jsonResult.stderr, "preflight-client");
+  expectExcludes(jsonResult.stderr, "release-status-token");
+
   console.log("OK browser firmware release status self-test passed");
 } finally {
   await new Promise((resolve) => server.close(resolve));
 }
 
-function runReleaseStatus(productionUrl, githubApiBaseUrl) {
+function runReleaseStatus(productionUrl, githubApiBaseUrl, extraArgs = []) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ["scripts/check-browser-firmware-release-status.mjs", productionUrl], {
+    const child = spawn(process.execPath, ["scripts/check-browser-firmware-release-status.mjs", productionUrl, ...extraArgs], {
       cwd: process.cwd(),
       env: {
         ...process.env,

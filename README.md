@@ -125,6 +125,13 @@ secrets, run:
 npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
 ```
 
+For automation, add `--json` after `--` to get a machine-readable result with
+`ready`, `blockerCount`, `warningCount`, and per-check statuses:
+
+```sh
+npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
+```
+
 If GitHub API rate limits block the Actions release-gate lookup, set
 `BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` to a token that can read this
 repository's Actions runs.
