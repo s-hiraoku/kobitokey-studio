@@ -145,7 +145,9 @@ try {
     throw new Error("Expected failing production preflight fixture to fail");
   }
   for (const expected of [
-    "production page is missing release security headers",
+    "production page is missing Content-Security-Policy",
+    "production page is missing Strict-Transport-Security",
+    "production page should return Referrer-Policy: no-referrer (got strict-origin-when-cross-origin)",
     "release metadata route should return 200, got 404",
     "device-code route should reject invalid JSON with 400, got 405",
     "device-code route should reject unsupported OAuth scope with 400, got 405",

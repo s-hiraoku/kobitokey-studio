@@ -92,7 +92,7 @@ try {
   );
   expectNoOutput(
     invalidEvidence,
-    ["production page is missing release security headers"],
+    ["production page is missing Content-Security-Policy"],
     "Expected invalid external evidence to stop before production preflight",
   );
 

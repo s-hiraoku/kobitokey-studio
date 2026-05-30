@@ -15,6 +15,16 @@ const outPath = readArg("--out");
 const skipValidate = args.includes("--no-validate");
 const runUiSmoke = args.includes("--run-ui-smoke") || readOptionalBooleanEnv("BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE") === true;
 const token = process.env.GITHUB_TOKEN || process.env.BROWSER_FIRMWARE_E2E_GITHUB_TOKEN || "";
+const RELEASE_SECURITY_HEADERS = [
+  { name: "Content-Security-Policy", header: "content-security-policy" },
+  { name: "Strict-Transport-Security", header: "strict-transport-security" },
+  { name: "Referrer-Policy", header: "referrer-policy", expected: "no-referrer" },
+  { name: "X-Content-Type-Options", header: "x-content-type-options", expected: "nosniff" },
+  { name: "X-Frame-Options", header: "x-frame-options", expected: "DENY" },
+  { name: "Cross-Origin-Opener-Policy", header: "cross-origin-opener-policy", expected: "same-origin-allow-popups" },
+  { name: "Cross-Origin-Resource-Policy", header: "cross-origin-resource-policy", expected: "same-origin" },
+  { name: "Permissions-Policy", header: "permissions-policy" },
+];
 
 const productionUrl = requireEnv("BROWSER_FIRMWARE_E2E_PRODUCTION_URL");
 const productionFetchUrl = process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL || productionUrl;
@@ -267,6 +277,10 @@ async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDe
   if (!response.ok) {
     throw new Error(`Production URL returned ${response.status}: ${fetchUrl}`);
   }
+  const pageSecurityHeaderIssues = collectReleaseSecurityHeaderIssues("Production URL", headers);
+  if (pageSecurityHeaderIssues.length > 0) {
+    throw new Error(`Production URL release security header check failed: ${pageSecurityHeaderIssues.join("; ")}`);
+  }
   const pageHtml = await response.text();
   const releaseMetadata = await fetchReleaseMetadata(new URL("/api/release-metadata", production));
 
@@ -295,8 +309,12 @@ async function fetchReleaseMetadata(url) {
   if (response.status !== 200) {
     throw new Error(`Release metadata route returned ${response.status}: ${url.href}`);
   }
-  if (response.headers.get("cache-control") !== "no-store" || !hasReleaseSecurityHeaders(response.headers)) {
-    throw new Error(`Release metadata route is missing no-store or release security headers: ${url.href}`);
+  if (response.headers.get("cache-control") !== "no-store") {
+    throw new Error(`Release metadata route is missing Cache-Control: no-store: ${url.href}`);
+  }
+  const metadataSecurityHeaderIssues = collectReleaseSecurityHeaderIssues("Release metadata route", response.headers);
+  if (metadataSecurityHeaderIssues.length > 0) {
+    throw new Error(`Release metadata route security header check failed: ${metadataSecurityHeaderIssues.join("; ")}`);
   }
   const body = await response.json().catch(() => null);
   if (body?.schemaVersion !== 1 || !isSha(body?.appCommitSha)) {
@@ -399,16 +417,22 @@ async function checkApiSecurityHeaders(urls) {
 }
 
 function hasReleaseSecurityHeaders(headers) {
-  return (
-    Boolean(headers.get("content-security-policy")) &&
-    Boolean(headers.get("strict-transport-security")) &&
-    headers.get("referrer-policy") === "no-referrer" &&
-    headers.get("x-content-type-options") === "nosniff" &&
-    headers.get("x-frame-options") === "DENY" &&
-    headers.get("cross-origin-opener-policy") === "same-origin-allow-popups" &&
-    headers.get("cross-origin-resource-policy") === "same-origin" &&
-    Boolean(headers.get("permissions-policy"))
-  );
+  return collectReleaseSecurityHeaderIssues("response", headers).length === 0;
+}
+
+function collectReleaseSecurityHeaderIssues(label, headers) {
+  const headerIssues = [];
+  for (const { name, header, expected } of RELEASE_SECURITY_HEADERS) {
+    const actual = headers.get(header);
+    if (!actual) {
+      headerIssues.push(`${label} is missing ${name}`);
+      continue;
+    }
+    if (expected && actual !== expected) {
+      headerIssues.push(`${label} should return ${name}: ${expected} (got ${actual})`);
+    }
+  }
+  return headerIssues;
 }
 
 function isSha(value) {

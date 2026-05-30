@@ -31,6 +31,16 @@ Optional environment:
 
 const productionUrl = args.find((arg) => !arg.startsWith("--")) || process.env.BROWSER_FIRMWARE_PRODUCTION_URL || DEFAULT_PRODUCTION_URL;
 const issues = [];
+const RELEASE_SECURITY_HEADERS = [
+  { name: "Content-Security-Policy", header: "content-security-policy" },
+  { name: "Strict-Transport-Security", header: "strict-transport-security" },
+  { name: "Referrer-Policy", header: "referrer-policy", expected: "no-referrer" },
+  { name: "X-Content-Type-Options", header: "x-content-type-options", expected: "nosniff" },
+  { name: "X-Frame-Options", header: "x-frame-options", expected: "DENY" },
+  { name: "Cross-Origin-Opener-Policy", header: "cross-origin-opener-policy", expected: "same-origin-allow-popups" },
+  { name: "Cross-Origin-Resource-Policy", header: "cross-origin-resource-policy", expected: "same-origin" },
+  { name: "Permissions-Policy", header: "permissions-policy" },
+];
 
 await checkProductionPreflight(productionUrl);
 
@@ -62,9 +72,7 @@ async function checkProductionPreflight(rawUrl) {
   if (!page.ok) {
     issues.push(`production page returned ${page.status}`);
   }
-  if (!hasReleaseSecurityHeaders(page.headers)) {
-    issues.push("production page is missing release security headers");
-  }
+  issues.push(...collectReleaseSecurityHeaderIssues("production page", page.headers));
   const pageHtml = await page.text().catch((error) => {
     issues.push(`production page body could not be read: ${formatError(error)}`);
     return "";
@@ -93,9 +101,7 @@ async function checkReleaseMetadata(url) {
   if (response.headers.get("cache-control") !== "no-store") {
     issues.push("release metadata route should return Cache-Control: no-store");
   }
-  if (!hasReleaseSecurityHeaders(response.headers)) {
-    issues.push("release metadata route is missing release security headers");
-  }
+  issues.push(...collectReleaseSecurityHeaderIssues("release metadata route", response.headers));
   const body = await response.json().catch(() => null);
   if (body?.schemaVersion !== 1) {
     issues.push("release metadata route should return schemaVersion 1");
@@ -119,9 +125,7 @@ async function checkInvalidJsonRoute(url, label) {
   if (response.headers.get("cache-control") !== "no-store") {
     issues.push(`${label} route should return Cache-Control: no-store`);
   }
-  if (!hasReleaseSecurityHeaders(response.headers)) {
-    issues.push(`${label} route is missing release security headers`);
-  }
+  issues.push(...collectReleaseSecurityHeaderIssues(`${label} route`, response.headers));
   const body = await response.json().catch(() => null);
   if (body?.error !== "invalid_json") {
     issues.push(`${label} route should return invalid_json for malformed JSON`);
@@ -159,9 +163,7 @@ async function checkOAuthDeviceFlow(url) {
   if (response.headers.get("cache-control") !== "no-store") {
     issues.push("device-code OAuth response should return Cache-Control: no-store");
   }
-  if (!hasReleaseSecurityHeaders(response.headers)) {
-    issues.push("device-code OAuth response is missing release security headers");
-  }
+  issues.push(...collectReleaseSecurityHeaderIssues("device-code OAuth response", response.headers));
   const body = await response.json().catch(() => null);
   if (!body?.device_code || !body?.user_code || !body?.verification_uri || !body?.expires_in) {
     issues.push("device-code route should return a complete GitHub OAuth device code response");
@@ -222,16 +224,22 @@ async function postJson(url, body) {
 }
 
 function hasReleaseSecurityHeaders(headers) {
-  return (
-    Boolean(headers.get("content-security-policy")) &&
-    Boolean(headers.get("strict-transport-security")) &&
-    headers.get("referrer-policy") === "no-referrer" &&
-    headers.get("x-content-type-options") === "nosniff" &&
-    headers.get("x-frame-options") === "DENY" &&
-    headers.get("cross-origin-opener-policy") === "same-origin-allow-popups" &&
-    headers.get("cross-origin-resource-policy") === "same-origin" &&
-    Boolean(headers.get("permissions-policy"))
-  );
+  return collectReleaseSecurityHeaderIssues("response", headers).length === 0;
+}
+
+function collectReleaseSecurityHeaderIssues(label, headers) {
+  const headerIssues = [];
+  for (const { name, header, expected } of RELEASE_SECURITY_HEADERS) {
+    const actual = headers.get(header);
+    if (!actual) {
+      headerIssues.push(`${label} is missing ${name}`);
+      continue;
+    }
+    if (expected && actual !== expected) {
+      headerIssues.push(`${label} should return ${name}: ${expected} (got ${actual})`);
+    }
+  }
+  return headerIssues;
 }
 
 function parseHttpsUrl(value) {
