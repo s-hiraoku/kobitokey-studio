@@ -18,6 +18,9 @@ const token = process.env.GITHUB_TOKEN || process.env.BROWSER_FIRMWARE_E2E_GITHU
 
 const productionUrl = requireEnv("BROWSER_FIRMWARE_E2E_PRODUCTION_URL");
 const productionFetchUrl = process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL || productionUrl;
+if (!skipValidate && !sameUrl(productionFetchUrl, productionUrl)) {
+  throw new Error("BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL requires --no-validate and is only for collector tests");
+}
 const oauthClientId = requireEnv("BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID");
 const repository = requireEnv("BROWSER_FIRMWARE_E2E_REPOSITORY");
 const branch = requireEnv("BROWSER_FIRMWARE_E2E_BRANCH");
@@ -196,7 +199,7 @@ Boolean release confirmations:
 
 Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
-  BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL for collector tests
+  BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL for collector tests with --no-validate
   BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL for collector tests
   BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN for a future custom domain
   BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE=true
@@ -645,6 +648,14 @@ function readFlashMethodEnv(name) {
     return value;
   }
   throw new Error(`${name} must be direct-copy or download-copy`);
+}
+
+function sameUrl(left, right) {
+  try {
+    return new URL(left).href === new URL(right).href;
+  } catch {
+    return left === right;
+  }
 }
 
 function readOptionalBooleanEnv(name) {

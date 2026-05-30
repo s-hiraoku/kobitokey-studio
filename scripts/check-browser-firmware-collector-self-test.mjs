@@ -16,6 +16,7 @@ const rightUf2Path = join(dir, "kobitokey_right.uf2");
 const manualReportPath = join(dir, "manual-report.json");
 const autoReportPath = join(dir, "auto-report.json");
 const unembeddedClientReportPath = join(dir, "unembedded-client-report.json");
+const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
 const fakeNpmPath = join(dir, "npm");
 let artifactDownloadAuthorization = null;
 const artifactZip = zipSync({
@@ -199,6 +200,17 @@ server.headersTimeout = 1_000;
 try {
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;
+  const fetchOverrideResult = await runCollector(baseUrl, fetchOverrideReportPath, {
+    includeManualUiSmoke: true,
+    noValidate: false,
+    runUiSmoke: false,
+  });
+  assert(fetchOverrideResult.status !== 0, "collector should reject production fetch URL overrides during validated runs");
+  assert(
+    fetchOverrideResult.stderr.includes("BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL requires --no-validate"),
+    "collector fetch URL override rejection was not explained",
+  );
+
   const result = await runCollector(baseUrl, manualReportPath, { includeManualUiSmoke: true, runUiSmoke: false });
 
   if (result.status !== 0) {
@@ -328,7 +340,9 @@ function readRequestBody(request, callback) {
 function runCollector(baseUrl, reportPath, options) {
   return new Promise((resolve) => {
     const childArgs = ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--out", reportPath];
-    childArgs.push("--no-validate");
+    if (options.noValidate !== false) {
+      childArgs.push("--no-validate");
+    }
     if (options.runUiSmoke) {
       childArgs.push("--run-ui-smoke");
     }
