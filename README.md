@@ -256,8 +256,19 @@ your local firmware clone with the `参照…` button.
 
 ## Deployment Notes
 
-The browser app is deployed as a Cloudflare Worker with static assets from `main`
-using:
+The browser app is served from a Cloudflare Worker with static assets. Do not
+treat a GitHub Pages deploy, CI success, or a merge to `main` alone as proof
+that the browser app is public-release ready. The production Worker must expose
+the target commit through `/api/release-metadata` and pass the OAuth production
+preflight.
+
+Use the guarded deploy wrapper from an authenticated machine:
+
+```sh
+BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
+```
+
+The underlying Cloudflare build should match:
 
 | Setting | Value |
 | --- | --- |
@@ -266,6 +277,6 @@ using:
 | Build output directory | `dist/client` |
 | Root directory | `/` |
 
-The guide is deployed separately to GitHub Pages from `docs/`. Detailed release
-and documentation publishing checks live in
+The guide is deployed separately to GitHub Pages from `docs/`. Detailed Worker
+release and documentation publishing checks live in
 [`docs/deployment.md`](docs/deployment.md).

@@ -134,6 +134,8 @@ const checks = [
       allIncludes(files.docsDeployment, [
         "npm run deploy:browser-firmware",
         "current git HEAD",
+        "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
+        "/api/release-metadata",
       ]),
   },
   {
@@ -732,11 +734,16 @@ const checks = [
       allIncludes(files.docsDeployment, [
         "PR / feature branch の Workers preview",
         "preview preflight の成功は production 公開の証跡にしない",
+        "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
         "release metadata missing",
         "Worker API の 405",
       ]) &&
       allIncludes(files.readme, [
         "A passing preview preflight is not production release evidence",
+        "Do not",
+        "GitHub Pages deploy",
+        "merge to `main` alone",
+        "/api/release-metadata",
         "missing `/api/release-metadata`",
         "405 responses from Worker",
       ]),

@@ -10,7 +10,7 @@ permalink: /deployment/
 
 | 対象 | 公開先 | 更新元 |
 | --- | --- | --- |
-| ブラウザアプリ | <https://kobitokey-studio.s-hiraoku.workers.dev/> | Cloudflare Workers + static assets が `main` から `npm run build` |
+| ブラウザアプリ | <https://kobitokey-studio.s-hiraoku.workers.dev/> | Cloudflare Workers + static assets を `npm run deploy:browser-firmware` で更新し、production preflight で current git HEAD と照合 |
 | 使い方ガイド | <https://s-hiraoku.github.io/kobitokey-studio/> | GitHub Pages が `docs/` から Jekyll build |
 
 ## ブラウザアプリの公開
@@ -33,7 +33,7 @@ Cloudflare の `Workers & Pages` → `kobitokey-studio` → `Settings` → `Buil
 | Build output directory | `dist/client` |
 | Root directory | `/` |
 
-`main` に push すると自動で production deployment が作られます。
+`main` への merge や GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません。公開判定は production URL の `/api/release-metadata` が対象 commit を返し、Worker API と OAuth preflight が通った状態で行います。
 
 Worker bundle は `src/worker.ts` から作られ、Vite build 後の redirected Wrangler configuration は `dist/kobitokey_studio/wrangler.json` に出力されます。公開前に `npm run check:browser-firmware` を通すと、local `node_modules` の test/build/Wrangler tools を直接使い、OS の一時ディレクトリ配下へ Wrangler log / registry / config / dry-run output を作り、Worker と assets が束ねられることを確認できます。
 
