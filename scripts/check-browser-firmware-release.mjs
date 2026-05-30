@@ -193,6 +193,15 @@ const checks = [
       ),
   },
   {
+    name: "public user docs do not label browser Firmware Mode as beta",
+    pass: () =>
+      allIncludes(files.readme, ["Firmware Mode | Browser app and Tauri desktop app", "Browser Firmware Mode can read firmware files from GitHub"]) &&
+      allIncludes(files.docsQuickStart, ["✅ GitHub 連携対応", "ブラウザ版の Firmware Mode は GitHub 連携で利用できます"]) &&
+      allIncludes(files.docsUsageGuide, ["✅ GitHub 連携対応", "ブラウザ版 Firmware Mode は GitHub 連携で利用できます"]) &&
+      allIncludes(files.docsDeployment, ["Browser release: Direct Mode と Firmware Mode"]) &&
+      noIncludes(files.readme + files.docsQuickStart + files.docsUsageGuide + files.docsDeployment, ["beta", "Beta", "ベータ", "β", "🧪"]),
+  },
+  {
     name: "GitHub Pages user guide links to app entry points by setting area",
     pass: () =>
       allIncludes(files.docsConfig, ["user-guide.md"]) &&
@@ -1264,6 +1273,10 @@ function read(path) {
 
 function allIncludes(contents, needles) {
   return needles.every((needle) => contents.includes(needle));
+}
+
+function noIncludes(contents, needles) {
+  return needles.every((needle) => !contents.includes(needle));
 }
 
 function scriptIncludes(scriptName, fragment) {

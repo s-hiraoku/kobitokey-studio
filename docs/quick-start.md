@@ -15,10 +15,10 @@ permalink: /quick-start/
 
 | ビルド | Direct Mode | Firmware Mode |
 | --- | --- | --- |
-| ブラウザ版 (`npm run dev`) | ✅ 利用可 | 🧪 GitHub 連携 beta |
+| ブラウザ版 (`npm run dev`) | ✅ 利用可 | ✅ GitHub 連携対応 |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 利用可 |
 
-ブラウザ版の Firmware Mode は GitHub 連携 beta です。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 の分類まで進めます。
+ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 の分類まで進めます。
 
 スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
 
@@ -41,7 +41,7 @@ KobitoKey Studio のリポジトリで依存関係を入れます。
 npm install
 ```
 
-ブラウザで起動するには次のコマンドを実行し、Chrome / Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode beta を試せます。
+ブラウザで起動するには次のコマンドを実行し、Chrome / Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode を試せます。
 
 ```sh
 npm run dev

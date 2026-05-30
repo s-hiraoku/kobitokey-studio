@@ -20,7 +20,7 @@ KobitoKey Studio supports two editing workflows.
 | Workflow | Available in | What it changes |
 | --- | --- | --- |
 | Direct Mode | Browser app and Tauri desktop app | Writes supported ZMK Studio settings directly to a connected keyboard. USB is recommended; Bluetooth is experimental and only works when the ZMK Studio device appears |
-| Firmware Mode | Browser app beta and Tauri desktop app | Browser beta edits `KobitoKey_QWERTY` through GitHub API, triggers Actions builds, downloads artifacts, and classifies left/right UF2 files. Tauri edits a local clone and helps copy UF2 files |
+| Firmware Mode | Browser app and Tauri desktop app | Browser app edits `KobitoKey_QWERTY` through GitHub API, triggers Actions builds, downloads artifacts, and classifies left/right UF2 files. Tauri edits a local clone and helps copy UF2 files |
 
 Use Direct Mode for quick supported key action edits. Use Firmware Mode when
 the change must stay in the firmware repository, needs Combo or Trackball file
@@ -45,7 +45,7 @@ For end-user steps, start with the published docs:
 - Preview file-level diffs before saving
 - Trigger GitHub Actions builds through the browser GitHub API or the Tauri backend
 - Download build artifacts and guide UF2 copying to bootloader volumes
-- Browser Firmware beta can read firmware files from GitHub, create one commit for the managed files, dispatch `build.yml`, find the matching run, download artifacts, classify left/right UF2 files, and write UF2 files to verified UF2 bootloader folders through the File System Access API when available. It also exposes side-fixed UF2 download buttons for manual bootloader copy fallback
+- Browser Firmware Mode can read firmware files from GitHub, create one commit for the managed files, dispatch `build.yml`, find the matching run, download artifacts, classify left/right UF2 files, and write UF2 files to verified UF2 bootloader folders through the File System Access API when available. It also exposes side-fixed UF2 download buttons for manual bootloader copy fallback
 
 Direct Mode supports key action writes in both browser and desktop builds.
 Combo and Trackball are reference-only in Direct Mode because the current
@@ -248,7 +248,7 @@ device flow and artifact zip proxying. Set `VITE_GITHUB_OAUTH_CLIENT_ID` for the
 browser OAuth button. The OAuth flow requests the `repo` scope so it can read
 and commit managed firmware files and dispatch Actions builds; the Worker rejects
 broader or unrelated requested scopes. If you paste a fine-grained token in the
-beta UI while testing, grant repository Contents write and Actions write
+browser UI while testing, grant repository Contents write and Actions write
 permissions only for the firmware repository.
 
 Tauri Firmware Mode still uses the `gh` CLI from the Tauri backend. Authenticate

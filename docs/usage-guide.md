@@ -16,11 +16,11 @@ permalink: /usage-guide/
 
 | ビルド | Direct Mode (キー) | Direct Mode (Combo / Trackball) | Firmware Mode |
 | --- | --- | --- | --- |
-| ブラウザ版 (`npm run dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | 🧪 GitHub 連携 beta |
+| ブラウザ版 (`npm run dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ GitHub 連携対応 |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ 利用可 |
 
-- ブラウザ版 Firmware Mode は GitHub 連携 beta です。GitHub OAuth device flow または GitHub token をメモリ上で使い、repository 読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 分類まで進めます。
-- OAuth device flow と artifact download は実環境で CORS / scope / rate limit の確認が必要です。
+- ブラウザ版 Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token をメモリ上で使い、repository 読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 分類まで進めます。
+- OAuth device flow と artifact download は release gate で CORS / scope / rate limit を確認します。
 - デスクトップ版 Firmware Mode は、ローカル clone、`gh` CLI、bootloader volume 検出を使う従来フローです。
 
 ## まず結論
@@ -30,7 +30,7 @@ KobitoKey Studio では、最初に `Firmware Mode` と `Direct Mode` のどち�
 | 迷っている内容 | 選ぶもの | 理由 |
 | --- | --- | --- |
 | キーを 1 個だけ素早く変更したい | Direct Mode | ビルドと UF2 書き込みなしで実機へ保存できるため |
-| ブラウザだけで試したい | Direct Mode または Firmware Mode beta (Chrome/Edge) | Direct は実機キー書き込み、Firmware は GitHub 経由で build まで進めるため |
+| ブラウザだけで試したい | Direct Mode または Firmware Mode (Chrome/Edge) | Direct は実機キー書き込み、Firmware は GitHub 経由で build まで進めるため |
 | Combo を設定したい | Firmware Mode | 現在の ZMK Studio firmware は Combo RPC を公開していないため |
 | トラックボールを設定したい | Firmware Mode | 現在の KobitoKey firmware では Direct Mode 書き込み未対応のため |
 | 設定をファイルとして残したい / GitHub Actions ビルドまで進めたい | Firmware Mode | ブラウザ版は GitHub 経由、デスクトップ版はローカル clone 経由で進めるため |
@@ -62,7 +62,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | USB data 通信できるケーブルがある | UF2 書き込みに必須 | USB Direct に必須 |
 | Chrome または Edge を使っている | ブラウザ版では推奨 | ブラウザ Direct では必須 |
 
-ブラウザ版の Firmware Mode beta では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを利用できます。
+ブラウザ版の Firmware Mode では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを利用できます。
 
 ## 画面の見方
 
@@ -143,10 +143,10 @@ Direct Mode でキーを書き込む場合は、ブラウザ版または Tauri �
 
 | 起動方法 | 向いている用途 |
 | --- | --- |
-| ブラウザ版 | Direct Mode の試用とキー動作の書き込み、GitHub 連携 Firmware Mode beta |
+| ブラウザ版 | Direct Mode の試用とキー動作の書き込み、GitHub 連携 Firmware Mode |
 | Tauri デスクトップ版 | ローカル clone を直接扱う Firmware Mode、`gh` CLI 経由のビルド、bootloader volume 検出、Direct の key 書き込み |
 
-ブラウザ公開版では、Firmware Mode beta を GitHub 経由の安全な commit / build / artifact / UF2 保存フローとして使えます。Tauri デスクトップ版は一部ユーザー向けに配布するローカル作業用です。
+ブラウザ公開版では、Firmware Mode を GitHub 経由の安全な commit / build / artifact / UF2 保存フローとして使えます。Tauri デスクトップ版は一部ユーザー向けに配布するローカル作業用です。
 
 ### ローカル開発版の起動
 
@@ -157,7 +157,7 @@ npm install
 npm run dev
 ```
 
-起動後、Chrome または Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode beta を切り替えられます。
+起動後、Chrome または Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode を切り替えられます。
 
 ローカル clone を直接扱う従来の Firmware Mode を使うには、Rust と Cargo を用意したうえで Tauri デスクトップ版を起動します。
 
@@ -169,7 +169,7 @@ Tauri デスクトップ版では、ローカルファイルの読み書き、`g
 
 ### GitHub 認証の準備
 
-ブラウザ版 Firmware Mode beta は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。
+ブラウザ版 Firmware Mode は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。
 
 Tauri 版 Firmware Mode の GitHub Actions build 操作は、Tauri backend から `gh` CLI を呼び出します。初回は次で認証してください。
 
@@ -201,7 +201,7 @@ Direct Mode は、ZMK Studio API を使って実機へ直接設定を書き込�
 
 | 機能 | Tauri デスクトップ版 | ブラウザ版 |
 | --- | --- | --- |
-| Firmware Mode (トグル) | 利用可 | GitHub 連携 beta |
+| Firmware Mode (トグル) | 利用可 | GitHub 連携対応 |
 | Firmware ファイル読み込み | ローカルフォルダから読み込み | GitHub repository から読み込み |
 | Firmware ファイル保存 | ローカルファイルへ直接保存 | GitHub commit として保存 |
 | GitHub Actions build | `gh` CLI 経由で対応 | GitHub API 経由で対応 |
@@ -231,7 +231,7 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 
 ## 3. Firmware Mode で設定する
 
-> ブラウザ版では GitHub 連携 beta として動作します。ローカル clone を直接読み書きしたい場合は `npm run tauri dev` でデスクトップ版を起動してください。
+> ブラウザ版では GitHub 連携で動作します。ローカル clone を直接読み書きしたい場合は `npm run tauri dev` でデスクトップ版を起動してください。
 
 ### 3.1 プロジェクトを読み込む
 

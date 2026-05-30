@@ -81,7 +81,7 @@ BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run depl
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions production Worker deploy で使う Cloudflare account id |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions production Worker deploy で使う Cloudflare API token |
 
-OAuth flow は `repo` scope を要求します。この値が未設定でも、beta UI の token 入力欄に対象 repository の Contents write / Actions write 権限を持つ fine-grained GitHub token を入れれば検証できます。token は browser memory 上だけで使い、local storage には保存しません。
+OAuth flow は `repo` scope を要求します。この値が未設定でも、ブラウザ UI の token 入力欄に対象 repository の Contents write / Actions write 権限を持つ fine-grained GitHub token を入れれば検証できます。token は browser memory 上だけで使い、local storage には保存しません。
 
 ### リリース確認
 
@@ -109,7 +109,7 @@ OAuth flow は `repo` scope を要求します。この値が未設定でも、b
 
 - PC の Chrome / Edge: 対応
 - スマホブラウザ: 初版では未対応画面を表示
-- Browser release: Direct Mode と Firmware Mode beta
+- Browser release: Direct Mode と Firmware Mode
 - Tauri desktop release: Direct Mode と Firmware Mode
 
 Direct Mode は Web Serial / Web Bluetooth を使うため、ブラウザ版は HTTPS、`127.0.0.1`、または `localhost` で開く必要があります。
