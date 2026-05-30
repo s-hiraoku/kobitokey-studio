@@ -139,7 +139,10 @@ requireValue(
   report.ui?.artifactProvenanceMatchesBuildArtifacts === true,
   "ui.artifactProvenanceMatchesBuildArtifacts must be true",
 );
-requireValue(report.ui?.smokeCommand === "npm run check:browser-firmware:ui", "ui.smokeCommand must be npm run check:browser-firmware:ui");
+requireValue(
+  ["npm run check:browser-firmware:ui", "node scripts/check-browser-firmware-ui-smoke.mjs"].includes(report.ui?.smokeCommand),
+  "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
+);
 requireValue(Number.isInteger(report.ui?.smokeViewportCount) && report.ui.smokeViewportCount >= 2, "ui.smokeViewportCount must be at least 2");
 
 if (issues.length > 0) {

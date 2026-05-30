@@ -20,7 +20,7 @@ const autoReportPath = join(dir, "auto-report.json");
 const unembeddedClientReportPath = join(dir, "unembedded-client-report.json");
 const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
 const artifactMismatchReportPath = join(dir, "artifact-mismatch-report.json");
-const fakeNpmPath = join(dir, "npm");
+const fakeUiSmokePath = join(dir, "fake-ui-smoke.mjs");
 let artifactDownloadAuthorization = null;
 const artifactZip = zipSync({
   "firmware/manifest.json": new TextEncoder().encode(
@@ -40,17 +40,11 @@ writeFileSync(leftUf2Path, "left firmware bytes");
 writeFileSync(rightUf2Path, "right firmware bytes");
 writeFileSync(mismatchedRightUf2Path, "right firmware bytes from another run");
 writeFileSync(
-  fakeNpmPath,
-  `#!/bin/sh
-if [ "$1" = "run" ] && [ "$2" = "check:browser-firmware:ui" ]; then
-  echo "OK fake browser firmware UI smoke for $BROWSER_FIRMWARE_SMOKE_URL"
-  exit 0
-fi
-echo "unexpected npm command: $*" >&2
-exit 99
+  fakeUiSmokePath,
+  `console.log("OK fake browser firmware UI smoke for " + process.env.BROWSER_FIRMWARE_SMOKE_URL);
 `,
 );
-chmodSync(fakeNpmPath, 0o755);
+chmodSync(fakeUiSmokePath, 0o755);
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -351,6 +345,10 @@ try {
 
   const autoReport = JSON.parse(readFileSync(autoReportPath, "utf8"));
   assert(autoReport.ui.buildAndFlashSmokePassed === true, "automatic UI smoke result was not collected");
+  assert(
+    autoReport.ui.smokeCommand === "node scripts/check-browser-firmware-ui-smoke.mjs",
+    "automatic UI smoke command should record the direct Node smoke script",
+  );
   assert(autoReport.ui.tokenNotStoredInLocalStorage === true, "automatic token localStorage UI smoke state was not collected");
   assert(autoReport.ui.tokenClearWorks === true, "automatic token clear UI smoke state was not collected");
   assert(autoReport.ui.layerStructureActionsPassed === true, "automatic layer structure UI smoke state was not collected");
@@ -419,7 +417,7 @@ function runCollector(baseUrl, reportPath, options) {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        PATH: `${dir}:${process.env.PATH || ""}`,
+        BROWSER_FIRMWARE_E2E_UI_SMOKE_SCRIPT: fakeUiSmokePath,
         BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
         BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL: `${baseUrl}/`,
         BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID: options.oauthClientId || "collector-oauth-client",

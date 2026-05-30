@@ -208,7 +208,8 @@ BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-fi
 On a release QA machine with Chrome/Edge or Playwright Chromium available, run
 the rendered UI smoke for the browser Firmware Mode buttons and right pane. You
 can run it directly, or let the external E2E collector execute it against the
-production URL with `--run-ui-smoke`:
+production URL with `--run-ui-smoke`. The collector invokes the local Node smoke
+script directly and records that command in the evidence report:
 
 ```sh
 npm run check:browser-firmware:ui

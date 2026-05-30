@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { unzipSync } from "fflate";
 
 const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
+const UI_SMOKE_SCRIPT = "scripts/check-browser-firmware-ui-smoke.mjs";
+const UI_SMOKE_COMMAND = "node scripts/check-browser-firmware-ui-smoke.mjs";
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
   printUsage();
@@ -140,7 +142,7 @@ const report = {
   },
   ui: {
     ...uiSmoke,
-    smokeCommand: "npm run check:browser-firmware:ui",
+    smokeCommand: runUiSmoke ? UI_SMOKE_COMMAND : readUiSmokeCommandEnv(),
     smokeViewportCount: Number(process.env.BROWSER_FIRMWARE_E2E_SMOKE_VIEWPORT_COUNT || 2),
   },
   notes: process.env.BROWSER_FIRMWARE_E2E_NOTES || "",
@@ -231,6 +233,7 @@ Optional:
   BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE=true
   BROWSER_FIRMWARE_SMOKE_URL=https://kobitokey-studio.s-hiraoku.workers.dev
   BROWSER_FIRMWARE_E2E_CLASSIFICATION_SOURCE=manifest|filename
+  BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND="${UI_SMOKE_COMMAND}" or "npm run check:browser-firmware:ui"
   BROWSER_FIRMWARE_E2E_SMOKE_VIEWPORT_COUNT=2
   BROWSER_FIRMWARE_E2E_NOTES
   --run-ui-smoke
@@ -257,8 +260,8 @@ function readManualUiSmoke() {
 
 function runProductionUiSmoke(productionUrlForSmoke) {
   const smokeUrl = process.env.BROWSER_FIRMWARE_SMOKE_URL || productionUrlForSmoke;
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(npmCommand, ["run", "check:browser-firmware:ui"], {
+  const smokeScript = process.env.BROWSER_FIRMWARE_E2E_UI_SMOKE_SCRIPT || UI_SMOKE_SCRIPT;
+  const result = spawnSync(process.execPath, [smokeScript], {
     encoding: "utf8",
     env: {
       ...process.env,
@@ -288,6 +291,10 @@ function runProductionUiSmoke(productionUrlForSmoke) {
     artifactProvenanceVisible: true,
     artifactProvenanceMatchesBuildArtifacts: true,
   };
+}
+
+function readUiSmokeCommandEnv() {
+  return process.env.BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND?.trim() || "npm run check:browser-firmware:ui";
 }
 
 async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDeviceFlow) {

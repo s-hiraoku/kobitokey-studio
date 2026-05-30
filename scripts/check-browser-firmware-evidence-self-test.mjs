@@ -72,7 +72,7 @@ try {
     "ui.referencedLayerDeleteBlocked must be true",
     "ui.artifactProvenanceVisible must be true",
     "ui.artifactProvenanceMatchesBuildArtifacts must be true",
-    "ui.smokeCommand must be npm run check:browser-firmware:ui",
+    "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
   ];
   for (const error of requiredErrors) {
     if (!invalid.stderr.includes(error)) {
