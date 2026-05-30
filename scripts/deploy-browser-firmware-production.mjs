@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const requireOAuth = args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";
@@ -12,6 +13,8 @@ const skipMergeReadiness = args.includes("--skip-merge-readiness");
 const skipReason = process.env.BROWSER_FIRMWARE_DEPLOY_SKIP_REASON?.trim() || "";
 const productionUrl =
   args.find((arg) => !arg.startsWith("--")) || process.env.BROWSER_FIRMWARE_PRODUCTION_URL || DEFAULT_PRODUCTION_URL;
+const expectedProductionOrigin =
+  process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
 
 if (args.includes("--help") || args.includes("-h")) {
   console.log(`Usage: node scripts/deploy-browser-firmware-production.mjs [production-url]
@@ -27,6 +30,9 @@ Default URL:
 Environment:
   BROWSER_FIRMWARE_PRODUCTION_URL
     Production URL to preflight when no positional production-url is provided.
+  BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN
+    Expected public production origin. Defaults to
+    ${DEFAULT_EXPECTED_PRODUCTION_ORIGIN}.
   BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID
     When set, the post-deploy preflight also verifies the deployed Worker can
     start GitHub OAuth device flow and the frontend bundle embeds the client id.
@@ -77,6 +83,14 @@ if ((skipLocalCheck || skipMergeReadiness) && !skipReason) {
   console.error("BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags.");
   process.exit(1);
 }
+const productionUrlIssues = validateProductionUrl(productionUrl);
+if (productionUrlIssues.length > 0) {
+  console.error("Browser Firmware Mode production deploy URL is not ready:");
+  for (const issue of productionUrlIssues) {
+    console.error(`- ${issue}`);
+  }
+  process.exit(1);
+}
 
 if (!skipMergeReadiness) {
   run("node", ["scripts/check-browser-firmware-merge-readiness.mjs"]);
@@ -109,6 +123,34 @@ function readGitHeadSha() {
     stdio: ["ignore", "pipe", "ignore"],
   });
   return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function validateProductionUrl(rawUrl) {
+  const issues = [];
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return ["production URL must be a valid http(s) URL"];
+  }
+  if (url.protocol !== "https:") {
+    issues.push("production URL must be an https URL");
+  }
+  if (url.searchParams.get("mode") !== "firmware") {
+    issues.push("production URL must include mode=firmware");
+  }
+  if (!sameOrigin(url.href, expectedProductionOrigin)) {
+    issues.push("production URL must use the expected public production origin");
+  }
+  return issues;
+}
+
+function sameOrigin(left, right) {
+  try {
+    return new URL(left).origin === new URL(right).origin;
+  } catch {
+    return left === right;
+  }
 }
 
 function run(command, commandArgs, extraEnv = {}) {
