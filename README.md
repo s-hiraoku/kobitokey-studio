@@ -125,6 +125,10 @@ secrets, run:
 npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
 ```
 
+If GitHub API rate limits block the Actions release-gate lookup, set
+`BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` to a token that can read this
+repository's Actions runs.
+
 After a production deployment, run the lightweight preflight first to catch
 missing Worker routes, missing artifact proxy input validation, or release
 security headers before starting hardware QA:

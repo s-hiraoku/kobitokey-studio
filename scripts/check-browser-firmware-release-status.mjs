@@ -30,7 +30,10 @@ Environment:
   BROWSER_FIRMWARE_E2E_REPORT
     External E2E evidence report path when --e2e-report is omitted.
   GITHUB_TOKEN
-    Optional, used only to avoid unauthenticated GitHub API rate limits.
+    Optional fallback token for GitHub API reads.
+  BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN
+    Optional token used only to avoid unauthenticated GitHub API rate limits.
+    Prefer this over GITHUB_TOKEN for local release-status checks.
   BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY=true
     Reports a dirty worktree as a warning. Use for diagnostics only, not for
     public release decisions.
@@ -176,12 +179,19 @@ async function fetchGitHubJson(url) {
     Accept: "application/vnd.github+json",
     "User-Agent": "kobitokey-studio-release-status",
   };
-  if (process.env.GITHUB_TOKEN?.trim()) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN.trim()}`;
+  const token = process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
   const response = await fetch(url, { headers });
   if (!response.ok) {
-    throw new Error(`GitHub API ${response.status}: ${await response.text()}`);
+    const body = await response.text();
+    if (response.status === 403 && body.toLowerCase().includes("rate limit")) {
+      throw new Error(
+        "GitHub API 403 rate limit: set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN for release-status checks",
+      );
+    }
+    throw new Error(`GitHub API ${response.status}: ${body}`);
   }
   return response.json();
 }

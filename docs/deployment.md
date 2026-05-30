@@ -63,7 +63,9 @@ Repository secrets には次を設定します。
 npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
 ```
 
-この wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。非 dry-run の production deploy では dirty worktree と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` 未設定を拒否し、未 commit の差分や OAuth なしの token 手入力専用 UI が current git HEAD の公開済み証跡に混ざらないようにします。
+GitHub API rate limit で Actions release gate を読めない場合は、`BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` にこの repository の Actions run を読める token を設定します。この token は release-status の GitHub API 読み取りだけに使い、出力には表示しません。
+
+deploy wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。非 dry-run の production deploy では dirty worktree と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` 未設定を拒否し、未 commit の差分や OAuth なしの token 手入力専用 UI が current git HEAD の公開済み証跡に混ざらないようにします。
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run deploy:browser-firmware

@@ -149,6 +149,7 @@ const checks = [
       allIncludes(files.releaseStatus, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
         "CLOUDFLARE_API_TOKEN",
+        "BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN",
         "BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY",
         "BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL",
         "scripts/check-browser-firmware-merge-readiness.mjs",
@@ -163,6 +164,7 @@ const checks = [
         "PASS production preflight",
         "BLOCKER external E2E evidence",
         "Summary: 1 blocker(s),",
+        "release-status-token",
         "OK browser firmware release status self-test passed",
       ]) &&
       allIncludes(files.readme, ["check:browser-firmware:release-status"]) &&

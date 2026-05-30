@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 
 const appCommitSha = readGitHeadSha();
+const seenAuthorizations = [];
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -33,6 +34,7 @@ const server = createServer((request, response) => {
   }
 
   if (request.method === "GET" && url.pathname === "/repos/s-hiraoku/kobitokey-studio/actions/runs") {
+    seenAuthorizations.push(request.headers.authorization ?? "");
     writeJson(response, 200, {
       workflow_runs: [
         {
@@ -49,6 +51,7 @@ const server = createServer((request, response) => {
   }
 
   if (request.method === "GET" && url.pathname === "/repos/s-hiraoku/kobitokey-studio/actions/runs/12345/jobs") {
+    seenAuthorizations.push(request.headers.authorization ?? "");
     writeJson(response, 200, {
       jobs: [
         {
@@ -110,6 +113,11 @@ try {
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
   expectExcludes(result.stderr, "preflight-client");
+  expectExcludes(result.stdout, "release-status-token");
+  expectExcludes(result.stderr, "release-status-token");
+  if (!seenAuthorizations.every((authorization) => authorization === "Bearer release-status-token")) {
+    throw new Error("Expected release status to use BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN for GitHub API reads");
+  }
 
   console.log("OK browser firmware release status self-test passed");
 } finally {
@@ -126,6 +134,7 @@ function runReleaseStatus(productionUrl, githubApiBaseUrl) {
         BROWSER_FIRMWARE_MAIN_REF: "HEAD",
         BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY: "true",
         BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL: githubApiBaseUrl,
+        BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN: "release-status-token",
         CLOUDFLARE_API_TOKEN: "dummy-token",
       },
     });
