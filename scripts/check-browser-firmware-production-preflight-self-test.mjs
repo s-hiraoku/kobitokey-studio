@@ -209,8 +209,12 @@ function readRequestBody(request, callback) {
 function releaseSecurityHeaders() {
   return {
     "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=()",
   };
 }

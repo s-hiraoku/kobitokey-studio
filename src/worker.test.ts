@@ -357,6 +357,10 @@ describe("worker GitHub API proxy", () => {
     expect(response.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
     expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(response.headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin-allow-popups");
+    expect(response.headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    expect(response.headers.get("Strict-Transport-Security")).toBe("max-age=31536000; includeSubDomains; preload");
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
   });
 
@@ -365,6 +369,7 @@ describe("worker GitHub API proxy", () => {
 
     expect(response.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
     expect(response.headers.get("Content-Security-Policy")).toContain("connect-src 'self' https://api.github.com http: ws:");
+    expect(response.headers.get("Strict-Transport-Security")).toBeNull();
   });
 
   it("adds browser security headers to API responses without losing no-store", async () => {
@@ -382,6 +387,10 @@ describe("worker GitHub API proxy", () => {
     expect(response.headers.get("Content-Security-Policy")).toContain("connect-src 'self' https://api.github.com");
     expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(response.headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin-allow-popups");
+    expect(response.headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    expect(response.headers.get("Strict-Transport-Security")).toBe("max-age=31536000; includeSubDomains; preload");
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
     expect(fetchSpy).not.toHaveBeenCalled();
   });

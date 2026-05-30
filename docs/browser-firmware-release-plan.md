@@ -89,7 +89,7 @@ permalink: /browser-firmware-release-plan/
 - Artifact に `manifest.json` または `firmware-manifest.json` が含まれる場合は、manifest を優先して left / right UF2 を分類する。manifest がない場合はファイル名 token で分類する。manifest は同じ GitHub artifact 内の UF2 だけを分類対象にし、manifest が left / right を同じ UF2 に割り当てる場合は完全な左右 artifact として扱わず、分類済み target を release gate に渡して flash gate で止める。
 - left / right が別パスでも同じ UF2 basename になる場合は、download fallback と確認ダイアログで区別できないため flash gate を開かない。
 - `src/worker.ts` が OAuth device flow と artifact zip download の same-origin API を提供する。API は `POST` のみ受け付け、不正 JSON を 400 で返し、OAuth / artifact response を `no-store` にし、static asset と API response の両方に release security headers を付け、artifact proxy の owner / repo / artifact id を検証してから GitHub へ転送する。artifact zip の redirect は Worker が手動で追跡し、redirect 先の download URL へは GitHub token を転送しない。
-- Worker は静的アセット応答に CSP、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`、不要な browser permission を閉じる `Permissions-Policy` を付ける。
+- Worker は静的アセット応答に CSP、HSTS、`X-Frame-Options: DENY`、`Cross-Origin-Opener-Policy: same-origin-allow-popups`、`Cross-Origin-Resource-Policy: same-origin`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`、不要な browser permission を閉じる `Permissions-Policy` を付ける。
 - ブラウザ flash は File System Access API の `showDirectoryPicker()` で bootloader folder を選び、`INFO_UF2.TXT` または `CURRENT.UF2` を検出できた volume にだけ UF2 を書き込む。対応しない環境や直接コピーがうまくいかない環境では、side 固定の UF2 download と手動コピー完了記録に fallback できる。
 - repository、branch、commit、run、flash 進捗は local storage に保存し、token と UF2 bytes は保存しない。復元時は commit / run / successful build の依存関係を満たさない古い進捗を破棄し、right 完了は left 完了がある場合だけ復元する。
 

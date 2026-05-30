@@ -57,8 +57,12 @@ const server = createServer((request, response) => {
     response.writeHead(200, {
       "Content-Type": "text/html",
       "Content-Security-Policy": "default-src 'self'",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      "Cross-Origin-Resource-Policy": "same-origin",
       "Permissions-Policy": "camera=()",
     });
     response.end(`<!doctype html><title>KobitoKey Studio</title><script type="module" src="/assets/app.js"></script>${crossOriginScript}`);
@@ -69,8 +73,12 @@ const server = createServer((request, response) => {
     response.writeHead(200, {
       "Content-Type": "text/javascript",
       "Content-Security-Policy": "default-src 'self'",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      "Cross-Origin-Resource-Policy": "same-origin",
       "Permissions-Policy": "camera=()",
     });
     response.end('const oauthClientId = "collector-oauth-client";');
@@ -81,8 +89,12 @@ const server = createServer((request, response) => {
     response.writeHead(200, {
       "Content-Type": "text/javascript",
       "Content-Security-Policy": "default-src 'self'",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      "Cross-Origin-Resource-Policy": "same-origin",
       "Permissions-Policy": "camera=()",
     });
     response.end('const oauthClientId = "unembedded-client";');
@@ -441,8 +453,12 @@ function assert(condition, message) {
 function releaseSecurityHeaders() {
   return {
     "Content-Security-Policy": "default-src 'self'; connect-src 'self' https://api.github.com",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=()",
   };
 }

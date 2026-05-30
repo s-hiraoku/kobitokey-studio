@@ -419,11 +419,17 @@ const checks = [
       allIncludes(files.wranglerConfig, ['"binding": "ASSETS"', '"run_worker_first": true']) &&
       allIncludes(files.worker, [
         '"Content-Security-Policy"',
+        '"Strict-Transport-Security"',
         '"Referrer-Policy"',
         '"X-Content-Type-Options"',
+        '"X-Frame-Options"',
+        '"Cross-Origin-Opener-Policy"',
+        '"Cross-Origin-Resource-Policy"',
         '"Permissions-Policy"',
         '"frame-ancestors \'none\'"',
+        "same-origin-allow-popups",
         "isLocalDev",
+        "max-age=31536000; includeSubDomains; preload",
         "\"script-src 'self' 'unsafe-inline' 'unsafe-eval'\"",
       ]) &&
       allIncludes(files.workerTest, [
@@ -431,10 +437,27 @@ const checks = [
         "allows Vite dev preamble under local development hosts",
         "adds browser security headers to API responses without losing no-store",
         "Content-Security-Policy",
+        "Strict-Transport-Security",
+        "X-Frame-Options",
+        "Cross-Origin-Opener-Policy",
+        "Cross-Origin-Resource-Policy",
         "no-referrer",
         "nosniff",
         "camera=()",
-      ]),
+      ]) &&
+      allIncludes(files.productionPreflight, [
+        "strict-transport-security",
+        "x-frame-options",
+        "cross-origin-opener-policy",
+        "cross-origin-resource-policy",
+      ]) &&
+      allIncludes(files.evidenceCollector, [
+        "strict-transport-security",
+        "x-frame-options",
+        "cross-origin-opener-policy",
+        "cross-origin-resource-policy",
+      ]) &&
+      allIncludes(files.releasePlan, ["Cross-Origin-Opener-Policy: same-origin-allow-popups", "X-Frame-Options: DENY"]),
   },
   {
     name: "GitHub commit is protected by loaded branch head SHA",

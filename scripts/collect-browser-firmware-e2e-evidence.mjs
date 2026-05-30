@@ -401,8 +401,12 @@ async function checkApiSecurityHeaders(urls) {
 function hasReleaseSecurityHeaders(headers) {
   return (
     Boolean(headers.get("content-security-policy")) &&
+    Boolean(headers.get("strict-transport-security")) &&
     headers.get("referrer-policy") === "no-referrer" &&
     headers.get("x-content-type-options") === "nosniff" &&
+    headers.get("x-frame-options") === "DENY" &&
+    headers.get("cross-origin-opener-policy") === "same-origin-allow-popups" &&
+    headers.get("cross-origin-resource-policy") === "same-origin" &&
     Boolean(headers.get("permissions-policy"))
   );
 }
