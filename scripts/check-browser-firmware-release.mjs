@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 const files = {
   readme: read("README.md"),
   packageJson: read("package.json"),
+  viteConfig: read("vite.config.ts"),
   releaseCheckRunner: read("scripts/run-browser-firmware-check.mjs"),
   evidenceSelfTest: read("scripts/check-browser-firmware-evidence-self-test.mjs"),
   collectorSelfTest: read("scripts/check-browser-firmware-collector-self-test.mjs"),
@@ -337,6 +338,7 @@ const checks = [
     name: "GitHub OAuth and artifact zip are same-origin Worker APIs",
     pass: () =>
       allIncludes(files.worker, [
+        '"/api/release-metadata"',
         '"/api/github/device-code"',
         '"/api/github/access-token"',
         '"/api/github/artifact-zip"',
@@ -347,8 +349,11 @@ const checks = [
         "parseHttpsUrl",
         "github_artifact_redirect_invalid_location",
         '"Cache-Control": "no-store"',
+        "APP_COMMIT_SHA",
       ]) &&
+      allIncludes(files.viteConfig, ["__KOBITOKEY_APP_COMMIT_SHA__", "git", "rev-parse", "HEAD"]) &&
       allIncludes(files.workerTest, [
+        "exposes release metadata through the Worker",
         "rejects unsupported GitHub OAuth scopes before calling GitHub",
         "sanitizes failed artifact download responses",
         "follows artifact zip redirects without forwarding the GitHub token",
@@ -564,19 +569,21 @@ const checks = [
         "前回の UF2 bytes と左右 flash 完了状態をメモリから破棄",
         "check:browser-firmware:production-preflight",
         "preview preflight の成功は production 公開の証跡にしない",
-        "release security headers missing や Worker API の 405",
+        "release metadata missing",
+        "Worker API の 405",
         "実 repository と実 GitHub Actions で end-to-end QA を行う",
         "Flash E2E",
       ]) &&
       allIncludes(files.docsDeployment, [
         "PR / feature branch の Workers preview",
         "preview preflight の成功は production 公開の証跡にしない",
-        "release security headers missing や Worker API の 405",
+        "release metadata missing",
+        "Worker API の 405",
       ]) &&
       allIncludes(files.readme, [
         "A passing preview preflight is not production release evidence",
-        "missing release",
-        "405 responses from Worker API routes",
+        "missing `/api/release-metadata`",
+        "405 responses from Worker",
       ]),
   },
   {
@@ -605,6 +612,7 @@ const checks = [
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "--require-oauth",
+        "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "scripts/check-browser-firmware-external-evidence.mjs",
       ]) &&
       allIncludes(files.publicReleaseSelfTest, [
@@ -618,14 +626,19 @@ const checks = [
         "OK browser firmware public release self-test passed",
       ]) &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`ci.appCommitSha` must"]) &&
+      allIncludes(files.docsDeployment, ["`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`production.appCommitSha`", "`ci.appCommitSha` must"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
+        "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
         "production URL must include mode=firmware",
         "production page is missing release security headers",
+        "/api/release-metadata",
+        "release metadata appCommitSha should be a 40-character SHA",
+        "release metadata appCommitSha should match BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "/api/github/device-code",
         "/api/github/access-token",
         "/api/github/artifact-zip",
@@ -645,12 +658,14 @@ const checks = [
         "Expected failing production preflight fixture to fail",
         "Expected OAuth-required production preflight fixture without client id to fail",
         "Expected OAuth-required production preflight fixture with client id to pass",
+        "Expected production preflight fixture with mismatched app commit SHA to fail",
         "Expected OAuth-required production preflight fixture with client id only in a cross-origin asset to fail",
         "Expected OAuth-required production preflight fixture to require the client id in the frontend bundle",
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
         "preflight-client",
         "unembedded-client",
         "cross-origin.js",
+        "release metadata route should return 200, got 404",
         "production page is missing release security headers",
         "device-code route should reject invalid JSON with 400, got 405",
         "OK browser firmware production preflight self-test passed",
@@ -664,6 +679,8 @@ const checks = [
         "production.url must open browser Firmware Mode with mode=firmware",
         "production.url must use the expected public production origin",
         "production.fetchUrl must match production.url for public release evidence",
+        "production.appCommitSha must not be a placeholder SHA",
+        "production.appCommitSha must match ci.appCommitSha",
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "requireFirmwareModeUrl",
         "requireExpectedProductionOrigin",
@@ -731,6 +748,7 @@ const checks = [
         "production.url must not be a placeholder URL",
         "production.url must use the expected public production origin",
         "production.fetchUrl must match production.url for public release evidence",
+        "production.appCommitSha must be a 40-character SHA",
         "production.apiSecurityHeadersChecked must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
@@ -766,7 +784,10 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED",
         "collectProductionEvidence",
+        "fetchReleaseMetadata",
         "fetchUrl",
+        "appCommitSha",
+        "/api/release-metadata",
         "/api/github/access-token",
         "checkUnsupportedOAuthScope",
         "checkOAuthDeviceFlow",

@@ -35,6 +35,7 @@ try {
     "production.url must open browser Firmware Mode with mode=firmware",
     "production.url must use the expected public production origin",
     "production.fetchUrl must match production.url for public release evidence",
+    "production.appCommitSha must be a 40-character SHA",
     "production.apiSecurityHeadersChecked must be true",
     "production.workerOAuthDeviceFlowStarted must be true",
     "production.frontendOAuthClientIdPresent must be true",
@@ -116,6 +117,7 @@ function createValidReport() {
     production: {
       url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
       fetchUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      appCommitSha: "89abcdef0123456789abcdef0123456789abcdef",
       workerDeviceCodeRouteChecked: true,
       workerAccessTokenRouteChecked: true,
       workerUnsupportedScopeRejected: true,

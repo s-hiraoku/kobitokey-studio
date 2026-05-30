@@ -88,6 +88,14 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/release-metadata") {
+    writeJson(response, 200, {
+      schemaVersion: 1,
+      appCommitSha,
+    });
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/github/device-code") {
     readRequestBody(request, (body) => {
       try {
@@ -206,6 +214,7 @@ try {
   const report = JSON.parse(readFileSync(manualReportPath, "utf8"));
   assert(report.production.securityHeadersChecked === true, "production security headers were not collected");
   assert(report.production.fetchUrl === `${baseUrl}/`, "production fetch URL was not recorded in the report");
+  assert(report.production.appCommitSha === appCommitSha, "production app commit sha was not collected from release metadata");
   assert(report.production.apiSecurityHeadersChecked === true, "production API security headers were not collected");
   assert(report.production.workerDeviceCodeRouteChecked === true, "device-code route was not checked");
   assert(report.production.workerAccessTokenRouteChecked === true, "access-token route was not checked");

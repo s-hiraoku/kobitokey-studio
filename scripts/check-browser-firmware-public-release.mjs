@@ -45,6 +45,7 @@ const skipMergeReadiness = args.includes("--skip-merge-readiness");
 const skipCurrentHead = args.includes("--skip-current-head");
 const issues = [];
 let report;
+let reportAppCommitSha = "";
 
 if (!process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
   issues.push("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required for the production OAuth release preflight");
@@ -84,7 +85,7 @@ if (preflightProductionUrl && !sameOrigin(preflightProductionUrl, expectedProduc
   issues.push("production preflight URL must use the expected public production origin");
 }
 if (report && !skipCurrentHead) {
-  const reportAppCommitSha = typeof report.ci?.appCommitSha === "string" ? report.ci.appCommitSha.trim() : "";
+  reportAppCommitSha = typeof report.ci?.appCommitSha === "string" ? report.ci.appCommitSha.trim() : "";
   const currentHeadSha = readGitHeadSha();
   if (!reportAppCommitSha) {
     issues.push("e2e report ci.appCommitSha is required so public-release can prove the current app commit");
@@ -93,6 +94,8 @@ if (report && !skipCurrentHead) {
   } else if (reportAppCommitSha !== currentHeadSha) {
     issues.push("e2e report ci.appCommitSha must match the current git HEAD");
   }
+} else if (report) {
+  reportAppCommitSha = typeof report.ci?.appCommitSha === "string" ? report.ci.appCommitSha.trim() : "";
 }
 
 if (issues.length > 0) {
@@ -111,7 +114,7 @@ run("node", [
   "scripts/check-browser-firmware-production-preflight.mjs",
   "--require-oauth",
   preflightProductionUrl,
-]);
+], reportAppCommitSha ? { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: reportAppCommitSha } : {});
 run("node", ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
 
 console.log(`OK ${basename(e2eReportPath)} passed browser firmware public release gate`);
@@ -152,9 +155,9 @@ function readGitHeadSha() {
   return result.status === 0 ? result.stdout.trim() : "";
 }
 
-function run(command, commandArgs) {
+function run(command, commandArgs, extraEnv = {}) {
   const result = spawnSync(command, commandArgs, {
-    env: process.env,
+    env: { ...process.env, ...extraEnv },
     stdio: "inherit",
   });
   if (result.error) {

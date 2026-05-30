@@ -19,6 +19,9 @@ Optional environment:
   BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID
     When set, the preflight also verifies that the deployed Worker can start
     a real GitHub OAuth device flow with repo scope.
+  BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA
+    When set, the preflight verifies /api/release-metadata returns the same
+    deployed app commit SHA.
   BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH=true
     Fails unless BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is set and the
     deployed Worker can start a real GitHub OAuth device flow with repo scope,
@@ -68,12 +71,42 @@ async function checkProductionPreflight(rawUrl) {
   });
 
   const apiBase = new URL(url);
+  await checkReleaseMetadata(new URL("/api/release-metadata", apiBase));
   await checkInvalidJsonRoute(new URL("/api/github/device-code", apiBase), "device-code");
   await checkInvalidJsonRoute(new URL("/api/github/access-token", apiBase), "access-token");
   await checkInvalidJsonRoute(new URL("/api/github/artifact-zip", apiBase), "artifact-zip");
   await checkUnsupportedOAuthScope(new URL("/api/github/device-code", apiBase));
   await checkOAuthDeviceFlow(new URL("/api/github/device-code", apiBase));
   await checkFrontendOAuthClientId(url, pageHtml);
+}
+
+async function checkReleaseMetadata(url) {
+  const response = await fetch(url).catch((error) => {
+    issues.push(`release metadata request failed: ${formatError(error)}`);
+    return null;
+  });
+  if (!response) return;
+  if (response.status !== 200) {
+    issues.push(`release metadata route should return 200, got ${response.status}`);
+    return;
+  }
+  if (response.headers.get("cache-control") !== "no-store") {
+    issues.push("release metadata route should return Cache-Control: no-store");
+  }
+  if (!hasReleaseSecurityHeaders(response.headers)) {
+    issues.push("release metadata route is missing release security headers");
+  }
+  const body = await response.json().catch(() => null);
+  if (body?.schemaVersion !== 1) {
+    issues.push("release metadata route should return schemaVersion 1");
+  }
+  if (!isSha(body?.appCommitSha)) {
+    issues.push("release metadata appCommitSha should be a 40-character SHA");
+  }
+  const expectedAppCommitSha = process.env.BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA?.trim();
+  if (expectedAppCommitSha && body?.appCommitSha !== expectedAppCommitSha) {
+    issues.push("release metadata appCommitSha should match BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA");
+  }
 }
 
 async function checkInvalidJsonRoute(url, label) {
@@ -207,6 +240,10 @@ function parseHttpsUrl(value) {
   } catch {
     return null;
   }
+}
+
+function isSha(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
 }
 
 function formatError(error) {

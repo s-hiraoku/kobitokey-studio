@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 
+const appCommitSha = "89abcdef0123456789abcdef0123456789abcdef";
+
 const goodServer = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   if (request.method === "GET" && url.pathname === "/") {
@@ -12,6 +14,14 @@ const goodServer = createServer((request, response) => {
       ...releaseSecurityHeaders(),
     });
     response.end(`<!doctype html><title>KobitoKey Studio</title><script type="module" src="/assets/app.js"></script>${crossOriginScript}`);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/release-metadata") {
+    writeJson(response, 200, {
+      schemaVersion: 1,
+      appCommitSha,
+    });
     return;
   }
 
@@ -86,7 +96,10 @@ try {
   const goodUrl = await listen(goodServer);
   const badUrl = await listen(badServer);
 
-  const good = await runPreflight(goodUrl, { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client" });
+  const good = await runPreflight(goodUrl, {
+    BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client",
+    BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: appCommitSha,
+  });
   if (good.status !== 0) {
     process.stderr.write(good.stderr);
     process.stdout.write(good.stdout);
@@ -100,6 +113,15 @@ try {
   if (!missingOAuth.stderr.includes("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required when OAuth preflight is required")) {
     process.stderr.write(missingOAuth.stderr);
     throw new Error("Expected OAuth-required production preflight fixture to require a client id");
+  }
+
+  const wrongAppCommit = await runPreflight(goodUrl, { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: "0123456789abcdef0123456789abcdef01234567" });
+  if (wrongAppCommit.status === 0) {
+    throw new Error("Expected production preflight fixture with mismatched app commit SHA to fail");
+  }
+  if (!wrongAppCommit.stderr.includes("release metadata appCommitSha should match BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA")) {
+    process.stderr.write(wrongAppCommit.stderr);
+    throw new Error("Expected production preflight fixture to require the deployed app commit SHA");
   }
 
   const requiredOAuth = await runPreflight(goodUrl, { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client" }, ["--require-oauth"]);
@@ -124,6 +146,7 @@ try {
   }
   for (const expected of [
     "production page is missing release security headers",
+    "release metadata route should return 200, got 404",
     "device-code route should reject invalid JSON with 400, got 405",
     "device-code route should reject unsupported OAuth scope with 400, got 405",
   ]) {

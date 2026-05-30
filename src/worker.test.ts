@@ -325,6 +325,31 @@ describe("worker GitHub API proxy", () => {
     expect(env.ASSETS.fetch).toHaveBeenCalledOnce();
   });
 
+  it("exposes release metadata through the Worker", async () => {
+    const response = await worker.fetch(new Request("https://app.example/api/release-metadata"), env);
+
+    await expect(response.json()).resolves.toMatchObject({
+      schemaVersion: 1,
+      appCommitSha: "development",
+    });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Content-Security-Policy")).toContain("connect-src 'self' https://api.github.com");
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-GET release metadata requests with an Allow header", async () => {
+    const response = await worker.fetch(
+      new Request("https://app.example/api/release-metadata", {
+        method: "POST",
+      }),
+      env,
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: "method_not_allowed" });
+    expect(response.status).toBe(405);
+    expect(response.headers.get("Allow")).toBe("GET");
+  });
+
   it("adds browser security headers to static asset responses", async () => {
     const response = await worker.fetch(new Request("https://app.example/"), env);
 

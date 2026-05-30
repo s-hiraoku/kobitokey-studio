@@ -25,6 +25,8 @@ requireFirmwareModeUrl(report.production?.url, "production.url must open browser
 requireExpectedProductionOrigin(report.production?.url, "production.url must use the expected public production origin");
 requireHttpsUrl(report.production?.fetchUrl, "production.fetchUrl must be an https URL");
 requireValue(report.production?.fetchUrl === report.production?.url, "production.fetchUrl must match production.url for public release evidence");
+requireSha(report.production?.appCommitSha, "production.appCommitSha must be a 40-character SHA");
+requireNonPlaceholderHash(report.production?.appCommitSha, "production.appCommitSha must not be a placeholder SHA");
 requireValue(report.production?.workerDeviceCodeRouteChecked === true, "production.workerDeviceCodeRouteChecked must be true");
 requireValue(report.production?.workerAccessTokenRouteChecked === true, "production.workerAccessTokenRouteChecked must be true");
 requireValue(report.production?.workerUnsupportedScopeRejected === true, "production.workerUnsupportedScopeRejected must be true");
@@ -37,6 +39,7 @@ requireValue(report.production?.apiSecurityHeadersChecked === true, "production.
 requireHttpsUrl(report.ci?.runUrl, "ci.runUrl must be an https URL");
 requireSha(report.ci?.appCommitSha, "ci.appCommitSha must be a 40-character SHA");
 requireNonPlaceholderHash(report.ci?.appCommitSha, "ci.appCommitSha must not be a placeholder SHA");
+requireValue(report.production?.appCommitSha === report.ci?.appCommitSha, "production.appCommitSha must match ci.appCommitSha");
 requireValue(report.ci?.browserFirmwareReleaseCheckPassed === true, "ci.browserFirmwareReleaseCheckPassed must be true");
 
 requireValue(isRepoSlug(report.github?.repository), "github.repository must be owner/repo");

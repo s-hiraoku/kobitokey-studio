@@ -5,6 +5,7 @@
   "production": {
     "url": "https://example.com/?mode=firmware",
     "fetchUrl": "https://example.com/?mode=firmware",
+    "appCommitSha": "0000000000000000000000000000000000000000",
     "workerDeviceCodeRouteChecked": false,
     "workerAccessTokenRouteChecked": false,
     "workerUnsupportedScopeRejected": false,

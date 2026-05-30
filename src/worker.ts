@@ -23,9 +23,19 @@ type ArtifactZipRequest = {
 
 type JsonReadResult<T> = { ok: true; value: T } | { ok: false; response: Response };
 
+declare const __KOBITOKEY_APP_COMMIT_SHA__: string | undefined;
+
+const APP_COMMIT_SHA =
+  typeof __KOBITOKEY_APP_COMMIT_SHA__ === "string" && __KOBITOKEY_APP_COMMIT_SHA__.trim()
+    ? __KOBITOKEY_APP_COMMIT_SHA__.trim()
+    : "development";
+
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/api/release-metadata") {
+      return withSecurityHeaders(releaseMetadata(request), request);
+    }
     if (url.pathname === "/api/github/device-code") {
       return withSecurityHeaders(await proxyDeviceCode(request), request);
     }
@@ -38,6 +48,19 @@ export default {
     return withSecurityHeaders(await env.ASSETS.fetch(request), request);
   },
 };
+
+function releaseMetadata(request: Request): Response {
+  if (request.method !== "GET") {
+    const response = json({ error: "method_not_allowed" }, 405);
+    response.headers.set("Allow", "GET");
+    return response;
+  }
+
+  return json({
+    schemaVersion: 1,
+    appCommitSha: APP_COMMIT_SHA,
+  });
+}
 
 async function proxyDeviceCode(request: Request): Promise<Response> {
   if (request.method !== "POST") return methodNotAllowed();

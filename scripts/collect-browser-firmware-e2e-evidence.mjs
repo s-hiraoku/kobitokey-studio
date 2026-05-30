@@ -19,7 +19,6 @@ const token = process.env.GITHUB_TOKEN || process.env.BROWSER_FIRMWARE_E2E_GITHU
 const productionUrl = requireEnv("BROWSER_FIRMWARE_E2E_PRODUCTION_URL");
 const productionFetchUrl = process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL || productionUrl;
 const oauthClientId = requireEnv("BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID");
-const appCommitSha = process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA || readGitHeadSha();
 const repository = requireEnv("BROWSER_FIRMWARE_E2E_REPOSITORY");
 const branch = requireEnv("BROWSER_FIRMWARE_E2E_BRANCH");
 const commitSha = requireEnv("BROWSER_FIRMWARE_E2E_COMMIT_SHA");
@@ -28,6 +27,7 @@ const leftUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_LEFT_UF2");
 const rightUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_RIGHT_UF2");
 
 const production = await collectProductionEvidence(productionUrl, productionFetchUrl, oauthClientId);
+const appCommitSha = process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA || production.appCommitSha || readGitHeadSha();
 const commit = await fetchGitHubJson(`/repos/${repository}/commits/${commitSha}`, token);
 const run = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}`, token);
 const actionsArtifacts = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}/artifacts`, token);
@@ -152,7 +152,7 @@ Required environment:
   BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID
   BROWSER_FIRMWARE_E2E_TESTER
   BROWSER_FIRMWARE_E2E_CI_RUN_URL
-  BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA (optional when git HEAD is available)
+  BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA (optional when production metadata or git HEAD is available)
   BROWSER_FIRMWARE_E2E_CI_PASSED=true
   BROWSER_FIRMWARE_E2E_REPOSITORY=owner/repo
   BROWSER_FIRMWARE_E2E_BRANCH
@@ -261,10 +261,12 @@ async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDe
     throw new Error(`Production URL returned ${response.status}: ${fetchUrl}`);
   }
   const pageHtml = await response.text();
+  const releaseMetadata = await fetchReleaseMetadata(new URL("/api/release-metadata", production));
 
   return {
     url: reportUrl,
     fetchUrl,
+    appCommitSha: releaseMetadata.appCommitSha,
     workerDeviceCodeRouteChecked: await checkWorkerRoute(new URL("/api/github/device-code", production)),
     workerAccessTokenRouteChecked: await checkWorkerRoute(new URL("/api/github/access-token", production)),
     workerUnsupportedScopeRejected: await checkUnsupportedOAuthScope(new URL("/api/github/device-code", production)),
@@ -279,6 +281,21 @@ async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDe
       new URL("/api/github/artifact-zip", production),
     ]),
   };
+}
+
+async function fetchReleaseMetadata(url) {
+  const response = await fetch(url);
+  if (response.status !== 200) {
+    throw new Error(`Release metadata route returned ${response.status}: ${url.href}`);
+  }
+  if (response.headers.get("cache-control") !== "no-store" || !hasReleaseSecurityHeaders(response.headers)) {
+    throw new Error(`Release metadata route is missing no-store or release security headers: ${url.href}`);
+  }
+  const body = await response.json().catch(() => null);
+  if (body?.schemaVersion !== 1 || !isSha(body?.appCommitSha)) {
+    throw new Error("Release metadata route did not return schemaVersion 1 with a 40-character appCommitSha");
+  }
+  return body;
 }
 
 async function checkFrontendOAuthClientId(pageUrl, pageHtml, clientId) {
@@ -381,6 +398,10 @@ function hasReleaseSecurityHeaders(headers) {
     headers.get("x-content-type-options") === "nosniff" &&
     Boolean(headers.get("permissions-policy"))
   );
+}
+
+function isSha(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
 }
 
 async function fetchGitHubJson(path, authToken) {

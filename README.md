@@ -130,8 +130,8 @@ BROWSER_FIRMWARE_PRODUCTION_URL=https://feature-firmware-mode-kobitokey-studio.s
 
 A passing preview preflight is not production release evidence. The default
 production URL must pass after the target commit is deployed; missing release
-security headers or 405 responses from Worker API routes mean production is
-still on an older deployment.
+security headers, missing `/api/release-metadata`, or 405 responses from Worker
+API routes mean production is still on an older deployment.
 
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:
@@ -143,7 +143,8 @@ npm run check:browser-firmware:merge-readiness
 To prove the deployed OAuth proxy can start the GitHub device flow, pass the
 public OAuth app client id as well. This is the stricter preflight to use for
 the final browser Firmware Mode release gate; it checks both the Worker device
-flow and the deployed frontend bundle that powers the GitHub connect button:
+flow, the deployed frontend bundle that powers the GitHub connect button, and
+the deployed app commit reported by `/api/release-metadata`:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
@@ -157,8 +158,9 @@ report URL must use the expected public production origin
 (`https://kobitokey-studio.s-hiraoku.workers.dev` by default, or
 `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` for a future custom domain). The
 report `production.fetchUrl` must match `production.url`, so a test fetch
-override cannot be used as public evidence. The report `ci.appCommitSha` must
-match the current git `HEAD`:
+override cannot be used as public evidence. The report `production.appCommitSha`
+must match `ci.appCommitSha`, and `ci.appCommitSha` must match the current git
+`HEAD`:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
