@@ -57,6 +57,8 @@ try {
     "artifacts.classificationSource manifest requires build.githubArtifactManifests",
     "artifacts.classificationSource manifest requires manifest targets to match left and right UF2 names",
     "artifacts.left.sha256 must not be a placeholder hash",
+    "artifacts.left.artifactId must be a positive integer",
+    "artifacts.left.artifactName must be a non-placeholder name",
     "artifacts.left must match a UF2 entry from build.githubArtifactUf2Files",
     "left and right artifact UF2 basenames must differ",
     "flash.left.method must be direct-copy or download-copy",
@@ -231,10 +233,14 @@ function createValidReport() {
       left: {
         uf2Name: "kobitokey_left.uf2",
         sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        artifactId: 456,
+        artifactName: "firmware",
       },
       right: {
         uf2Name: "kobitokey_right.uf2",
         sha256: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        artifactId: 456,
+        artifactName: "firmware",
       },
     },
     flash: {
@@ -391,10 +397,14 @@ function createFilenameReport() {
       left: {
         uf2Name: "kobitokey_l.uf2",
         sha256: report.artifacts.left.sha256,
+        artifactId: 456,
+        artifactName: "firmware",
       },
       right: {
         uf2Name: "kobitokey_r.uf2",
         sha256: report.artifacts.right.sha256,
+        artifactId: 456,
+        artifactName: "firmware",
       },
     },
     flash: {

@@ -378,6 +378,8 @@ function requireArtifactSide(value, side) {
   requireValue(typeof value?.uf2Name === "string" && value.uf2Name.toLowerCase().endsWith(".uf2"), `artifacts.${side}.uf2Name must end with .uf2`);
   requireSha256(value?.sha256, `artifacts.${side}.sha256 must be a SHA-256 hash`);
   requireNonPlaceholderHash(value?.sha256, `artifacts.${side}.sha256 must not be a placeholder hash`);
+  requirePositiveInteger(value?.artifactId, `artifacts.${side}.artifactId must be a positive integer`);
+  requireNonPlaceholderString(value?.artifactName, `artifacts.${side}.artifactName must be a non-placeholder name`);
 }
 
 function requireClassificationProof(artifacts, manifests, uf2Files) {
@@ -430,7 +432,11 @@ function requireArtifactUf2Proof(githubArtifactUf2Files, value, side) {
   }
   requireValue(
     githubArtifactUf2Files.some(
-      (uf2) => artifactBasename(uf2?.name) === artifactBasename(value.uf2Name) && uf2?.sha256 === value.sha256,
+      (uf2) =>
+        uf2?.artifactId === value.artifactId &&
+        uf2?.artifactName === value.artifactName &&
+        artifactBasename(uf2?.name) === artifactBasename(value.uf2Name) &&
+        uf2?.sha256 === value.sha256,
     ),
     `artifacts.${side} must match a UF2 entry from build.githubArtifactUf2Files`,
   );

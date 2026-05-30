@@ -49,6 +49,8 @@ const rightUf2 = hashFile(rightUf2Path);
 const githubArtifacts = collectGitHubArtifactDetails(actionsArtifacts);
 const artifactNames = githubArtifacts.map((artifact) => artifact.name);
 const githubArtifactEntries = await collectGitHubArtifactEntries(repository, githubArtifacts, token);
+const leftArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, leftUf2);
+const rightArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, rightUf2);
 const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiSmoke();
 
 const report = {
@@ -93,10 +95,14 @@ const report = {
     left: {
       uf2Name: leftUf2.name,
       sha256: leftUf2.sha256,
+      artifactId: leftArtifactProof?.artifactId,
+      artifactName: leftArtifactProof?.artifactName,
     },
     right: {
       uf2Name: rightUf2.name,
       sha256: rightUf2.sha256,
+      artifactId: rightArtifactProof?.artifactId,
+      artifactName: rightArtifactProof?.artifactName,
     },
   },
   flash: {
@@ -545,6 +551,21 @@ function hashFile(path) {
     name: basename(path),
     sha256: createHash("sha256").update(bytes).digest("hex"),
   };
+}
+
+function artifactProofForUf2(uf2Files, uf2) {
+  if (!Array.isArray(uf2Files)) {
+    return null;
+  }
+  return (
+    uf2Files.find(
+      (candidate) =>
+        basename(candidate?.name ?? "") === uf2.name &&
+        candidate?.sha256 === uf2.sha256 &&
+        Number.isInteger(candidate?.artifactId) &&
+        typeof candidate?.artifactName === "string",
+    ) ?? null
+  );
 }
 
 function collectCommitFilenames(commit) {

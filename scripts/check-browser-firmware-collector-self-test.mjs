@@ -288,6 +288,8 @@ try {
   );
   assert(report.artifacts.left.sha256 === sha256("left firmware bytes"), "left UF2 hash mismatch");
   assert(report.artifacts.right.sha256 === sha256("right firmware bytes"), "right UF2 hash mismatch");
+  assert(report.artifacts.left.artifactId === 456, "left UF2 artifact id was not recorded in artifacts proof");
+  assert(report.artifacts.right.artifactName === "firmware", "right UF2 artifact name was not recorded in artifacts proof");
   assert(report.flash.left.method === "direct-copy", "left flash method was not collected");
   assert(report.flash.right.method === "download-copy", "right flash method was not collected");
   assert(report.flash.left.confirmationPromptAccepted === true, "left flash confirmation prompt state was not collected");
