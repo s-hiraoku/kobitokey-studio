@@ -301,9 +301,7 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
 
   await page.locator("#browser-firmware-token").fill("release-smoke-token");
   await page.getByRole("button", { name: "GitHub から読み込み" }).click();
-  await page.waitForFunction(() =>
-    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("firmware files を読み込みました"),
-  );
+  await waitForBuildStatusText(page, "firmware files を読み込みました");
 
   await page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" }).click();
   await page.locator(".layer-list button").first().click();
@@ -314,19 +312,11 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
 
   await page.getByRole("button", { name: "Diff 確認済み" }).click();
   await page.getByRole("button", { name: "Commit & Build" }).click();
-  await page.waitForFunction(
-    (sha) => document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes(sha.slice(0, 7)),
-    commitSha,
-  );
+  await waitForBuildStatusText(page, commitSha.slice(0, 7));
   await page.getByRole("button", { name: "最新 run" }).click();
-  await page.waitForFunction(
-    (expectedRunId) => document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes(`run ${expectedRunId}`),
-    runId,
-  );
+  await waitForBuildStatusText(page, `run ${runId}`);
   await page.getByRole("button", { name: "Artifact 取得" }).click();
-  await page.waitForFunction(() =>
-    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("artifact を取得しました"),
-  );
+  await waitForBuildStatusText(page, "artifact を取得しました", 60_000);
 
   const state = await page.evaluate(() => {
     const headerText = document.querySelector(".browser-release-workbench .flash-wizard-header span")?.textContent?.trim() ?? "";
@@ -529,6 +519,24 @@ async function fulfillJson(route, value, status = 200) {
 
 function readFixtureText(filename) {
   return readFileSync(join(process.cwd(), "public", "fixtures", filename), "utf8");
+}
+
+async function waitForBuildStatusText(page, expectedText, timeout = 30_000) {
+  try {
+    await page.waitForFunction(
+      (text) =>
+        document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes(text),
+      expectedText,
+      { timeout },
+    );
+  } catch (error) {
+    const currentStatus =
+      (await page.locator(".browser-release-workbench .build-status[role='status']").textContent().catch(() => "")) ?? "";
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Timed out waiting for Build & Flash status "${expectedText}". Current status: "${currentStatus.trim() || "-"}". ${reason}`,
+    );
+  }
 }
 
 async function readReleaseWizardState(page) {
