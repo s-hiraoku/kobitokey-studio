@@ -542,10 +542,13 @@ const checks = [
       ]),
   },
   {
-    name: "artifact manifest cannot map both sides to the same UF2",
+    name: "artifact manifest cannot map unsafe UF2 targets",
     pass: () =>
-      allIncludes(files.githubClient, ["classifyUf2ArtifactsFromManifests", "left && right && left === right"]) &&
-      files.githubClientTest.includes("does not reuse a manifest-selected UF2 as the opposite side from filename fallback"),
+      allIncludes(files.githubClient, ["classifyUf2ArtifactsFromManifests", "left && right && left === right", "classifyArtifactEntries"]) &&
+      allIncludes(files.githubClientTest, [
+        "does not reuse a manifest-selected UF2 as the opposite side from filename fallback",
+        "does not use a manifest to classify UF2 files from another artifact",
+      ]),
   },
   {
     name: "browser flash writes only to verified UF2 bootloader folders",

@@ -86,7 +86,7 @@ permalink: /browser-firmware-release-plan/
 - Flash gate は commit SHA、成功 build run id、left / right artifact 分類が揃っている場合だけ開く。
 - GitHub から読み込んだ時点の branch head SHA を保持し、commit 直前の branch head が変わっている場合は stale な編集内容で上書きせず、読み込み直しを求める。
 - GitHub API 失敗時は 401 / 403 / 404 / 409 / 422 / rate limit をユーザー向けに変換し、再接続、scope 確認、repository / branch 確認、再読み込みなどの次アクションを表示する。
-- Artifact に `manifest.json` または `firmware-manifest.json` が含まれる場合は、manifest を優先して left / right UF2 を分類する。manifest がない場合はファイル名 token で分類する。manifest が left / right を同じ UF2 に割り当てる場合は完全な左右 artifact として扱わず、分類済み target を release gate に渡して flash gate で止める。
+- Artifact に `manifest.json` または `firmware-manifest.json` が含まれる場合は、manifest を優先して left / right UF2 を分類する。manifest がない場合はファイル名 token で分類する。manifest は同じ GitHub artifact 内の UF2 だけを分類対象にし、manifest が left / right を同じ UF2 に割り当てる場合は完全な左右 artifact として扱わず、分類済み target を release gate に渡して flash gate で止める。
 - left / right が別パスでも同じ UF2 basename になる場合は、download fallback と確認ダイアログで区別できないため flash gate を開かない。
 - `src/worker.ts` が OAuth device flow と artifact zip download の same-origin API を提供する。API は `POST` のみ受け付け、不正 JSON を 400 で返し、OAuth / artifact response を `no-store` にし、static asset と API response の両方に release security headers を付け、artifact proxy の owner / repo / artifact id を検証してから GitHub へ転送する。artifact zip の redirect は Worker が手動で追跡し、redirect 先の download URL へは GitHub token を転送しない。
 - Worker は静的アセット応答に CSP、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`、不要な browser permission を閉じる `Permissions-Policy` を付ける。

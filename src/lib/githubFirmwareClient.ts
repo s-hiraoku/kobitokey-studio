@@ -276,17 +276,19 @@ export async function downloadGitHubFirmwareArtifacts(
   }
   const files: GitHubArtifactUf2[] = [];
   const manifests: GitHubArtifactManifest[] = [];
+  const entriesByArtifact: Array<{ files: GitHubArtifactUf2[]; manifests: GitHubArtifactManifest[] }> = [];
 
   for (const artifact of activeArtifacts) {
     const zipBytes = await fetchGitHubArtifactZip(ref, artifact.id, options);
     const entries = extractFirmwareArtifactEntriesFromZip(zipBytes);
+    entriesByArtifact.push(entries);
     files.push(...entries.files);
     manifests.push(...entries.manifests);
   }
   if (files.length === 0) {
     throw new Error(`GitHub Actions run ${runId} の artifact に UF2 が含まれていません。firmware build の出力を確認してください`);
   }
-  const manifestClassification = classifyUf2ArtifactsFromManifests(files.map((file) => file.name), manifests);
+  const manifestClassification = classifyArtifactEntries(entriesByArtifact);
 
   return {
     files,
@@ -463,6 +465,29 @@ export function classifyUf2ArtifactsFromManifests(
   }
 
   return { targets: byName };
+}
+
+function classifyArtifactEntries(
+  artifacts: Array<{ files: GitHubArtifactUf2[]; manifests: GitHubArtifactManifest[] }>,
+): { manifestPath?: string; targets: ClassifiedUf2Artifacts } {
+  const allFiles = artifacts.flatMap((artifact) => artifact.files.map((file) => file.name));
+  for (const artifact of artifacts) {
+    const classification = classifyUf2ArtifactsFromManifests(
+      artifact.files.map((file) => file.name),
+      artifact.manifests,
+    );
+    if (classification.manifestPath) {
+      return {
+        manifestPath: classification.manifestPath,
+        targets: {
+          ...classification.targets,
+          unknown: allFiles.filter((file) => file !== classification.targets.left && file !== classification.targets.right),
+        },
+      };
+    }
+  }
+
+  return { targets: classifyUf2Artifacts(allFiles) };
 }
 
 function mergeManifestTargets(

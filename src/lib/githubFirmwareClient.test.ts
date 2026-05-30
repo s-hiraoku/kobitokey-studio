@@ -565,6 +565,46 @@ describe("GitHub artifact helpers", () => {
     expect(result.files.map((file) => file.name)).toEqual(["KobitoKey_left.uf2", "KobitoKey_right.uf2"]);
   });
 
+  it("does not use a manifest to classify UF2 files from another artifact", async () => {
+    const manifestZip = zipSync({
+      "firmware-manifest.json": new TextEncoder().encode(
+        JSON.stringify({
+          left: { file: "KobitoKey_A.uf2" },
+          right: { file: "KobitoKey_B.uf2" },
+        }),
+      ),
+    });
+    const uf2Zip = zipSync({
+      "KobitoKey_A.uf2": new Uint8Array([1]),
+      "KobitoKey_B.uf2": new Uint8Array([2]),
+    });
+    const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/actions/runs/123/artifacts")) {
+        return jsonResponse({
+          artifacts: [
+            { id: 10, name: "manifest", expired: false },
+            { id: 11, name: "firmware", expired: false },
+          ],
+        });
+      }
+      if (String(url) === "/api/github/artifact-zip") {
+        const body = JSON.parse(String(init?.body));
+        if (body.artifactId === 10) return new Response(manifestZip);
+        if (body.artifactId === 11) return new Response(uf2Zip);
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const result = await downloadGitHubFirmwareArtifacts(ref, 123, { fetchImpl: fetchImpl as typeof fetch, token: "token" });
+
+    expect(result.manifestPath).toBeUndefined();
+    expect(result.targets).toEqual({
+      left: null,
+      right: null,
+      unknown: ["KobitoKey_A.uf2", "KobitoKey_B.uf2"],
+    });
+  });
+
   it("verifies the run commit, branch, and success state before downloading artifacts", async () => {
     const zip = zipSync({
       "KobitoKey_left.uf2": new Uint8Array([1]),
