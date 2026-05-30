@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
 const expectedProductionOrigin =
   process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
+const scriptDir = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 
 if (args.includes("--help") || args.includes("-h")) {
@@ -118,12 +120,12 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
+run(process.execPath, [scriptPath("check-browser-firmware-external-evidence.mjs"), e2eReportPath]);
 if (!skipMergeReadiness) {
-  run(process.execPath, ["scripts/check-browser-firmware-merge-readiness.mjs"]);
+  run(process.execPath, [scriptPath("check-browser-firmware-merge-readiness.mjs")]);
 }
 run(process.execPath, [
-  "scripts/check-browser-firmware-production-preflight.mjs",
+  scriptPath("check-browser-firmware-production-preflight.mjs"),
   "--require-oauth",
   preflightProductionUrl,
 ], reportAppCommitSha ? { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: reportAppCommitSha } : {});
@@ -172,6 +174,10 @@ function readGitWorktreeStatus() {
     stdio: ["ignore", "pipe", "ignore"],
   });
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function scriptPath(filename) {
+  return join(scriptDir, filename);
 }
 
 function run(command, commandArgs, extraEnv = {}) {

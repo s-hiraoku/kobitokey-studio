@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 const publicReleaseScript = resolve("scripts/check-browser-firmware-public-release.mjs");
 const templateReport = resolve("docs/browser-firmware-e2e-evidence.template.json");
 const dir = mkdtempSync(join(tmpdir(), "browser-firmware-public-release-"));
+const cleanRepoDir = createGitRepo("clean-release-");
 
 try {
   const previewReport = join(dir, "preview.json");
@@ -150,7 +151,7 @@ function expectNoOutput(result, unexpectedMessages, message) {
 }
 
 function runPublicRelease(args, env = {}) {
-  return runPublicReleaseInCwd(process.cwd(), args, env);
+  return runPublicReleaseInCwd(cleanRepoDir, args, env);
 }
 
 function runPublicReleaseInCwd(cwd, args, env = {}) {
@@ -178,13 +179,7 @@ function runPublicReleaseInCwd(cwd, args, env = {}) {
 }
 
 async function runDirtyWorktreePublicRelease() {
-  const repoDir = mkdtempSync(join(dir, "dirty-release-"));
-  runGit(repoDir, ["init"]);
-  runGit(repoDir, ["config", "user.email", "kobitokey-release-self-test@example.com"]);
-  runGit(repoDir, ["config", "user.name", "KobitoKey Release Self Test"]);
-  writeFileSync(join(repoDir, "README.md"), "release self-test\n");
-  runGit(repoDir, ["add", "README.md"]);
-  runGit(repoDir, ["commit", "-m", "Initial commit"]);
+  const repoDir = createGitRepo("dirty-release-");
   writeFileSync(join(repoDir, "dirty.txt"), "not committed\n");
 
   return runPublicReleaseInCwd(
@@ -195,6 +190,17 @@ async function runDirtyWorktreePublicRelease() {
       BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test dirty worktree",
     },
   );
+}
+
+function createGitRepo(prefix) {
+  const repoDir = mkdtempSync(join(dir, prefix));
+  runGit(repoDir, ["init"]);
+  runGit(repoDir, ["config", "user.email", "kobitokey-release-self-test@example.com"]);
+  runGit(repoDir, ["config", "user.name", "KobitoKey Release Self Test"]);
+  writeFileSync(join(repoDir, "README.md"), "release self-test\n");
+  runGit(repoDir, ["add", "README.md"]);
+  runGit(repoDir, ["commit", "-m", "Initial commit"]);
+  return repoDir;
 }
 
 function runGit(cwd, args) {

@@ -762,11 +762,12 @@ const checks = [
         "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
         "--skip-current-head",
-        "scripts/check-browser-firmware-merge-readiness.mjs",
-        "scripts/check-browser-firmware-production-preflight.mjs",
+        'scriptPath("check-browser-firmware-merge-readiness.mjs")',
+        'scriptPath("check-browser-firmware-production-preflight.mjs")',
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
-        "scripts/check-browser-firmware-external-evidence.mjs",
+        'scriptPath("check-browser-firmware-external-evidence.mjs")',
+        "fileURLToPath(import.meta.url)",
       ]) &&
       allIncludes(files.publicReleaseSelfTest, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
@@ -783,13 +784,15 @@ const checks = [
         "Expected dirty worktree to stop before production preflight",
         "BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags",
         "working tree is dirty; commit or stash changes before public release gate",
+        "createGitRepo",
+        "cleanRepoDir",
         "runDirtyWorktreePublicRelease",
         "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&
       allIncludes(files.publicReleaseCheck, [
-        'run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath])',
-        'run(process.execPath, ["scripts/check-browser-firmware-merge-readiness.mjs"])',
+        'run(process.execPath, [scriptPath("check-browser-firmware-external-evidence.mjs"), e2eReportPath])',
+        'run(process.execPath, [scriptPath("check-browser-firmware-merge-readiness.mjs")])',
         'run(process.execPath, [',
       ]) &&
       !files.publicReleaseCheck.includes('run("node"') &&
