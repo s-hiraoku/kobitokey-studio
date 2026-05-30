@@ -854,6 +854,7 @@ const checks = [
         "ui.comboEditActionsPassed must be true",
         "ui.trackballEditActionsPassed must be true",
         "ui.releaseWizardPreconditionsPassed must be true",
+        "ui.artifactProvenanceVisible must be true",
       ]) &&
       allIncludes(files.evidenceSelfTest, [
         "Expected valid external evidence report to pass",
@@ -893,6 +894,7 @@ const checks = [
         "flash.left.method must be direct-copy or download-copy",
         "ui.tokenClearWorks must be true",
         "ui.referencedLayerDeleteBlocked must be true",
+        "ui.artifactProvenanceVisible must be true",
         "ui.smokeCommand must be npm run check:browser-firmware:ui",
       ]) &&
       allIncludes(files.evidenceCollector, [
@@ -916,6 +918,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_COMBO_EDIT_ACTIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED",
+        "BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE",
         "collectProductionEvidence",
         "fetchReleaseMetadata",
         "fetchUrl",
@@ -995,6 +998,7 @@ const checks = [
         "combo edit UI smoke state was not collected",
         "trackball edit UI smoke state was not collected",
         "release wizard precondition UI smoke state was not collected",
+        "artifact provenance UI smoke state was not collected",
         "OK browser firmware external evidence collector self-test passed",
       ]) &&
       allIncludes(files.externalEvidenceTemplate, [
@@ -1036,6 +1040,7 @@ const checks = [
         '"comboEditActionsPassed"',
         '"trackballEditActionsPassed"',
         '"releaseWizardPreconditionsPassed"',
+        '"artifactProvenanceVisible"',
       ]),
   },
 ];

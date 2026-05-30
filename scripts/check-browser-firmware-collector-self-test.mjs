@@ -289,6 +289,7 @@ try {
   assert(report.ui.comboEditActionsPassed === true, "combo edit UI smoke state was not collected");
   assert(report.ui.trackballEditActionsPassed === true, "trackball edit UI smoke state was not collected");
   assert(report.ui.releaseWizardPreconditionsPassed === true, "release wizard precondition UI smoke state was not collected");
+  assert(report.ui.artifactProvenanceVisible === true, "artifact provenance UI smoke state was not collected");
 
   const autoResult = await runCollector(baseUrl, autoReportPath, { includeManualUiSmoke: false, runUiSmoke: true });
   if (autoResult.status !== 0) {
@@ -307,6 +308,7 @@ try {
   assert(autoReport.ui.comboEditActionsPassed === true, "automatic combo UI smoke state was not collected");
   assert(autoReport.ui.trackballEditActionsPassed === true, "automatic trackball UI smoke state was not collected");
   assert(autoReport.ui.releaseWizardPreconditionsPassed === true, "automatic release wizard precondition UI smoke state was not collected");
+  assert(autoReport.ui.artifactProvenanceVisible === true, "automatic artifact provenance UI smoke state was not collected");
 
   const unembeddedClientResult = await runCollector(baseUrl, unembeddedClientReportPath, {
     includeManualUiSmoke: true,
@@ -409,6 +411,7 @@ function runCollector(baseUrl, reportPath, options) {
               BROWSER_FIRMWARE_E2E_COMBO_EDIT_ACTIONS_PASSED: "true",
               BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED: "true",
               BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED: "true",
+              BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE: "true",
             }
           : {}),
       },

@@ -64,6 +64,7 @@ try {
     "flash.right.keyboardHalfChecked must be true",
     "ui.tokenClearWorks must be true",
     "ui.referencedLayerDeleteBlocked must be true",
+    "ui.artifactProvenanceVisible must be true",
     "ui.smokeCommand must be npm run check:browser-firmware:ui",
   ];
   for (const error of requiredErrors) {
@@ -272,6 +273,7 @@ function createValidReport() {
       comboEditActionsPassed: true,
       trackballEditActionsPassed: true,
       releaseWizardPreconditionsPassed: true,
+      artifactProvenanceVisible: true,
       smokeCommand: "npm run check:browser-firmware:ui",
       smokeViewportCount: 2,
     },
@@ -346,6 +348,7 @@ function createInvalidReport() {
       ...createValidReport().ui,
       tokenClearWorks: false,
       referencedLayerDeleteBlocked: false,
+      artifactProvenanceVisible: false,
       smokeCommand: "manual",
     },
   };
