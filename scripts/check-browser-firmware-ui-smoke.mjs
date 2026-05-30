@@ -332,9 +332,17 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
     const leftButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
       button.textContent?.includes("Left を書き込み"),
     );
+    const rightButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
+      button.textContent?.includes("Right を書き込み"),
+    );
+    const rightDownloadButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-download-actions button")).find((button) =>
+      button.textContent?.includes("Right UF2 をダウンロード"),
+    );
     return {
       headerText,
       leftDisabled: leftButton?.disabled ?? null,
+      rightDisabled: rightButton?.disabled ?? null,
+      rightDownloadDisabled: rightDownloadButton?.disabled ?? null,
       summaryText,
     };
   });
@@ -356,9 +364,61 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   if (state.leftDisabled !== false) {
     failures.push(`${label}: left flash should be enabled after artifact provenance is shown`);
   }
+  if (state.rightDisabled !== true || state.rightDownloadDisabled !== true) {
+    failures.push(`${label}: right flash should stay disabled until left is completed`);
+  }
+
+  const downloadPromise = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
+  await page
+    .locator(".browser-release-workbench .flash-download-actions")
+    .getByRole("button", { name: "Left UF2 をダウンロード" })
+    .click();
+  await confirmFlashDialog(page, "確認してダウンロード");
+  const download = await downloadPromise;
+  if (!download) {
+    failures.push(`${label}: left UF2 download fallback should trigger a browser download`);
+  } else if (download.suggestedFilename() !== "KobitoKey_left.uf2") {
+    failures.push(`${label}: left UF2 download filename should be KobitoKey_left.uf2, got "${download.suggestedFilename()}"`);
+  }
+
+  await page.getByRole("button", { name: "Left コピー完了を記録" }).click();
+  await confirmFlashDialog(page, "完了として記録");
+  await page.waitForFunction(() =>
+    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("Left UF2 の手動コピー完了として記録しました"),
+  );
+
+  const rightState = await page.evaluate(() => {
+    const headerText = document.querySelector(".browser-release-workbench .flash-wizard-header span")?.textContent?.trim() ?? "";
+    const leftButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
+      button.textContent?.includes("Left を書き込み"),
+    );
+    const rightButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
+      button.textContent?.includes("Right を書き込み"),
+    );
+    return {
+      headerText,
+      leftDisabled: leftButton?.disabled ?? null,
+      rightDisabled: rightButton?.disabled ?? null,
+    };
+  });
+
+  for (const expected of ["firmware/KobitoKey_right.uf2", `artifact ${artifactName} #${artifactId}`]) {
+    if (!rightState.headerText.includes(expected)) {
+      failures.push(`${label}: right flash target header should include "${expected}", got "${rightState.headerText}"`);
+    }
+  }
+  if (rightState.leftDisabled !== true || rightState.rightDisabled !== false) {
+    failures.push(`${label}: right flash should be enabled only after left is completed`);
+  }
 
   await page.unroute("**/*");
   return failures;
+}
+
+async function confirmFlashDialog(page, actionName) {
+  await page.locator(".flash-confirm-dialog").waitFor();
+  await page.locator(".flash-confirm-dialog input[type='checkbox']").check();
+  await page.locator(".flash-confirm-dialog").getByRole("button", { name: actionName }).click();
 }
 
 async function installGitHubArtifactRouteMocks(page, { artifactId, artifactName, artifactZip, commitSha, runId }) {
