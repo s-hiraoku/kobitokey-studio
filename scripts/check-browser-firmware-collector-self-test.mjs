@@ -13,10 +13,12 @@ const runId = 123;
 const dir = mkdtempSync(join(tmpdir(), "browser-firmware-collector-"));
 const leftUf2Path = join(dir, "kobitokey_left.uf2");
 const rightUf2Path = join(dir, "kobitokey_right.uf2");
+const mismatchedRightUf2Path = join(dir, "kobitokey_right_mismatch.uf2");
 const manualReportPath = join(dir, "manual-report.json");
 const autoReportPath = join(dir, "auto-report.json");
 const unembeddedClientReportPath = join(dir, "unembedded-client-report.json");
 const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
+const artifactMismatchReportPath = join(dir, "artifact-mismatch-report.json");
 const fakeNpmPath = join(dir, "npm");
 let artifactDownloadAuthorization = null;
 const artifactZip = zipSync({
@@ -35,6 +37,7 @@ const artifactZip = zipSync({
 
 writeFileSync(leftUf2Path, "left firmware bytes");
 writeFileSync(rightUf2Path, "right firmware bytes");
+writeFileSync(mismatchedRightUf2Path, "right firmware bytes from another run");
 writeFileSync(
   fakeNpmPath,
   `#!/bin/sh
@@ -236,6 +239,17 @@ try {
     "collector fetch URL override rejection was not explained",
   );
 
+  const mismatchedArtifactResult = await runCollector(baseUrl, artifactMismatchReportPath, {
+    includeManualUiSmoke: true,
+    rightUf2Path: mismatchedRightUf2Path,
+    runUiSmoke: false,
+  });
+  assert(mismatchedArtifactResult.status !== 0, "collector should reject UF2 files that do not match the GitHub artifact zip");
+  assert(
+    mismatchedArtifactResult.stderr.includes("BROWSER_FIRMWARE_E2E_RIGHT_UF2 must match a UF2 entry from the GitHub artifact zip"),
+    "collector UF2 artifact mismatch rejection was not explained",
+  );
+
   const result = await runCollector(baseUrl, manualReportPath, { includeManualUiSmoke: true, runUiSmoke: false });
 
   if (result.status !== 0) {
@@ -401,8 +415,8 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_BRANCH: "browser-firmware-release-test",
         BROWSER_FIRMWARE_E2E_COMMIT_SHA: commitSha,
         BROWSER_FIRMWARE_E2E_RUN_ID: String(runId),
-        BROWSER_FIRMWARE_E2E_LEFT_UF2: leftUf2Path,
-        BROWSER_FIRMWARE_E2E_RIGHT_UF2: rightUf2Path,
+        BROWSER_FIRMWARE_E2E_LEFT_UF2: options.leftUf2Path || leftUf2Path,
+        BROWSER_FIRMWARE_E2E_RIGHT_UF2: options.rightUf2Path || rightUf2Path,
         BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT: "2026-05-27T00:10:00Z",
         BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT: "2026-05-27T00:12:00Z",
         BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED: "true",

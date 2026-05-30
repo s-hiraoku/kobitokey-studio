@@ -51,6 +51,8 @@ const artifactNames = githubArtifacts.map((artifact) => artifact.name);
 const githubArtifactEntries = await collectGitHubArtifactEntries(repository, githubArtifacts, token);
 const leftArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, leftUf2);
 const rightArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, rightUf2);
+requireArtifactProof(leftArtifactProof, "left", leftUf2);
+requireArtifactProof(rightArtifactProof, "right", rightUf2);
 const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiSmoke();
 
 const report = {
@@ -566,6 +568,14 @@ function artifactProofForUf2(uf2Files, uf2) {
         typeof candidate?.artifactName === "string",
     ) ?? null
   );
+}
+
+function requireArtifactProof(proof, side, uf2) {
+  if (!proof) {
+    throw new Error(
+      `BROWSER_FIRMWARE_E2E_${side.toUpperCase()}_UF2 must match a UF2 entry from the GitHub artifact zip by basename and SHA-256: ${uf2.name}`,
+    );
+  }
 }
 
 function collectCommitFilenames(commit) {
