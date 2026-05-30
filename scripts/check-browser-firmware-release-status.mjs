@@ -68,6 +68,11 @@ record(
       ? "dirty worktree ignored for diagnostic status"
       : "commit or stash changes before deploy/public-release gate"
     : "clean",
+  worktreeStatus
+    ? allowDirty
+      ? "Run release-status again from a clean worktree before making the public-release decision."
+      : "Commit or stash changes, then rerun release-status."
+    : "",
 );
 record(
   "OAuth client id env",
@@ -75,6 +80,9 @@ record(
   process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
     ? "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is set"
     : "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is missing",
+  process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
+    ? ""
+    : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy.",
 );
 record(
   "Cloudflare token env",
@@ -82,6 +90,9 @@ record(
   process.env.CLOUDFLARE_API_TOKEN?.trim()
     ? "CLOUDFLARE_API_TOKEN is set"
     : "CLOUDFLARE_API_TOKEN is not set; an existing wrangler login may still work",
+  process.env.CLOUDFLARE_API_TOKEN?.trim()
+    ? ""
+    : "Set CLOUDFLARE_API_TOKEN for GitHub Actions production Worker deploy, or confirm the local machine has a valid wrangler login.",
 );
 
 const mergeReadinessArgs = ["scripts/check-browser-firmware-merge-readiness.mjs"];
@@ -93,6 +104,9 @@ record(
   "merge readiness",
   mergeReadiness.status === 0 ? "pass" : "blocker",
   summarizeProcess(mergeReadiness),
+  mergeReadiness.status === 0
+    ? ""
+    : "Merge or rebase origin/main into the branch, resolve conflicts if any, then rerun release-status from a clean worktree.",
 );
 
 await checkReleaseGateCi({ branch, headSha });
@@ -101,6 +115,15 @@ checkExternalEvidence(e2eReportPath);
 
 const blockers = checks.filter((check) => check.status === "blocker");
 const warnings = checks.filter((check) => check.status === "warn");
+const nextActions = checks
+  .filter((check) => check.status === "blocker" || check.status === "warn")
+  .filter((check) => check.action)
+  .map((check) => ({
+    name: check.name,
+    status: check.status,
+    action: check.action,
+  }))
+  .filter(Boolean);
 
 if (outputJson) {
   console.log(
@@ -113,6 +136,7 @@ if (outputJson) {
         productionUrl,
         blockerCount: blockers.length,
         warningCount: warnings.length,
+        nextActions,
         checks,
       },
       null,
@@ -123,6 +147,12 @@ if (outputJson) {
   console.log(`Browser Firmware Mode release status for ${shortHead}`);
   for (const check of checks) {
     console.log(`${statusLabel(check.status)} ${check.name}: ${check.detail}`);
+  }
+  if (nextActions.length > 0) {
+    console.log("Next actions:");
+    for (const nextAction of nextActions) {
+      console.log(`- ${nextAction.name}: ${nextAction.action}`);
+    }
   }
   console.log(`Summary: ${blockers.length} blocker(s), ${warnings.length} warning(s)`);
 }
@@ -142,7 +172,12 @@ async function checkReleaseGateCi({ branch, headSha }) {
   try {
     runs = await fetchGitHubJson(runsUrl);
   } catch (error) {
-    record("GitHub Actions release gate", "blocker", `could not read workflow runs: ${formatError(error)}`);
+    record(
+      "GitHub Actions release gate",
+      "blocker",
+      `could not read workflow runs: ${formatError(error)}`,
+      "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions release-gate lookup.",
+    );
     return;
   }
 
@@ -152,7 +187,12 @@ async function checkReleaseGateCi({ branch, headSha }) {
     try {
       jobs = await fetchGitHubJson(run.jobs_url);
     } catch (error) {
-      record("GitHub Actions release gate", "blocker", `could not read jobs for run ${run.id}: ${formatError(error)}`);
+      record(
+        "GitHub Actions release gate",
+        "blocker",
+        `could not read jobs for run ${run.id}: ${formatError(error)}`,
+        "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions jobs lookup.",
+      );
       return;
     }
     const releaseGateJob = (jobs.jobs ?? []).find((job) => job.name === RELEASE_GATE_JOB_NAME);
@@ -165,7 +205,7 @@ async function checkReleaseGateCi({ branch, headSha }) {
   const runSummary =
     headRuns.map((run) => `${run.event} run ${run.id} ${run.status}/${run.conclusion ?? "pending"}`).join("; ") ||
     "no workflow run found for current HEAD";
-  record("GitHub Actions release gate", "blocker", runSummary);
+  record("GitHub Actions release gate", "blocker", runSummary, "Wait for the current HEAD's Browser firmware release gates job to complete successfully, then rerun release-status.");
 }
 
 function checkProductionPreflight({ headSha, productionUrl }) {
@@ -178,16 +218,29 @@ function checkProductionPreflight({ headSha, productionUrl }) {
     "production preflight",
     preflight.status === 0 ? "pass" : "blocker",
     preflight.status === 0 ? `passed for ${productionUrl}` : summarizeProcess(preflight),
+    preflight.status === 0
+      ? ""
+      : "Deploy the current commit to the production Worker with npm run deploy:browser-firmware or the Deploy GitHub Pages workflow with deploy_browser_firmware_worker enabled, then rerun release-status.",
   );
 }
 
 function checkExternalEvidence(reportPath) {
   if (!reportPath) {
-    record("external E2E evidence", "blocker", "--e2e-report or BROWSER_FIRMWARE_E2E_REPORT is required");
+    record(
+      "external E2E evidence",
+      "blocker",
+      "--e2e-report or BROWSER_FIRMWARE_E2E_REPORT is required",
+      "Generate an external E2E report with BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run collect:browser-firmware:e2e-report -- --out <report.json> after production deploy and real left/right flash verification.",
+    );
     return;
   }
   if (!existsSync(reportPath)) {
-    record("external E2E evidence", "blocker", `${reportPath} does not exist`);
+    record(
+      "external E2E evidence",
+      "blocker",
+      `${reportPath} does not exist`,
+      "Pass an existing external E2E report path with --e2e-report or BROWSER_FIRMWARE_E2E_REPORT.",
+    );
     return;
   }
   const evidence = run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", reportPath]);
@@ -195,6 +248,9 @@ function checkExternalEvidence(reportPath) {
     "external E2E evidence",
     evidence.status === 0 ? "pass" : "blocker",
     evidence.status === 0 ? `${reportPath} passed evidence validation` : summarizeProcess(evidence),
+    evidence.status === 0
+      ? ""
+      : "Fix the external E2E report values, regenerate it from production, or rerun check:browser-firmware:e2e-report for detailed validation errors.",
   );
 }
 
@@ -220,8 +276,13 @@ async function fetchGitHubJson(url) {
   return response.json();
 }
 
-function record(name, status, detail) {
-  checks.push({ name, status, detail: detail.trim().replace(/\s+/g, " ") });
+function record(name, status, detail, action = "") {
+  checks.push({
+    name,
+    status,
+    detail: detail.trim().replace(/\s+/g, " "),
+    ...(action ? { action: action.trim().replace(/\s+/g, " ") } : {}),
+  });
 }
 
 function statusLabel(status) {

@@ -110,6 +110,8 @@ try {
   expectIncludes(result.stdout, "PASS GitHub Actions release gate");
   expectIncludes(result.stdout, "PASS production preflight");
   expectIncludes(result.stdout, "BLOCKER external E2E evidence");
+  expectIncludes(result.stdout, "Next actions:");
+  expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E report");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
   expectExcludes(result.stderr, "preflight-client");
@@ -139,6 +141,18 @@ try {
   if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production preflight" && check.status === "pass")) {
     process.stdout.write(jsonResult.stdout);
     throw new Error("Expected release status --json to include passing production preflight check");
+  }
+  if (
+    !Array.isArray(json.nextActions) ||
+    !json.nextActions.some(
+      (nextAction) =>
+        nextAction.name === "external E2E evidence" &&
+        nextAction.status === "blocker" &&
+        nextAction.action.includes("collect:browser-firmware:e2e-report"),
+    )
+  ) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include actionable nextActions for external E2E evidence");
   }
   expectExcludes(jsonResult.stdout, "preflight-client");
   expectExcludes(jsonResult.stdout, "release-status-token");

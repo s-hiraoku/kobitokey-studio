@@ -156,6 +156,10 @@ const checks = [
         "ready: blockers.length === 0",
         "blockerCount: blockers.length",
         "warningCount: warnings.length",
+        "nextActions",
+        "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally",
+        "deploy_browser_firmware_worker",
+        "collect:browser-firmware:e2e-report",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
@@ -167,14 +171,16 @@ const checks = [
         "PASS GitHub Actions release gate",
         "PASS production preflight",
         "BLOCKER external E2E evidence",
+        "Next actions:",
         "Summary: 1 blocker(s),",
         "Expected release status --json output to parse",
         "Expected release status --json to expose ready=false with one blocker and a numeric warning count",
+        "Expected release status --json to include actionable nextActions for external E2E evidence",
         "release-status-token",
         "OK browser firmware release status self-test passed",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json"]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json"]),
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions"]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",
