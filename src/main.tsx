@@ -896,7 +896,7 @@ function App() {
     const message =
       trimmedBinding === from
         ? `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の下書きを取り消しました`
-        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を下書きに設定しました`;
+        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み予定に追加しました`;
     setDirectKeyWriteFeedback({ kind: "idle", message });
     showToast(trimmedBinding === from ? "info" : "success", message);
     setStatus(message);
@@ -1509,7 +1509,7 @@ function App() {
     });
     setSelectedComboId(combo.id);
     if (!options.silent) {
-      setStatus(`${combo.id} の編集内容を下書きに設定しました`);
+      setStatus(`${combo.id} の編集内容を書き込み予定に追加しました`);
     }
   }
 
@@ -3847,7 +3847,7 @@ function DirectWelcome({
           <h2>キーボードを接続</h2>
           <p>
             USB 推奨です。Bluetooth も使えますが、ZMK Studio 用のデバイスが表示される場合のみ接続できます。読み込んだ後は、
-            複数の key を下書きで調整してから、まとめて実機へ書き込めます。
+            複数の key を書き込み予定として調整してから、まとめて実機へ書き込めます。
           </p>
         </div>
         <ol className="direct-connect-steps">
@@ -3861,7 +3861,7 @@ function DirectWelcome({
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config で下書きに設定してからまとめて書き込みます。</span>
+            <span>読み込み後に key を選び、右側の Key Config で書き込み予定に追加してからまとめて書き込みます。</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -3995,7 +3995,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="このキーに設定" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="キーの動作に設定" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -4085,7 +4085,7 @@ function DirectInspectorTabs({
             </div>
           </div>
           <BindingEditor
-            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "下書きに設定"}
+            actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -5244,7 +5244,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo 動作に設定"
+            actionLabel="Combo の動作に設定"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}

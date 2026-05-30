@@ -257,7 +257,7 @@ Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer �
 2. 中央のキーボード図で変更したい key をクリックします。
 3. 右側の `Binding` panel で binding type を選びます。
 4. on-screen picker から keycode、layer、modifier、mouse button、Bluetooth action などを選びます。
-5. `このキーに設定` を押します。
+5. `キーの動作に設定` を押します。
 6. 中央の表示と右側の preview が変わったことを確認します。
 
 Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `保存` を押してください。
@@ -301,7 +301,7 @@ Raw は、KobitoKey Studio がまだ構造化 UI を持たない binding を扱�
 3. `binding` に発火させたい binding を設定します。
 4. key grid で 2 つ以上の key position を選びます。
 5. `timeoutMs` を設定します。
-6. binding は `Combo 動作に設定`、Combo 全体は `Combo を保存` で編集内容に保存します。
+6. binding は `Combo の動作に設定`、Combo 全体は `Combo を保存` で編集内容に保存します。
 
 Combo の key position は、手入力ではなく画面上の 1-40 の key grid から選べます。実際に押す組み合わせに対応する位置を選び、中央の Combo overlay で位置関係を確認してください。
 
