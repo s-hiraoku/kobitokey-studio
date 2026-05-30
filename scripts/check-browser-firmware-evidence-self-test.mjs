@@ -34,6 +34,7 @@ try {
     "production.url must not be a placeholder URL",
     "production.url must open browser Firmware Mode with mode=firmware",
     "production.url must use the expected public production origin",
+    "production.fetchUrl must match production.url for public release evidence",
     "production.apiSecurityHeadersChecked must be true",
     "production.workerOAuthDeviceFlowStarted must be true",
     "production.frontendOAuthClientIdPresent must be true",
@@ -114,6 +115,7 @@ function createValidReport() {
     tester: "release-qa",
     production: {
       url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      fetchUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
       workerDeviceCodeRouteChecked: true,
       workerAccessTokenRouteChecked: true,
       workerUnsupportedScopeRejected: true,
@@ -243,6 +245,7 @@ function createInvalidReport() {
     ...createValidReport(),
     production: {
       url: "https://example.com/",
+      fetchUrl: "https://preview.example.com/?mode=firmware",
       workerDeviceCodeRouteChecked: true,
       workerAccessTokenRouteChecked: true,
       workerUnsupportedScopeRejected: true,
@@ -314,6 +317,7 @@ function createPreviewReport() {
     production: {
       ...createValidReport().production,
       url: "https://feature-firmware-mode-kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      fetchUrl: "https://feature-firmware-mode-kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
     },
   };
 }

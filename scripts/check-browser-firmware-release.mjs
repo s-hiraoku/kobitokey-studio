@@ -614,9 +614,9 @@ const checks = [
         "e2e report ci.appCommitSha must match the current git HEAD",
         "OK browser firmware public release self-test passed",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "report `ci.appCommitSha` must match the current git `HEAD`"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`ci.appCommitSha` must"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -660,6 +660,7 @@ const checks = [
         "production.url must not be a placeholder URL",
         "production.url must open browser Firmware Mode with mode=firmware",
         "production.url must use the expected public production origin",
+        "production.fetchUrl must match production.url for public release evidence",
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "requireFirmwareModeUrl",
         "requireExpectedProductionOrigin",
@@ -726,6 +727,7 @@ const checks = [
         "kobitokey_left_right.uf2",
         "production.url must not be a placeholder URL",
         "production.url must use the expected public production origin",
+        "production.fetchUrl must match production.url for public release evidence",
         "production.apiSecurityHeadersChecked must be true",
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
@@ -761,6 +763,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED",
         "BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED",
         "collectProductionEvidence",
+        "fetchUrl",
         "/api/github/access-token",
         "checkUnsupportedOAuthScope",
         "checkOAuthDeviceFlow",
@@ -812,12 +815,12 @@ const checks = [
         "left UF2 was not proven against GitHub artifact zip",
         "right UF2 was not proven against GitHub artifact zip",
         "production security headers were not collected",
+        "production fetch URL was not recorded in the report",
         "production API security headers were not collected",
         "app commit sha was not collected from environment",
         "OAuth device flow was not started through production Worker",
         "frontend OAuth client id was not collected from production bundle",
-        "collector should fail when OAuth client id is only present in a cross-origin frontend asset",
-        "collector should report missing frontend OAuth client id evidence",
+        "collector should record missing frontend OAuth client id evidence when the id is only in a cross-origin asset",
         "cross-origin.js",
         "unembedded-client",
         "access-token route was not checked",
@@ -835,6 +838,7 @@ const checks = [
       allIncludes(files.externalEvidenceTemplate, [
         '"verifiedAt"',
         '"tester"',
+        '"fetchUrl"',
         '"appCommitSha"',
         '"securityHeadersChecked"',
         '"apiSecurityHeadersChecked"',

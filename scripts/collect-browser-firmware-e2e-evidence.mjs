@@ -264,6 +264,7 @@ async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDe
 
   return {
     url: reportUrl,
+    fetchUrl,
     workerDeviceCodeRouteChecked: await checkWorkerRoute(new URL("/api/github/device-code", production)),
     workerAccessTokenRouteChecked: await checkWorkerRoute(new URL("/api/github/access-token", production)),
     workerUnsupportedScopeRejected: await checkUnsupportedOAuthScope(new URL("/api/github/device-code", production)),

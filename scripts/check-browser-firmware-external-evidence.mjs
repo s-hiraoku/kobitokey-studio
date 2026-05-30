@@ -23,6 +23,8 @@ requireHttpsUrl(report.production?.url, "production.url must be an https URL");
 requireNoPlaceholderUrl(report.production?.url, "production.url must not be a placeholder URL");
 requireFirmwareModeUrl(report.production?.url, "production.url must open browser Firmware Mode with mode=firmware");
 requireExpectedProductionOrigin(report.production?.url, "production.url must use the expected public production origin");
+requireHttpsUrl(report.production?.fetchUrl, "production.fetchUrl must be an https URL");
+requireValue(report.production?.fetchUrl === report.production?.url, "production.fetchUrl must match production.url for public release evidence");
 requireValue(report.production?.workerDeviceCodeRouteChecked === true, "production.workerDeviceCodeRouteChecked must be true");
 requireValue(report.production?.workerAccessTokenRouteChecked === true, "production.workerAccessTokenRouteChecked must be true");
 requireValue(report.production?.workerUnsupportedScopeRejected === true, "production.workerUnsupportedScopeRejected must be true");

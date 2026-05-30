@@ -4,6 +4,7 @@
   "tester": "",
   "production": {
     "url": "https://example.com/?mode=firmware",
+    "fetchUrl": "https://example.com/?mode=firmware",
     "workerDeviceCodeRouteChecked": false,
     "workerAccessTokenRouteChecked": false,
     "workerUnsupportedScopeRejected": false,

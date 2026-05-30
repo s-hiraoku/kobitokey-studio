@@ -205,6 +205,7 @@ try {
 
   const report = JSON.parse(readFileSync(manualReportPath, "utf8"));
   assert(report.production.securityHeadersChecked === true, "production security headers were not collected");
+  assert(report.production.fetchUrl === `${baseUrl}/`, "production fetch URL was not recorded in the report");
   assert(report.production.apiSecurityHeadersChecked === true, "production API security headers were not collected");
   assert(report.production.workerDeviceCodeRouteChecked === true, "device-code route was not checked");
   assert(report.production.workerAccessTokenRouteChecked === true, "access-token route was not checked");
@@ -281,14 +282,15 @@ try {
     oauthClientId: "unembedded-client",
     runUiSmoke: false,
   });
+  if (unembeddedClientResult.status !== 0) {
+    process.stderr.write(unembeddedClientResult.stderr);
+    process.stdout.write(unembeddedClientResult.stdout);
+    process.exit(unembeddedClientResult.status ?? 1);
+  }
+  const unembeddedClientReport = JSON.parse(readFileSync(unembeddedClientReportPath, "utf8"));
   assert(
-    unembeddedClientResult.status !== 0,
-    "collector should fail when OAuth client id is only present in a cross-origin frontend asset",
-  );
-  assert(
-    unembeddedClientResult.stderr.includes("production.frontendOAuthClientIdPresent must be true"),
-    "collector should report missing frontend OAuth client id evidence",
-    unembeddedClientResult,
+    unembeddedClientReport.production.frontendOAuthClientIdPresent === false,
+    "collector should record missing frontend OAuth client id evidence when the id is only in a cross-origin asset",
   );
 
   console.log("OK browser firmware external evidence collector self-test passed");
@@ -319,6 +321,7 @@ function readRequestBody(request, callback) {
 function runCollector(baseUrl, reportPath, options) {
   return new Promise((resolve) => {
     const childArgs = ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--out", reportPath];
+    childArgs.push("--no-validate");
     if (options.runUiSmoke) {
       childArgs.push("--run-ui-smoke");
     }

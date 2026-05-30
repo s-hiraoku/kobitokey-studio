@@ -156,7 +156,9 @@ used for preflight must match `production.url` in the E2E report, and the
 report URL must use the expected public production origin
 (`https://kobitokey-studio.s-hiraoku.workers.dev` by default, or
 `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` for a future custom domain). The
-report `ci.appCommitSha` must match the current git `HEAD`:
+report `production.fetchUrl` must match `production.url`, so a test fetch
+override cannot be used as public evidence. The report `ci.appCommitSha` must
+match the current git `HEAD`:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
