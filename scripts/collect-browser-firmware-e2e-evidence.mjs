@@ -14,6 +14,10 @@ if (args.includes("--help") || args.includes("-h")) {
   printUsage();
   process.exit(0);
 }
+if (args.includes("--print-env-template")) {
+  printEnvTemplate();
+  process.exit(0);
+}
 
 const outPath = readArg("--out");
 const skipValidate = args.includes("--no-validate");
@@ -183,6 +187,7 @@ if (!skipValidate) {
 
 function printUsage() {
   console.log(`Usage: node scripts/collect-browser-firmware-e2e-evidence.mjs --out <report.json>
+       node scripts/collect-browser-firmware-e2e-evidence.mjs --print-env-template
 
 Required environment:
   BROWSER_FIRMWARE_E2E_PRODUCTION_URL
@@ -241,8 +246,66 @@ Optional:
   BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND="${UI_SMOKE_COMMAND}" or "npm run check:browser-firmware:ui"
   BROWSER_FIRMWARE_E2E_SMOKE_VIEWPORT_COUNT=2
   BROWSER_FIRMWARE_E2E_NOTES
+  --print-env-template
   --run-ui-smoke
   --no-validate`);
+}
+
+function printEnvTemplate() {
+  const currentHead = readOptionalGitValue(["rev-parse", "HEAD"]) || "<kobitokey-studio-app-commit-sha>";
+  const currentBranch = readOptionalGitValue(["rev-parse", "--abbrev-ref", "HEAD"]) || "feature/firmware-mode";
+  const lines = [
+    "# Browser Firmware Mode external E2E evidence environment.",
+    "# Fill placeholders before running the collector. Do not commit this file.",
+    `export BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote("https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware")}`,
+    "export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+    "export BROWSER_FIRMWARE_E2E_TESTER='<tester name>'",
+    "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>'",
+    `export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(currentHead)}`,
+    "export BROWSER_FIRMWARE_E2E_REPOSITORY='juichi50iii/KobitoKey_QWERTY'",
+    `export BROWSER_FIRMWARE_E2E_BRANCH=${shellQuote(currentBranch)}`,
+    "export BROWSER_FIRMWARE_E2E_COMMIT_SHA='<firmware-repository-commit-sha-created-by-commit-build>'",
+    "export BROWSER_FIRMWARE_E2E_RUN_ID='<firmware-build-actions-run-id>'",
+    "export BROWSER_FIRMWARE_E2E_LEFT_UF2='<absolute path to left UF2>'",
+    "export BROWSER_FIRMWARE_E2E_RIGHT_UF2='<absolute path to right UF2>'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT='<ISO timestamp after left flash>'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT='<ISO timestamp after right flash>'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD='direct-copy'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD='direct-copy'",
+    "export BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED='true'",
+    "export BROWSER_FIRMWARE_E2E_OAUTH_SCOPE_VERIFIED='true'",
+    "export BROWSER_FIRMWARE_E2E_RATE_LIMIT_VERIFIED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_COMPLETED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_COMPLETED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_BOOTLOADER_MARKER_CHECKED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_BOOTLOADER_MARKER_CHECKED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_CONFIRMATION_ACCEPTED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_CONFIRMATION_ACCEPTED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_KEYBOARD_HALF_CHECKED='true'",
+    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_KEYBOARD_HALF_CHECKED='true'",
+    "export BROWSER_FIRMWARE_E2E_RELOAD_RESTORED_PROGRESS='true'",
+    "export BROWSER_FIRMWARE_E2E_TOKEN_STORED='false'",
+    "export BROWSER_FIRMWARE_E2E_UF2_BYTES_STORED='false'",
+    "export BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE='true'",
+    "# Required only when not using --run-ui-smoke or BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE=true.",
+    "export BROWSER_FIRMWARE_E2E_UI_SMOKE_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_TOKEN_NOT_STORED_IN_LOCAL_STORAGE='true'",
+    "export BROWSER_FIRMWARE_E2E_TOKEN_CLEAR_WORKS='true'",
+    "export BROWSER_FIRMWARE_E2E_BUTTON_LAYOUT_NO_OVERFLOW='true'",
+    "export BROWSER_FIRMWARE_E2E_RIGHT_PANE_DEDUPLICATED='true'",
+    "export BROWSER_FIRMWARE_E2E_LAYER_STRUCTURE_ACTIONS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_REFERENCED_LAYER_DELETE_BLOCKED='true'",
+    "export BROWSER_FIRMWARE_E2E_KEY_BINDING_EDIT_ACTIONS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_COMBO_EDIT_ACTIONS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_TRACKBALL_EDIT_ACTIONS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE='true'",
+    "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS='true'",
+    "export BROWSER_FIRMWARE_E2E_NOTES='<optional QA notes without tokens or UF2 bytes>'",
+    "",
+    "npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
+  ];
+  console.log(lines.join("\n"));
 }
 
 function readManualUiSmoke() {
@@ -821,4 +884,16 @@ function readGitHeadSha() {
     throw new Error("BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA is required when git HEAD cannot be read");
   }
   return result.stdout.trim();
+}
+
+function readOptionalGitValue(gitArgs) {
+  const result = spawnSync("git", gitArgs, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
 }

@@ -231,9 +231,11 @@ the UF2 and manifest entry hashes so the validator can reject left/right UF2
 files or classification claims that are not backed by the GitHub artifact.
 Manifest-based classification must point to UF2 entries from the same GitHub artifact.
 Use the browser Firmware Mode production URL with `?mode=firmware` and provide
-the public OAuth app client id:
+the public OAuth app client id. Start by printing an env template, then fill the
+placeholders before collecting evidence:
 
 ```sh
+npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env
 BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json
 ```
 

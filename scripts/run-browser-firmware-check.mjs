@@ -31,6 +31,7 @@ runNode("scripts/check-browser-firmware-release-status-self-test.mjs");
 runNode("scripts/deploy-browser-firmware-production-self-test.mjs");
 runNode("scripts/deploy-browser-firmware-production.mjs", "--help");
 runNode("scripts/collect-browser-firmware-e2e-evidence.mjs", "--help");
+runNode("scripts/collect-browser-firmware-e2e-evidence.mjs", "--print-env-template");
 runNode("node_modules/vitest/vitest.mjs", "run");
 runNode("node_modules/typescript/bin/tsc");
 runNode("node_modules/vite/bin/vite.js", "build");

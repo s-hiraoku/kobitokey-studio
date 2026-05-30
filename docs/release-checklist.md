@@ -54,6 +54,7 @@ BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browse
 QA 端末で本番 URL、GitHub Actions run、artifact、left / right UF2、実機書き込み結果を記録します。
 
 ```sh
+npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env
 BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke
 ```
 

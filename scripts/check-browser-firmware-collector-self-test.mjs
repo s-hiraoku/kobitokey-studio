@@ -255,6 +255,18 @@ server.keepAliveTimeout = 1;
 server.headersTimeout = 1_000;
 
 try {
+  const envTemplate = await runCollectorEnvTemplate();
+  if (envTemplate.status !== 0) {
+    process.stderr.write(envTemplate.stderr);
+    process.stdout.write(envTemplate.stdout);
+    process.exit(envTemplate.status ?? 1);
+  }
+  assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_PRODUCTION_URL"), "collector env template is missing production URL");
+  assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_CI_RUN_URL"), "collector env template is missing app CI run URL");
+  assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_LEFT_UF2"), "collector env template is missing left UF2 path");
+  assert(envTemplate.stdout.includes("--run-ui-smoke"), "collector env template should recommend running UI smoke");
+  assert(!envTemplate.stdout.includes("collector-secret"), "collector env template should not print secret values");
+
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;
   const fetchOverrideResult = await runCollector(baseUrl, fetchOverrideReportPath, {
@@ -508,6 +520,33 @@ function runCollector(baseUrl, reportPath, options) {
               BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS: "true",
             }
           : {}),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      resolve({ status: 1, stdout, stderr: `${stderr}${error.message}` });
+    });
+    child.on("close", (status) => {
+      resolve({ status: status ?? 1, stdout, stderr });
+    });
+  });
+}
+
+function runCollectorEnvTemplate() {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--print-env-template"], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        BROWSER_FIRMWARE_E2E_GITHUB_TOKEN: "collector-secret",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
