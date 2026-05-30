@@ -117,7 +117,8 @@ npm run check:browser-firmware:e2e-report -- path/to/report.json
 ```
 
 After a production deployment, run the lightweight preflight first to catch
-missing Worker routes or release security headers before starting hardware QA:
+missing Worker routes, missing artifact proxy input validation, or release
+security headers before starting hardware QA:
 
 ```sh
 npm run check:browser-firmware:production-preflight

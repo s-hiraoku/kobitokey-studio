@@ -84,6 +84,7 @@ async function checkProductionPreflight(rawUrl) {
   await checkInvalidJsonRoute(new URL("/api/github/access-token", apiBase), "access-token");
   await checkInvalidJsonRoute(new URL("/api/github/artifact-zip", apiBase), "artifact-zip");
   await checkUnsupportedOAuthScope(new URL("/api/github/device-code", apiBase));
+  await checkArtifactRouteValidation(new URL("/api/github/artifact-zip", apiBase));
   await checkOAuthDeviceFlow(new URL("/api/github/device-code", apiBase));
   await checkFrontendOAuthClientId(url, pageHtml);
 }
@@ -142,6 +143,38 @@ async function checkUnsupportedOAuthScope(url) {
   const body = await response.json().catch(() => null);
   if (body?.error !== "unsupported_oauth_scope") {
     issues.push("device-code route should return unsupported_oauth_scope for unsupported scopes");
+  }
+}
+
+async function checkArtifactRouteValidation(url) {
+  await checkJsonError(
+    url,
+    JSON.stringify({ owner: "owner/name", repo: "repo", artifactId: 1, token: "preflight-token" }),
+    "invalid_owner_or_repo",
+    "artifact-zip route should reject invalid owner/repo path segments",
+  );
+  await checkJsonError(
+    url,
+    JSON.stringify({ owner: "owner", repo: "repo", artifactId: -1, token: "preflight-token" }),
+    "invalid_artifact_id",
+    "artifact-zip route should reject invalid artifact ids",
+  );
+}
+
+async function checkJsonError(url, bodyText, expectedError, message) {
+  const response = await postJson(url, bodyText);
+  if (!response) return;
+  if (response.status !== 400) {
+    issues.push(`${message} with 400, got ${response.status}`);
+    return;
+  }
+  if (response.headers.get("cache-control") !== "no-store") {
+    issues.push(`${message} with Cache-Control: no-store`);
+  }
+  issues.push(...collectReleaseSecurityHeaderIssues(message, response.headers));
+  const body = await response.json().catch(() => null);
+  if (body?.error !== expectedError) {
+    issues.push(`${message} with ${expectedError}`);
   }
 }
 

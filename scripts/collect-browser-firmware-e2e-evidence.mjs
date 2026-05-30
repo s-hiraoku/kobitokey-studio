@@ -299,7 +299,7 @@ async function collectProductionEvidence(reportUrl, fetchUrl, oauthClientIdForDe
     workerUnsupportedScopeRejected: await checkUnsupportedOAuthScope(new URL("/api/github/device-code", production)),
     workerOAuthDeviceFlowStarted: await checkOAuthDeviceFlow(new URL("/api/github/device-code", production), oauthClientIdForDeviceFlow),
     frontendOAuthClientIdPresent: await checkFrontendOAuthClientId(production, pageHtml, oauthClientIdForDeviceFlow),
-    workerArtifactRouteChecked: await checkWorkerRoute(new URL("/api/github/artifact-zip", production)),
+    workerArtifactRouteChecked: await checkArtifactRoute(new URL("/api/github/artifact-zip", production)),
     securityHeadersChecked:
       hasReleaseSecurityHeaders(headers),
     apiSecurityHeadersChecked: await checkApiSecurityHeaders([
@@ -384,6 +384,33 @@ async function checkOAuthDeviceFlow(url, clientId) {
 
 async function checkWorkerRoute(url) {
   return checkInvalidJsonWorkerResponse(url, { requireReleaseSecurityHeaders: false });
+}
+
+async function checkArtifactRoute(url) {
+  if (!(await checkWorkerRoute(url))) return false;
+  return (
+    (await checkJsonError(url, {
+      body: { owner: "owner/name", repo: "repo", artifactId: 1, token: "release-check-token" },
+      expectedError: "invalid_owner_or_repo",
+    })) &&
+    (await checkJsonError(url, {
+      body: { owner: "owner", repo: "repo", artifactId: -1, token: "release-check-token" },
+      expectedError: "invalid_artifact_id",
+    }))
+  );
+}
+
+async function checkJsonError(url, { body, expectedError }) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (response.status !== 400 || response.headers.get("cache-control") !== "no-store") {
+    return false;
+  }
+  const responseBody = await response.json().catch(() => null);
+  return responseBody?.error === expectedError;
 }
 
 async function checkInvalidJsonWorkerResponse(url, { requireReleaseSecurityHeaders }) {

@@ -44,11 +44,19 @@ const goodServer = createServer((request, response) => {
   }
 
   if (request.method === "POST" && url.pathname.startsWith("/api/github/")) {
-    readRequestBody(request, (body) => {
-      try {
-        const json = JSON.parse(body);
-        if (
-          url.pathname === "/api/github/device-code" &&
+	    readRequestBody(request, (body) => {
+	      try {
+	        const json = JSON.parse(body);
+	        if (url.pathname === "/api/github/artifact-zip" && json.owner === "owner/name") {
+	          writeJson(response, 400, { error: "invalid_owner_or_repo" });
+	          return;
+	        }
+	        if (url.pathname === "/api/github/artifact-zip" && json.artifactId === -1) {
+	          writeJson(response, 400, { error: "invalid_artifact_id" });
+	          return;
+	        }
+	        if (
+	          url.pathname === "/api/github/device-code" &&
           json.scope === "repo" &&
           (json.clientId === "preflight-client" || json.clientId === "unembedded-client")
         ) {
@@ -148,10 +156,12 @@ try {
     "production page is missing Content-Security-Policy",
     "production page is missing Strict-Transport-Security",
     "production page should return Referrer-Policy: no-referrer (got strict-origin-when-cross-origin)",
-    "release metadata route should return 200, got 404",
-    "device-code route should reject invalid JSON with 400, got 405",
-    "device-code route should reject unsupported OAuth scope with 400, got 405",
-  ]) {
+	    "release metadata route should return 200, got 404",
+	    "device-code route should reject invalid JSON with 400, got 405",
+	    "device-code route should reject unsupported OAuth scope with 400, got 405",
+	    "artifact-zip route should reject invalid owner/repo path segments with 400, got 405",
+	    "artifact-zip route should reject invalid artifact ids with 400, got 405",
+	  ]) {
     if (!bad.stderr.includes(expected)) {
       process.stderr.write(bad.stderr);
       throw new Error(`Expected failing production preflight fixture to include: ${expected}`);

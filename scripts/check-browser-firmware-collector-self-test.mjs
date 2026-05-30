@@ -131,18 +131,31 @@ const server = createServer((request, response) => {
     return;
   }
 
-  if (
-    request.method === "POST" &&
-    (url.pathname === "/api/github/access-token" || url.pathname === "/api/github/artifact-zip")
-  ) {
-    response.writeHead(400, {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-      ...releaseSecurityHeaders(),
-    });
-    response.end(JSON.stringify({ error: "invalid_json" }));
-    return;
-  }
+	  if (
+	    request.method === "POST" &&
+	    (url.pathname === "/api/github/access-token" || url.pathname === "/api/github/artifact-zip")
+	  ) {
+	    readRequestBody(request, (body) => {
+	      let error = "invalid_json";
+	      try {
+	        const json = JSON.parse(body);
+	        if (url.pathname === "/api/github/artifact-zip" && json.owner === "owner/name") {
+	          error = "invalid_owner_or_repo";
+	        } else if (url.pathname === "/api/github/artifact-zip" && json.artifactId === -1) {
+	          error = "invalid_artifact_id";
+	        }
+	      } catch {
+	        error = "invalid_json";
+	      }
+	      response.writeHead(400, {
+	        "Content-Type": "application/json",
+	        "Cache-Control": "no-store",
+	        ...releaseSecurityHeaders(),
+	      });
+	      response.end(JSON.stringify({ error }));
+	    });
+	    return;
+	  }
 
   if (request.method === "GET" && url.pathname === `/repos/${repository}/commits/${commitSha}`) {
     response.writeHead(200, { "Content-Type": "application/json" });
@@ -241,7 +254,7 @@ try {
   assert(report.production.workerUnsupportedScopeRejected === true, "unsupported OAuth scope rejection was not checked");
   assert(report.production.workerOAuthDeviceFlowStarted === true, "OAuth device flow was not started through production Worker");
   assert(report.production.frontendOAuthClientIdPresent === true, "frontend OAuth client id was not collected from production bundle");
-  assert(report.production.workerArtifactRouteChecked === true, "artifact route was not checked");
+  assert(report.production.workerArtifactRouteChecked === true, "artifact route validation was not checked");
   assert(report.ci.appCommitSha === appCommitSha, "app commit sha was not collected from environment");
   assert(report.commit.sha === commitSha, "commit sha was not collected from GitHub API");
   assert(report.commit.managedFiles.length === 1, "commit changed managed file list was not collected from GitHub API");
