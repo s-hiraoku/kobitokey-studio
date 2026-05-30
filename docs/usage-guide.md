@@ -257,7 +257,7 @@ Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer �
 2. 中央のキーボード図で変更したい key をクリックします。
 3. 右側の動作エディタで動作タイプを選びます。
 4. on-screen picker から keycode、layer、modifier、mouse button、Bluetooth action などを選びます。
-5. `選択キーの動作を変更` を押します。
+5. `選択キーに設定` を押します。
 6. 中央の表示と右側の preview が変わったことを確認します。
 
 Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `保存` を押してください。
@@ -301,7 +301,7 @@ Raw は、KobitoKey Studio がまだ構造化 UI を持たないキー動作を�
 3. Combo 成立時に発火させたい動作を設定します。
 4. key grid で 2 つ以上の key position を選びます。
 5. `timeoutMs` を設定します。
-6. Combo の動作は `Combo の動作を変更` で下書きに入れ、`Combo の編集を保存` で編集内容に保存します。
+6. Combo の動作は `Combo の動作に設定` で変更後の動作に入れ、`Combo を保存` で編集内容に保存します。
 
 Combo の key position は、手入力ではなく画面上の 1-40 の key grid から選べます。実際に押す組み合わせに対応する位置を選び、中央の Combo overlay で位置関係を確認してください。
 
@@ -321,7 +321,7 @@ Combo 設定で特に大事なのは、成立時の動作、`key positions`、�
 1. Firmware Mode で `Trackball` を開きます。
 2. CPI、cursor 感度、scroll 感度、gesture threshold などを確認します。
 3. 変更したい値を入力します。
-4. `トラックボール編集を保存` を押します。
+4. `トラックボール設定を保存` を押します。
 
 Firmware Mode のトラックボール設定は overlay ファイルへ反映されます。左右で別々に設定値がある項目は、画面の field 名と現在値を確認してから変更してください。
 
@@ -438,7 +438,7 @@ Direct Mode は、接続中の device へ設定を保存します。左右分割
 
 Direct Mode の変更は、必ずしも `KobitoKey_QWERTY` のファイルへ戻るわけではありません。長期的に管理したい設定は、あとで Firmware Mode のファイルにも反映しておくと、次回 firmware を作り直したときに差分が消えにくくなります。
 
-Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap のキー動作差分を Direct summary で確認できます。差分行の `このキーを取り込む` またはパネル上部の `キー差分を Firmware へ取り込む` を押すと、Direct 側の差分を firmware keymap に取り込めます。ファイルへの保存または書き出しは Firmware Mode で実行します。Combo は Direct Mode では参照のみです。
+Direct Mode で device を読み込むと、実機 keymap と現在読み込んでいる firmware keymap のキー動作差分を Direct summary で確認できます。差分行の `このキー差分を取り込む` またはパネル上部の `キー差分を Firmware に取り込む` を押すと、Direct 側の差分を firmware keymap に取り込めます。ファイルへの保存または書き出しは Firmware Mode で実行します。Combo は Direct Mode では参照のみです。
 
 Direct Mode の key 書き込みは、成功時に device へ自動保存します。Combo、Trackball、Timing は参照または未対応表示のみです。画面の保存状態が `自動保存済み` なら、ZMK Studio 側の未保存変更はありません。`未保存あり` が出る場合は、device 側に保存前の変更が残っている状態です。
 

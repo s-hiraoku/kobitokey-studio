@@ -1707,7 +1707,7 @@ function App() {
     leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
 
     setFiles({ ...files, leftOverlay, rightOverlay });
-    setStatus("トラックボール編集を保存しました");
+    setStatus("トラックボール設定を保存しました");
   }
 
   async function triggerBuild() {
@@ -3413,7 +3413,7 @@ function DirectFirmwareDiffPanel({
           onClick={() => onApplyFirmwareDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          キー差分を Firmware へ取り込む
+          キー差分を Firmware に取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3435,7 +3435,7 @@ function DirectFirmwareDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareDiffs([diff])}>
                     <UploadCloud size={14} />
-                    このキーを取り込む
+                    このキー差分を取り込む
                   </button>
                 </header>
                 <dl>
@@ -3472,7 +3472,7 @@ function DirectFirmwareComboDiffPanel({
           onClick={() => onApplyFirmwareComboDiffs(diffs)}
         >
           <UploadCloud size={15} />
-          Combo 差分を Firmware へ取り込む
+          Combo 差分を Firmware に取り込む
         </button>
       </div>
       {diffs.length === 0 ? (
@@ -3494,7 +3494,7 @@ function DirectFirmwareComboDiffPanel({
                   </div>
                   <button type="button" className="compact-action" onClick={() => onApplyFirmwareComboDiffs([diff])}>
                     <UploadCloud size={14} />
-                    この Combo を取り込む
+                    この Combo 差分を取り込む
                   </button>
                 </header>
                 <dl>
@@ -4036,7 +4036,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="選択キーの動作を変更" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="選択キーに設定" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -5258,7 +5258,7 @@ function ComboEditor({
   onSave,
   onSelect,
   readOnly = false,
-  saveLabel = "Combo の編集を保存",
+  saveLabel = "Combo を保存",
 }: {
   combo?: KeymapCombo;
   onPreview?: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
@@ -5331,7 +5331,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo の動作を変更"
+            actionLabel="Combo の動作に設定"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -6142,7 +6142,7 @@ function TrackballEditor({
           ))}
         </div>
         <button type="button" className="primary" onClick={() => onApply(form)}>
-          トラックボール編集を保存
+          トラックボール設定を保存
         </button>
       </div>
     </section>
