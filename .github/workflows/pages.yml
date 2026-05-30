@@ -72,7 +72,7 @@ jobs:
         run: npm run check:browser-firmware:ui
 
   deploy:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: (github.event_name == 'workflow_dispatch' && !inputs.deploy_browser_firmware_worker) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: release-check
     environment:
       name: github-pages

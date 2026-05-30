@@ -166,7 +166,8 @@ The same guarded production Worker deploy can run from GitHub Actions. Start
 the `Deploy GitHub Pages` workflow manually and enable the
 `deploy_browser_firmware_worker` input. Configure these repository secrets
 first: `VITE_GITHUB_OAUTH_CLIENT_ID`, `CLOUDFLARE_ACCOUNT_ID`, and
-`CLOUDFLARE_API_TOKEN`.
+`CLOUDFLARE_API_TOKEN`. When this input is enabled, the GitHub Pages deploy job
+is skipped so the manual run updates only the browser app Worker.
 
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:
@@ -284,7 +285,8 @@ BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:brows
 Or run the same guarded path from GitHub Actions by manually starting
 `Deploy GitHub Pages` with `deploy_browser_firmware_worker` enabled. That path
 requires repository secrets `VITE_GITHUB_OAUTH_CLIENT_ID`,
-`CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN`.
+`CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN`, and skips the GitHub Pages
+deploy job for that manual run.
 
 The underlying Cloudflare build should match:
 

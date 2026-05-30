@@ -477,6 +477,7 @@ const checks = [
         "BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware",
         "needs: release-check",
         "github.event_name == 'workflow_dispatch'",
+        "!inputs.deploy_browser_firmware_worker",
       ]),
   },
   {
