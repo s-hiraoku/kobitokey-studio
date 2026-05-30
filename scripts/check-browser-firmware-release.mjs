@@ -277,18 +277,20 @@ const checks = [
     name: "firmware edit action labels use consistent user-facing terminology",
     pass: () =>
       allIncludes(files.main, [
-        'actionLabel="キーの動作に設定"',
+        'actionLabel="キーの動作を設定"',
         'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "キーを書き込み予定に追加"}',
         'saveLabel = "Combo を保存"',
-        'actionLabel="Combo の動作に設定"',
+        'actionLabel="Combo の動作を選択"',
         "トラックボール設定を保存",
         "Firmware へ取り込む",
       ]) &&
       allIncludes(files.uiSmoke, [
-        'getByRole("button", { name: "キーの動作に設定" })',
+        'getByRole("button", { name: "キーの動作を設定" })',
         'getByRole("button", { name: "トラックボール設定を保存" })',
       ]) &&
       [
+        "キーの動作に設定",
+        "Combo の動作に設定",
         "このキーに設定",
         "下書きに設定",
         "Combo 動作に設定",

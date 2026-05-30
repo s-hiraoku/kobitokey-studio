@@ -4036,7 +4036,7 @@ function FirmwareKeyInspector({
       <section>
         <p className="eyebrow">Key {keyIndex + 1}</p>
         <h2>{selectedBinding}</h2>
-        <BindingEditor actionLabel="キーの動作に設定" binding={binding} onApply={onApplyBinding} />
+        <BindingEditor actionLabel="キーの動作を設定" binding={binding} onApply={onApplyBinding} />
       </section>
     </section>
   );
@@ -5300,7 +5300,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo の動作に設定"
+            actionLabel="Combo の動作を選択"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -5417,7 +5417,7 @@ function BindingEditor({
   return (
     <div className="binding-editor">
       {currentBinding !== undefined ? (
-        <div className="binding-review" aria-label="キー動作の書き込みプレビュー">
+        <div className="binding-review" aria-label="動作の変更プレビュー">
           <div>
             <span>現在の動作</span>
             <BindingSummary binding={currentBinding} />

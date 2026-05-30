@@ -174,7 +174,7 @@ async function setSelectedKeyRawBinding(page, binding) {
     details.setAttribute("open", "");
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
-  await page.getByRole("button", { name: "キーの動作に設定" }).click();
+  await page.getByRole("button", { name: "キーの動作を設定" }).click();
 }
 
 async function inspectKeyBindingEditActions(page, label) {
@@ -191,7 +191,7 @@ async function inspectKeyBindingEditActions(page, label) {
   }
 
   await page.locator('.choice-grid button[title="B"]').click();
-  await page.getByRole("button", { name: "キーの動作に設定" }).click();
+  await page.getByRole("button", { name: "キーの動作を設定" }).click();
 
   const afterApply = await readKeyBindingState(page);
   if (afterApply.selectedBinding !== "&kp B") {
@@ -325,7 +325,7 @@ async function inspectComboEditActions(page, label) {
     failures.push(`${label}: added combo should show all-layer scope, got "${afterCreate.selectedComboLayerScope}"`);
   }
   const comboEditor = page.locator(".combo-editor");
-  if ((await comboEditor.getByRole("button", { name: "Combo の動作に設定" }).count()) !== 1) {
+  if ((await comboEditor.getByRole("button", { name: "Combo の動作を選択" }).count()) !== 1) {
     failures.push(`${label}: combo binding picker should identify that it sets the combo action`);
   }
   if ((await comboEditor.getByRole("button", { name: "Combo を保存" }).count()) !== 1) {
