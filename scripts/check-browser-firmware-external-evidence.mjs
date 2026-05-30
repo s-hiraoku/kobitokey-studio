@@ -379,6 +379,10 @@ function requireArtifactUf2Proof(githubArtifactUf2Files, value, side) {
 
 function requireFlashSide(value, side, expectedUf2Name) {
   requireValue(value?.completed === true, `flash.${side}.completed must be true`);
+  requireValue(
+    value?.method === "direct-copy" || value?.method === "download-copy",
+    `flash.${side}.method must be direct-copy or download-copy`,
+  );
   requireValue(value?.bootloaderMarkerChecked === true, `flash.${side}.bootloaderMarkerChecked must be true`);
   requireValue(value?.confirmationPromptAccepted === true, `flash.${side}.confirmationPromptAccepted must be true`);
   requireValue(value?.keyboardHalfChecked === true, `flash.${side}.keyboardHalfChecked must be true`);

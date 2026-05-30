@@ -92,6 +92,7 @@
   "flash": {
     "left": {
       "completed": false,
+      "method": "direct-copy",
       "bootloaderMarkerChecked": false,
       "confirmationPromptAccepted": false,
       "keyboardHalfChecked": false,
@@ -100,6 +101,7 @@
     },
     "right": {
       "completed": false,
+      "method": "direct-copy",
       "bootloaderMarkerChecked": false,
       "confirmationPromptAccepted": false,
       "keyboardHalfChecked": false,

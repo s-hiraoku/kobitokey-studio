@@ -53,6 +53,7 @@ try {
     "artifacts.left.sha256 must not be a placeholder hash",
     "artifacts.left must match a UF2 entry from build.githubArtifactUf2Files",
     "left and right artifact UF2 basenames must differ",
+    "flash.left.method must be direct-copy or download-copy",
     "flash.left.confirmationPromptAccepted must be true",
     "flash.right.keyboardHalfChecked must be true",
     "ui.tokenClearWorks must be true",
@@ -204,6 +205,7 @@ function createValidReport() {
     flash: {
       left: {
         completed: true,
+        method: "direct-copy",
         bootloaderMarkerChecked: true,
         confirmationPromptAccepted: true,
         keyboardHalfChecked: true,
@@ -212,6 +214,7 @@ function createValidReport() {
       },
       right: {
         completed: true,
+        method: "download-copy",
         bootloaderMarkerChecked: true,
         confirmationPromptAccepted: true,
         keyboardHalfChecked: true,
@@ -297,6 +300,7 @@ function createInvalidReport() {
       ...createValidReport().flash,
       left: {
         ...createValidReport().flash.left,
+        method: "manual",
         confirmationPromptAccepted: false,
       },
       right: {

@@ -107,7 +107,8 @@ validate it. The validator rejects template placeholders, unchecked Worker OAuth
 routes, unsupported OAuth scope acceptance, mismatched GitHub commit/run URLs,
 run head SHA or branch mismatches, placeholder hashes, missing production/API
 security header proof, unconfirmed left/right flash prompts, missing
-keyboard-half checks, missing CI proof, missing UI smoke evidence, missing key,
+keyboard-half checks, missing flash method proof (`direct-copy` or
+`download-copy`), missing CI proof, missing UI smoke evidence, missing key,
 Combo, Trackball, or release wizard precondition proof, and missing layer
 structure action proof:
 

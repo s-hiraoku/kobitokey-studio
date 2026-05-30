@@ -255,6 +255,8 @@ try {
   );
   assert(report.artifacts.left.sha256 === sha256("left firmware bytes"), "left UF2 hash mismatch");
   assert(report.artifacts.right.sha256 === sha256("right firmware bytes"), "right UF2 hash mismatch");
+  assert(report.flash.left.method === "direct-copy", "left flash method was not collected");
+  assert(report.flash.right.method === "download-copy", "right flash method was not collected");
   assert(report.flash.left.confirmationPromptAccepted === true, "left flash confirmation prompt state was not collected");
   assert(report.flash.right.confirmationPromptAccepted === true, "right flash confirmation prompt state was not collected");
   assert(report.flash.left.keyboardHalfChecked === true, "left keyboard half check state was not collected");
@@ -361,6 +363,8 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_RATE_LIMIT_VERIFIED: "true",
         BROWSER_FIRMWARE_E2E_FLASH_LEFT_COMPLETED: "true",
         BROWSER_FIRMWARE_E2E_FLASH_RIGHT_COMPLETED: "true",
+        BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD: "direct-copy",
+        BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD: "download-copy",
         BROWSER_FIRMWARE_E2E_FLASH_LEFT_BOOTLOADER_MARKER_CHECKED: "true",
         BROWSER_FIRMWARE_E2E_FLASH_RIGHT_BOOTLOADER_MARKER_CHECKED: "true",
         BROWSER_FIRMWARE_E2E_FLASH_LEFT_CONFIRMATION_ACCEPTED: "true",

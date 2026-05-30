@@ -89,6 +89,7 @@ const report = {
   flash: {
     left: {
       completed: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_COMPLETED"),
+      method: readFlashMethodEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD"),
       bootloaderMarkerChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_BOOTLOADER_MARKER_CHECKED"),
       confirmationPromptAccepted: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_CONFIRMATION_ACCEPTED"),
       keyboardHalfChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_KEYBOARD_HALF_CHECKED"),
@@ -97,6 +98,7 @@ const report = {
     },
     right: {
       completed: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_COMPLETED"),
+      method: readFlashMethodEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD"),
       bootloaderMarkerChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_BOOTLOADER_MARKER_CHECKED"),
       confirmationPromptAccepted: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_CONFIRMATION_ACCEPTED"),
       keyboardHalfChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_KEYBOARD_HALF_CHECKED"),
@@ -162,6 +164,8 @@ Required environment:
   BROWSER_FIRMWARE_E2E_RIGHT_UF2
   BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT
   BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT
+  BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD=direct-copy|download-copy
+  BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD=direct-copy|download-copy
 
 Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED=true
@@ -633,6 +637,14 @@ function readBooleanEnv(name) {
     return false;
   }
   throw new Error(`${name} must be true or false`);
+}
+
+function readFlashMethodEnv(name) {
+  const value = requireEnv(name);
+  if (value === "direct-copy" || value === "download-copy") {
+    return value;
+  }
+  throw new Error(`${name} must be direct-copy or download-copy`);
 }
 
 function readOptionalBooleanEnv(name) {
