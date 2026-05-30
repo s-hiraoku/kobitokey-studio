@@ -12,6 +12,8 @@ be a general ZMK editor yet.
 - User guide: <https://s-hiraoku.github.io/kobitokey-studio/>
 - Supported browser target: desktop Chrome / Edge
 - Mobile browser target: unsupported screen in the initial release
+- Public release target: browser app. Tauri desktop builds are for limited local
+  distribution, not the primary public entry point.
 
 ## What It Does
 
@@ -19,8 +21,8 @@ KobitoKey Studio supports two editing workflows.
 
 | Workflow | Available in | What it changes |
 | --- | --- | --- |
-| Direct Mode | Browser app and Tauri desktop app | Writes supported ZMK Studio settings directly to a connected keyboard. USB is recommended; Bluetooth is experimental and only works when the ZMK Studio device appears |
-| Firmware Mode | Browser app and Tauri desktop app | Browser app edits `KobitoKey_QWERTY` through GitHub API, triggers Actions builds, downloads artifacts, and classifies left/right UF2 files. Tauri edits a local clone and helps copy UF2 files |
+| Direct Mode | Browser app; Tauri desktop for limited local distribution | Writes supported ZMK Studio settings directly to a connected keyboard. USB is recommended; Bluetooth is experimental and only works when the ZMK Studio device appears |
+| Firmware Mode | Browser app; Tauri desktop for limited local distribution | Browser app edits `KobitoKey_QWERTY` through GitHub API, triggers Actions builds, downloads artifacts, and classifies left/right UF2 files. Tauri edits a local clone and helps copy UF2 files |
 
 Use Direct Mode for quick supported key action edits. Use Firmware Mode when
 the change must stay in the firmware repository, needs Combo or Trackball file

@@ -45,13 +45,13 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 ### 初めて設定する
 
-1. Tauri デスクトップ版を起動する
+1. PC の Chrome / Edge でブラウザ版の公開 URL を開く
 2. `Firmware` を選ぶ
-3. `KobitoKey_QWERTY` フォルダを読み込む
-4. keymap を変更する
+3. `Build & Flash` から GitHub に接続し、repository と branch を指定して `GitHub から読み込み` を押す
+4. keymap、Combo、Trackball を変更する
 5. `Diff` を確認する
-6. 保存して GitHub Actions でビルドする
-7. 左右 UF2 を順番に書き込む
+6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
+7. 左右 UF2 を順番に bootloader へ書き込む
 
 ### キーを 1 個だけ試す
 
@@ -67,7 +67,9 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 2. `Combos` または `Trackball` を開く
 3. 変更する
 4. `Diff` を確認する
-5. ブラウザ版は `Commit & Build`、Tauri 版は保存して build し、UF2 書き込みで反映する
+5. ブラウザ版は `Commit & Build` で GitHub Actions build を起動し、UF2 書き込みで反映する
+
+Tauri デスクトップ版は一部ユーザー向けのローカル作業用です。公開版の案内はブラウザ版を基準にしています。
 
 ## 設定別の早見表
 

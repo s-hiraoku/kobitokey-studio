@@ -12,12 +12,12 @@ permalink: /usage-guide/
 
 ## 初版でできること(重要)
 
-初版リリースでは、ブラウザ版とデスクトップ版で使える機能が大きく違います。
+初版リリースでは、公開版はブラウザ版を基準に案内します。デスクトップ版は一部ユーザー向けのローカル作業用です。
 
 | ビルド | Direct Mode (キー) | Direct Mode (Combo / Trackball) | Firmware Mode |
 | --- | --- | --- | --- |
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ GitHub 連携対応 |
-| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ 利用可 |
+| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ 一部ユーザー向け |
 
 - ブラウザ版 Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token をメモリ上で使い、repository 読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 分類まで進めます。
 - OAuth device flow と artifact download は release gate で CORS / scope / rate limit を確認します。
@@ -62,7 +62,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | USB data 通信できるケーブルがある | UF2 書き込みに必須 | USB Direct に必須 |
 | Chrome または Edge を使っている | ブラウザ版では推奨 | ブラウザ Direct では必須 |
 
-ブラウザ版の Firmware Mode では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを利用できます。
+ブラウザ版の Firmware Mode では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを一部ユーザー向けに利用できます。
 
 ## 画面の見方
 
@@ -107,14 +107,13 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 
 ### Firmware Mode の基本フロー
 
-1. `Firmware` を選ぶ
-2. `KobitoKey_QWERTY` フォルダを読み込む
+1. PC の Chrome / Edge でブラウザ版を開き、`Firmware` を選ぶ
+2. `Build & Flash` で GitHub に接続し、repository と branch を指定して `GitHub から読み込み` を押す
 3. layer と key を選んでキー動作を変更する
 4. 必要なら Combo やトラックボールも変更する
 5. `Diff` で変更内容を確認する
-6. `保存` する
-7. GitHub Actions でビルドする
-8. left / right の UF2 をそれぞれ bootloader にコピーする
+6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
+7. left / right の UF2 をそれぞれ bootloader にコピーする
 
 ### Direct Mode の基本フロー
 

@@ -207,9 +207,27 @@ const checks = [
   {
     name: "public user docs do not label browser Firmware Mode as beta",
     pass: () =>
-      allIncludes(files.readme, ["Firmware Mode | Browser app and Tauri desktop app", "Browser Firmware Mode can read firmware files from GitHub"]) &&
-      allIncludes(files.docsQuickStart, ["✅ GitHub 連携対応", "ブラウザ版の Firmware Mode は GitHub 連携で利用できます"]) &&
-      allIncludes(files.docsUsageGuide, ["✅ GitHub 連携対応", "ブラウザ版 Firmware Mode は GitHub 連携で利用できます"]) &&
+      allIncludes(files.readme, [
+        "Public release target: browser app",
+        "Browser app; Tauri desktop for limited local distribution",
+        "Browser Firmware Mode can read firmware files from GitHub",
+      ]) &&
+      allIncludes(files.docsIndex, [
+        "PC の Chrome / Edge でブラウザ版の公開 URL を開く",
+        "Tauri デスクトップ版は一部ユーザー向けのローカル作業用です",
+      ]) &&
+      allIncludes(files.docsQuickStart, [
+        "✅ GitHub 連携対応",
+        "Tauri デスクトップ版は一部ユーザー向けのローカル作業用です",
+        "公開版の手順はブラウザ版を基準にしてください",
+        "ブラウザ版の Firmware Mode は GitHub 連携で利用できます",
+      ]) &&
+      allIncludes(files.docsUsageGuide, [
+        "✅ GitHub 連携対応",
+        "公開版はブラウザ版を基準に案内します",
+        "デスクトップ版は一部ユーザー向けのローカル作業用です",
+        "ブラウザ版 Firmware Mode は GitHub 連携で利用できます",
+      ]) &&
       allIncludes(files.docsDeployment, ["Browser release: Direct Mode と Firmware Mode"]) &&
       noIncludes(files.readme + files.docsQuickStart + files.docsUsageGuide + files.docsDeployment, ["beta", "Beta", "ベータ", "β", "🧪"]),
   },

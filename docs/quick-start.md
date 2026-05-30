@@ -16,9 +16,10 @@ permalink: /quick-start/
 | ビルド | Direct Mode | Firmware Mode |
 | --- | --- | --- |
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | ✅ GitHub 連携対応 |
-| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 利用可 |
+| デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 一部ユーザー向け |
 
 ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 の分類まで進めます。
+Tauri デスクトップ版は一部ユーザー向けのローカル作業用です。公開版の手順はブラウザ版を基準にしてください。
 
 スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
 
@@ -41,13 +42,15 @@ KobitoKey Studio のリポジトリで依存関係を入れます。
 npm install
 ```
 
-ブラウザで起動するには次のコマンドを実行し、Chrome / Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode を試せます。
+公開版を使う場合は、PC の Chrome / Edge で <https://kobitokey-studio.s-hiraoku.workers.dev/> を開きます。
+
+開発中のブラウザ版を起動するには次のコマンドを実行し、Chrome / Edge で `http://127.0.0.1:1420/` を開きます。Direct Mode と Firmware Mode を試せます。
 
 ```sh
 npm run dev
 ```
 
-ローカル clone を直接扱う従来の Firmware Mode を使うには、Tauri デスクトップ版を起動します。
+一部ユーザー向けにローカル clone を直接扱う従来の Firmware Mode を使う場合だけ、Tauri デスクトップ版を起動します。
 
 ```sh
 npm run tauri dev
@@ -55,17 +58,17 @@ npm run tauri dev
 
 ## 2. Firmware Mode で最初の変更をする
 
-ファイルとして確実に設定を残す基本ルートです。ブラウザ版は GitHub repository から読み込み、commit、GitHub Actions build、artifact 取得まで進めます。Tauri デスクトップ版はローカル clone と `gh` CLI を使います。
+ファイルとして確実に設定を残す基本ルートです。公開版ではブラウザから GitHub repository を読み込み、commit、GitHub Actions build、artifact 取得まで進めます。
 
 1. 上部の `Firmware` を選びます。
-2. ブラウザ版では `Build & Flash` ボタンで GitHub repository URL と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。Tauri 版ではヘッダの「プロジェクトフォルダ」で `参照…` を押し、`KobitoKey_QWERTY` のローカルフォルダを選びます。
-3. Tauri 版では `読み込み` を押します。
+2. `Build & Flash` ボタンで GitHub repository URL と branch を指定し、GitHub に接続して `GitHub から読み込み` を押します。
+3. `編集に戻る` で編集画面へ戻ります。
 4. 左側で layer を選びます。
 5. 中央のキーボード図で変更したい key を選びます。
 6. 右側の動作エディタで新しいキー動作を選びます。
 7. `選択キーの編集を保存` を押します。
 8. `Diff` で変更内容を確認します。
-9. ブラウザ版では `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。Tauri 版では `保存` を押します。
+9. `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。
 10. build 成功後に artifact を取得し、left / right UF2 を順番に書き込みます。
 
 Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
@@ -87,23 +90,16 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
 1. KobitoKey Studio の `Build & Flash` ボタンを押します。
-2. ブラウザ版では GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。Tauri 版では必要に応じて `接続確認` を押し、git / gh / workflow が OK になっていることを確認します。
-3. ブラウザ版では `Commit & Build`、Tauri 版では `保存してBuild` を押します。
+2. GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。
+3. `Commit & Build` を押します。
 4. build 成功後、`Artifact 取得` を押します。
 5. Studio が manifest または UF2 ファイル名から left / right を分類したことを確認します。
-6. ブラウザ版では左側を bootloader mode に入れて `Left を書き込み` を押し、表示された bootloader volume に保存します。Tauri 版では `Left` を選び、左側を bootloader mode に入れて `UF2 / Volume 更新` を押します。
-7. Tauri 版では `Left UF2 を bootloader にコピー` を押します。
-8. `Right` 側も同じように進めます。
+6. 左側を bootloader mode に入れて `Left を書き込み` を押し、表示された bootloader volume に保存します。
+7. `Right` 側も同じように進めます。
 
 ブラウザで bootloader folder を直接選べない場合や、手動コピーのほうが確実な場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。download した UF2 を bootloader volume に手動コピーしてから同じ side の書き込みボタンをもう一度押すと、完了として記録して次の side へ進みます。
 
-ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。Tauri 版の `保存してBuild` は、ローカル保存、commit / push、GitHub Actions 起動をまとめて行います。
-
-Tauri 版は `gh` CLI を使うため、初回は次を済ませてください。
-
-```sh
-gh auth login
-```
+ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。
 
 artifact に `manifest.json` または `firmware-manifest.json` がある場合、Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` が含まれる前提です。分類できない場合、ブラウザ版は左右の書き込みボタンを有効化しません。Tauri 版は手動の UF2 / Bootloader 選択で確認しながらコピーできます。
 
