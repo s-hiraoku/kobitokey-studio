@@ -768,6 +768,12 @@ const checks = [
         "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&
+      allIncludes(files.publicReleaseCheck, [
+        'run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath])',
+        'run(process.execPath, ["scripts/check-browser-firmware-merge-readiness.mjs"])',
+        'run(process.execPath, [',
+      ]) &&
+      !files.publicReleaseCheck.includes('run("node"') &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
       allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
       allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&

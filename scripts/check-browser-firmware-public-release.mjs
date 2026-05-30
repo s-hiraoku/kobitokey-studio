@@ -112,11 +112,11 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-run("node", ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
+run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
 if (!skipMergeReadiness) {
-  run("node", ["scripts/check-browser-firmware-merge-readiness.mjs"]);
+  run(process.execPath, ["scripts/check-browser-firmware-merge-readiness.mjs"]);
 }
-run("node", [
+run(process.execPath, [
   "scripts/check-browser-firmware-production-preflight.mjs",
   "--require-oauth",
   preflightProductionUrl,
