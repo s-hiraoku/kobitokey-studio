@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,6 +16,7 @@ const DEFAULT_NPM_CACHE = join(browserFirmwareTmpDir, "kobitokey-npm-cache");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const require = createRequire(import.meta.url);
 const PLAYWRIGHT_VERSION = require("playwright-core/package.json").version;
+const { zipSync } = require("fflate");
 
 let serverProcess = null;
 let serverOutput = "";
@@ -67,6 +68,7 @@ async function runSmoke() {
         await page.setViewportSize(viewport);
       }
       failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
+      failures.push(...(await inspectArtifactProvenanceAfterDownload(page, viewport.name)));
       failures.push(...(await inspectFirmwareUi(page, viewport.name)));
       failures.push(...(await inspectBuildFlashBackAction(page, viewport.name)));
       failures.push(...(await inspectFirmwareResetAction(page, viewport.name)));
@@ -267,6 +269,199 @@ async function inspectReleaseWizardPreconditions(page, label) {
   }
 
   return failures;
+}
+
+async function inspectArtifactProvenanceAfterDownload(page, label) {
+  const failures = [];
+  const commitSha = "1234567890abcdef1234567890abcdef12345678";
+  const runId = 987;
+  const artifactId = 42;
+  const artifactName = "firmware";
+  const artifactZip = zipSync({
+    "firmware/manifest.json": new TextEncoder().encode(
+      JSON.stringify({
+        outputs: [
+          { side: "left", file: "KobitoKey_left.uf2" },
+          { side: "right", file: "KobitoKey_right.uf2" },
+        ],
+      }),
+    ),
+    "firmware/KobitoKey_left.uf2": new Uint8Array([1, 2, 3]),
+    "firmware/KobitoKey_right.uf2": new Uint8Array([4, 5, 6]),
+  });
+
+  await installGitHubArtifactRouteMocks(page, { artifactId, artifactName, artifactZip, commitSha, runId });
+
+  await page.locator("#browser-firmware-token").fill("release-smoke-token");
+  await page.getByRole("button", { name: "GitHub から読み込み" }).click();
+  await page.waitForFunction(() =>
+    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("firmware files を読み込みました"),
+  );
+
+  await page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" }).click();
+  await page.locator(".layer-list button").first().click();
+  await page.locator(".physical-key").first().click();
+  await setSelectedKeyRawBinding(page, "&kp C");
+  await page.getByRole("button", { name: "Build & Flash" }).click();
+  await page.getByText("GitHub Commit & Build").waitFor();
+
+  await page.getByRole("button", { name: "Diff 確認済み" }).click();
+  await page.getByRole("button", { name: "Commit & Build" }).click();
+  await page.waitForFunction(
+    (sha) => document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes(sha.slice(0, 7)),
+    commitSha,
+  );
+  await page.getByRole("button", { name: "最新 run" }).click();
+  await page.waitForFunction(
+    (expectedRunId) => document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes(`run ${expectedRunId}`),
+    runId,
+  );
+  await page.getByRole("button", { name: "Artifact 取得" }).click();
+  await page.waitForFunction(() =>
+    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("artifact を取得しました"),
+  );
+
+  const state = await page.evaluate(() => {
+    const headerText = document.querySelector(".browser-release-workbench .flash-wizard-header span")?.textContent?.trim() ?? "";
+    const summaryText = document.querySelector(".browser-release-workbench .flash-wizard small")?.textContent?.trim() ?? "";
+    const leftButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
+      button.textContent?.includes("Left を書き込み"),
+    );
+    return {
+      headerText,
+      leftDisabled: leftButton?.disabled ?? null,
+      summaryText,
+    };
+  });
+
+  for (const expected of ["firmware/KobitoKey_left.uf2", `artifact ${artifactName} #${artifactId}`]) {
+    if (!state.headerText.includes(expected)) {
+      failures.push(`${label}: flash target header should include "${expected}", got "${state.headerText}"`);
+    }
+  }
+  for (const expected of [
+    `left OK (artifact ${artifactName} #${artifactId})`,
+    `right OK (artifact ${artifactName} #${artifactId})`,
+    `manifest firmware/manifest.json (artifact ${artifactName} #${artifactId})`,
+  ]) {
+    if (!state.summaryText.includes(expected)) {
+      failures.push(`${label}: artifact summary should include "${expected}", got "${state.summaryText}"`);
+    }
+  }
+  if (state.leftDisabled !== false) {
+    failures.push(`${label}: left flash should be enabled after artifact provenance is shown`);
+  }
+
+  await page.unroute("**/*");
+  return failures;
+}
+
+async function installGitHubArtifactRouteMocks(page, { artifactId, artifactName, artifactZip, commitSha, runId }) {
+  const loadedHeadSha = "loaded-head-sha";
+  const fixtures = {
+    "config/KobitoKey.keymap": readFixtureText("KobitoKey.keymap"),
+    "config/boards/shields/KobitoKey/KobitoKey_left.overlay": readFixtureText("KobitoKey_left.overlay"),
+    "config/boards/shields/KobitoKey/KobitoKey_right.overlay": readFixtureText("KobitoKey_right.overlay"),
+  };
+
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.origin === "https://api.github.com") {
+      if (request.method() === "GET" && url.pathname.endsWith("/git/ref/heads/main")) {
+        await fulfillJson(route, { object: { sha: loadedHeadSha } });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.includes("/contents/")) {
+        const path = decodeURIComponent(url.pathname.split("/contents/")[1] ?? "");
+        await fulfillJson(route, {
+          content: Buffer.from(fixtures[path] ?? "").toString("base64"),
+          encoding: "base64",
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith(`/git/commits/${loadedHeadSha}`)) {
+        await fulfillJson(route, { sha: loadedHeadSha, tree: { sha: "base-tree" } });
+        return;
+      }
+      if (request.method() === "POST" && url.pathname.endsWith("/git/trees")) {
+        await fulfillJson(route, { sha: "next-tree" });
+        return;
+      }
+      if (request.method() === "POST" && url.pathname.endsWith("/git/commits")) {
+        await fulfillJson(route, {
+          sha: commitSha,
+          html_url: `https://github.com/juichi50iii/KobitoKey_QWERTY/commit/${commitSha}`,
+          tree: { sha: "next-tree" },
+        });
+        return;
+      }
+      if (request.method() === "PATCH" && url.pathname.endsWith("/git/refs/heads/main")) {
+        await fulfillJson(route, { object: { sha: commitSha } });
+        return;
+      }
+      if (request.method() === "POST" && url.pathname.endsWith("/actions/workflows/build.yml/dispatches")) {
+        await route.fulfill({ body: "", status: 204 });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith("/actions/workflows/build.yml/runs")) {
+        await fulfillJson(route, {
+          workflow_runs: [
+            {
+              id: runId,
+              html_url: `https://github.com/juichi50iii/KobitoKey_QWERTY/actions/runs/${runId}`,
+              head_sha: commitSha,
+              head_branch: "main",
+              status: "completed",
+              conclusion: "success",
+            },
+          ],
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith(`/actions/runs/${runId}`)) {
+        await fulfillJson(route, {
+          id: runId,
+          html_url: `https://github.com/juichi50iii/KobitoKey_QWERTY/actions/runs/${runId}`,
+          head_sha: commitSha,
+          head_branch: "main",
+          status: "completed",
+          conclusion: "success",
+        });
+        return;
+      }
+      if (request.method() === "GET" && url.pathname.endsWith(`/actions/runs/${runId}/artifacts`)) {
+        await fulfillJson(route, {
+          artifacts: [{ id: artifactId, name: artifactName, expired: false }],
+        });
+        return;
+      }
+    }
+
+    if (request.method() === "POST" && url.pathname === "/api/github/artifact-zip") {
+      await route.fulfill({
+        body: Buffer.from(artifactZip),
+        contentType: "application/zip",
+        status: 200,
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+}
+
+async function fulfillJson(route, value, status = 200) {
+  await route.fulfill({
+    body: JSON.stringify(value),
+    contentType: "application/json",
+    status,
+  });
+}
+
+function readFixtureText(filename) {
+  return readFileSync(join(process.cwd(), "public", "fixtures", filename), "utf8");
 }
 
 async function readReleaseWizardState(page) {
