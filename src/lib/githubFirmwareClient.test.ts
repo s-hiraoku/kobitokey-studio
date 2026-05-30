@@ -400,6 +400,8 @@ describe("browser firmware GitHub release flow", () => {
     });
     expect(run).toMatchObject({ id: 987, headSha: "commit-sha", headBranch: "main", conclusion: "success" });
     expect(artifacts).toMatchObject({
+      manifestArtifactId: 42,
+      manifestArtifactName: "firmware",
       manifestPath: "firmware/manifest.json",
       targets: {
         left: "firmware/KobitoKey_left.uf2",
@@ -407,6 +409,12 @@ describe("browser firmware GitHub release flow", () => {
         unknown: [],
       },
     });
+    expect(artifacts.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ artifactId: 42, artifactName: "firmware", name: "firmware/KobitoKey_left.uf2" }),
+        expect.objectContaining({ artifactId: 42, artifactName: "firmware", name: "firmware/KobitoKey_right.uf2" }),
+      ]),
+    );
     expect(requests.map((request) => request.method)).toEqual([
       "GET",
       "GET",
@@ -562,7 +570,13 @@ describe("GitHub artifact helpers", () => {
       unknown: [],
     });
     expect(result.manifestPath).toBe("firmware-manifest.json");
+    expect(result.manifestArtifactId).toBe(10);
+    expect(result.manifestArtifactName).toBe("firmware");
     expect(result.files.map((file) => file.name)).toEqual(["KobitoKey_left.uf2", "KobitoKey_right.uf2"]);
+    expect(result.files.map((file) => `${file.artifactName}:${file.artifactId}:${file.name}`)).toEqual([
+      "firmware:10:KobitoKey_left.uf2",
+      "firmware:10:KobitoKey_right.uf2",
+    ]);
   });
 
   it("does not use a manifest to classify UF2 files from another artifact", async () => {
@@ -598,6 +612,8 @@ describe("GitHub artifact helpers", () => {
     const result = await downloadGitHubFirmwareArtifacts(ref, 123, { fetchImpl: fetchImpl as typeof fetch, token: "token" });
 
     expect(result.manifestPath).toBeUndefined();
+    expect(result.manifestArtifactId).toBeUndefined();
+    expect(result.manifestArtifactName).toBeUndefined();
     expect(result.targets).toEqual({
       left: null,
       right: null,

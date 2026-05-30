@@ -567,10 +567,19 @@ const checks = [
   {
     name: "artifact manifest cannot map unsafe UF2 targets",
     pass: () =>
-      allIncludes(files.githubClient, ["classifyUf2ArtifactsFromManifests", "left && right && left === right", "classifyArtifactEntries"]) &&
+      allIncludes(files.githubClient, [
+        "classifyUf2ArtifactsFromManifests",
+        "left && right && left === right",
+        "classifyArtifactEntries",
+        "withArtifactMetadata",
+        "manifestArtifactId",
+        "manifestArtifactName",
+      ]) &&
       allIncludes(files.githubClientTest, [
         "does not reuse a manifest-selected UF2 as the opposite side from filename fallback",
         "does not use a manifest to classify UF2 files from another artifact",
+        "artifactName: \"firmware\"",
+        "manifestArtifactId",
       ]),
   },
   {
@@ -583,6 +592,8 @@ const checks = [
         "confirmBrowserFirmwareFlashDownload",
         "confirmBrowserFirmwareManualFlashComplete",
         "FlashConfirmationDialog",
+        "firmwareArtifactProvenanceLabel",
+        "manifestArtifactName",
         "接続中の keyboard half",
         "bootloader volume にコピーします",
         "確認してダウンロード",
@@ -650,8 +661,10 @@ const checks = [
         "release metadata missing",
         "Worker API の 405",
         "実 repository と実 GitHub Actions で end-to-end QA を行う",
+        "GitHub artifact 名 / id",
         "Flash E2E",
       ]) &&
+      allIncludes(files.docsUsageGuide, ["GitHub artifact 名 / id", "artifact <name> #<id>"]) &&
       allIncludes(files.docsDeployment, [
         "PR / feature branch の Workers preview",
         "preview preflight の成功は production 公開の証跡にしない",

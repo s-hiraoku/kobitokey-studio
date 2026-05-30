@@ -4632,6 +4632,7 @@ function BrowserFirmwareReleaseWorkbench({
 }) {
   const isBusy = busyOperation !== "idle";
   const busyLabel = browserFirmwareOperationLabel(busyOperation);
+  const flashTargetArtifactLabel = artifacts ? firmwareArtifactProvenanceLabel(artifacts, flashSide) : "";
 
   return (
     <div className="workbench-grid build-workbench browser-release-workbench" aria-busy={isBusy}>
@@ -4776,7 +4777,10 @@ function BrowserFirmwareReleaseWorkbench({
         <div className="flash-wizard">
           <div className="flash-wizard-header">
             <strong>{sideLabel(flashSide)} 側を書き込み</strong>
-            <span>{artifacts?.targets[flashSide] ?? "UF2 未検出"}</span>
+            <span>
+              {artifacts?.targets[flashSide] ?? "UF2 未検出"}
+              {flashTargetArtifactLabel ? ` / ${flashTargetArtifactLabel}` : ""}
+            </span>
           </div>
           <div className="flash-side-toggle" role="group" aria-label="Flash side">
             {(["left", "right"] as FlashSide[]).map((side) => (
@@ -4808,15 +4812,42 @@ function BrowserFirmwareReleaseWorkbench({
           </div>
           <small>
             {artifacts
-              ? `left ${artifacts.targets.left ? "OK" : "未検出"} / right ${
-                  artifacts.targets.right ? "OK" : "未検出"
-                }${artifacts.manifestPath ? ` / manifest ${artifacts.manifestPath}` : ""}`
+              ? `${firmwareArtifactSideSummary(artifacts, "left")} / ${firmwareArtifactSideSummary(artifacts, "right")}${
+                  artifacts.manifestPath
+                    ? ` / manifest ${artifacts.manifestPath}${firmwareManifestArtifactLabel(artifacts) ? ` (${firmwareManifestArtifactLabel(artifacts)})` : ""}`
+                    : ""
+                }`
               : "成功した build の artifact を取得すると左右 UF2 を分類します"}
           </small>
         </div>
       </section>
     </div>
   );
+}
+
+function firmwareArtifactSideSummary(artifacts: GitHubFirmwareArtifacts, side: FlashSide): string {
+  if (!artifacts.targets[side]) {
+    return `${side} 未検出`;
+  }
+  const provenance = firmwareArtifactProvenanceLabel(artifacts, side);
+  return `${side} OK${provenance ? ` (${provenance})` : ""}`;
+}
+
+function firmwareArtifactProvenanceLabel(artifacts: GitHubFirmwareArtifacts, side: FlashSide): string {
+  const targetName = artifacts.targets[side];
+  const file = targetName ? artifacts.files.find((candidate) => candidate.name === targetName) : undefined;
+  return formatGitHubArtifactProvenance(file?.artifactName, file?.artifactId);
+}
+
+function firmwareManifestArtifactLabel(artifacts: GitHubFirmwareArtifacts): string {
+  return formatGitHubArtifactProvenance(artifacts.manifestArtifactName, artifacts.manifestArtifactId);
+}
+
+function formatGitHubArtifactProvenance(artifactName?: string, artifactId?: number): string {
+  if (artifactName && artifactId) return `artifact ${artifactName} #${artifactId}`;
+  if (artifactName) return `artifact ${artifactName}`;
+  if (artifactId) return `artifact #${artifactId}`;
+  return "";
 }
 
 function BrowserReleaseGateList({ readiness }: { readiness: FirmwareReleaseReadiness }) {

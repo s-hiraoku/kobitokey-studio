@@ -38,17 +38,23 @@ export type GitHubWorkflowRun = {
 };
 
 export type GitHubArtifactUf2 = {
+  artifactId?: number;
+  artifactName?: string;
   name: string;
   bytes: Uint8Array;
 };
 
 export type GitHubArtifactManifest = {
+  artifactId?: number;
+  artifactName?: string;
   name: string;
   contents: string;
 };
 
 export type GitHubFirmwareArtifacts = {
   files: GitHubArtifactUf2[];
+  manifestArtifactId?: number;
+  manifestArtifactName?: string;
   manifestPath?: string;
   targets: ClassifiedUf2Artifacts;
 };
@@ -280,7 +286,7 @@ export async function downloadGitHubFirmwareArtifacts(
 
   for (const artifact of activeArtifacts) {
     const zipBytes = await fetchGitHubArtifactZip(ref, artifact.id, options);
-    const entries = extractFirmwareArtifactEntriesFromZip(zipBytes);
+    const entries = withArtifactMetadata(extractFirmwareArtifactEntriesFromZip(zipBytes), artifact);
     entriesByArtifact.push(entries);
     files.push(...entries.files);
     manifests.push(...entries.manifests);
@@ -292,6 +298,8 @@ export async function downloadGitHubFirmwareArtifacts(
 
   return {
     files,
+    manifestArtifactId: manifestClassification.manifestArtifactId,
+    manifestArtifactName: manifestClassification.manifestArtifactName,
     manifestPath: manifestClassification.manifestPath,
     targets: manifestClassification.targets,
   };
@@ -448,6 +456,24 @@ export function extractFirmwareArtifactEntriesFromZip(zipBytes: Uint8Array): {
   return { files, manifests };
 }
 
+function withArtifactMetadata(
+  entries: { files: GitHubArtifactUf2[]; manifests: GitHubArtifactManifest[] },
+  artifact: { id: number; name: string },
+): { files: GitHubArtifactUf2[]; manifests: GitHubArtifactManifest[] } {
+  return {
+    files: entries.files.map((file) => ({
+      ...file,
+      artifactId: artifact.id,
+      artifactName: artifact.name,
+    })),
+    manifests: entries.manifests.map((manifest) => ({
+      ...manifest,
+      artifactId: artifact.id,
+      artifactName: artifact.name,
+    })),
+  };
+}
+
 export function classifyUf2ArtifactsFromManifests(
   uf2Files: string[],
   manifests: GitHubArtifactManifest[],
@@ -469,7 +495,7 @@ export function classifyUf2ArtifactsFromManifests(
 
 function classifyArtifactEntries(
   artifacts: Array<{ files: GitHubArtifactUf2[]; manifests: GitHubArtifactManifest[] }>,
-): { manifestPath?: string; targets: ClassifiedUf2Artifacts } {
+): { manifestArtifactId?: number; manifestArtifactName?: string; manifestPath?: string; targets: ClassifiedUf2Artifacts } {
   const allFiles = artifacts.flatMap((artifact) => artifact.files.map((file) => file.name));
   for (const artifact of artifacts) {
     const classification = classifyUf2ArtifactsFromManifests(
@@ -477,7 +503,10 @@ function classifyArtifactEntries(
       artifact.manifests,
     );
     if (classification.manifestPath) {
+      const manifest = artifact.manifests.find((candidate) => candidate.name === classification.manifestPath);
       return {
+        manifestArtifactId: manifest?.artifactId,
+        manifestArtifactName: manifest?.artifactName,
         manifestPath: classification.manifestPath,
         targets: {
           ...classification.targets,

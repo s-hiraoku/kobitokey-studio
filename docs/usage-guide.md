@@ -392,7 +392,7 @@ Firmware repository URL を設定している場合、KobitoKey Studio は対象
 1. GitHub Actions の build が成功したことを確認します。
 2. `Artifact 取得` を押します。
 3. ブラウザ版では、表示中 commit と一致する成功 run であることを GitHub API で再確認してから artifact zip を取得し、画面内で展開します。Tauri 版では、最新の成功 run から artifact を取得し、`KobitoKey_QWERTY/.kobitokey-studio/artifacts/` に保存します。
-4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。公開判定の証跡では、manifest が指す UF2 が同じ GitHub artifact 内にあることも確認します。
+4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。Flash パネルには left / right UF2 と manifest の GitHub artifact 名 / id も表示されます。公開判定の証跡では、manifest が指す UF2 が同じ GitHub artifact 内にあることも確認します。
 
 左右それぞれの UF2 が生成されていることを確認してください。ファイル名で left / right を取り違えないようにします。
 
@@ -412,7 +412,7 @@ KobitoKey の firmware は左右別々に書き込みます。
 
 ブラウザで folder picker が使える場合、Studio はコピー直前に side と UF2 ファイル名を確認し、接続中の keyboard half が正しい side であることをチェックしない限り続行できません。folder picker が使えない場合や直接コピーがうまくいかない場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。Studio は同じ確認を通してから該当 side の UF2 を download します。download した UF2 を bootloader volume に手動コピーした後、同じ side の書き込みボタンをもう一度押すと確認を表示し、その side を完了として記録して次の side へ進みます。
 
-左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合や、left / right が別パスでも同じ UF2 ファイル名になる場合は、書き込みボタンが有効になりません。
+左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合や、left / right が別パスでも同じ UF2 ファイル名になる場合は、書き込みボタンが有効になりません。書き込み前には表示中の UF2 名に加えて `artifact <name> #<id>` が想定した GitHub Actions artifact と一致していることも確認してください。
 
 ### 4.4 書き込み前の安全確認
 
