@@ -162,6 +162,8 @@ const checks = [
         "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally",
         "deploy_browser_firmware_worker",
         "collect:browser-firmware:e2e-report",
+        "--print-env-template",
+        "--run-ui-smoke",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",

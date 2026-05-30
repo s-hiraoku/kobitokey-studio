@@ -272,7 +272,7 @@ function checkExternalEvidence(reportPath) {
       "external E2E evidence",
       "blocker",
       "--e2e-report or BROWSER_FIRMWARE_E2E_REPORT is required",
-      "Generate an external E2E report with BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run collect:browser-firmware:e2e-report -- --out <report.json> after production deploy and real left/right flash verification.",
+      "Generate an external E2E env template with npm run collect:browser-firmware:e2e-report -- --print-env-template, fill it on the QA machine, then collect the report with --out <report.json> --run-ui-smoke after production deploy and real left/right flash verification.",
     );
     return;
   }

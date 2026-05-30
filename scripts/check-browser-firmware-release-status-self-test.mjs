@@ -134,7 +134,7 @@ try {
   expectIncludes(result.stdout, "PASS production preflight");
   expectIncludes(result.stdout, "BLOCKER external E2E evidence");
   expectIncludes(result.stdout, "Next actions:");
-  expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E report");
+  expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E env template");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
   expectExcludes(result.stderr, "preflight-client");
@@ -175,7 +175,8 @@ try {
       (nextAction) =>
         nextAction.name === "external E2E evidence" &&
         nextAction.status === "blocker" &&
-        nextAction.action.includes("collect:browser-firmware:e2e-report"),
+        nextAction.action.includes("--print-env-template") &&
+        nextAction.action.includes("--run-ui-smoke"),
     )
   ) {
     process.stdout.write(jsonResult.stdout);
