@@ -86,6 +86,8 @@ const checks = [
     name: "production deploy wrapper verifies deployed app commit before release",
     pass: () =>
       scriptIncludes("deploy:browser-firmware", "node scripts/deploy-browser-firmware-production.mjs") &&
+      scriptIncludes("deploy", "npm run deploy:browser-firmware") &&
+      !scriptIncludes("deploy", "wrangler deploy") &&
       allIncludes(files.productionDeploy, [
         "scripts/check-browser-firmware-merge-readiness.mjs",
         'runNode("scripts/run-browser-firmware-check.mjs")',
