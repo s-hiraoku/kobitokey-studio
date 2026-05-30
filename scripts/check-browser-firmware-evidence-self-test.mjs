@@ -45,6 +45,9 @@ try {
     "production.frontendOAuthClientIdPresent must be true",
     "ci.appCommitSha must not be a placeholder SHA",
     "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
+    "ci.runHeadSha must match ci.appCommitSha",
+    "ci.status must be completed",
+    "ci.conclusion must be success",
     "github.repository must not be the template owner/repo placeholder",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
@@ -172,6 +175,9 @@ function createValidReport() {
     },
     ci: {
       runUrl: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123456789",
+      runHeadSha: "89abcdef0123456789abcdef0123456789abcdef",
+      status: "completed",
+      conclusion: "success",
       appCommitSha: "89abcdef0123456789abcdef0123456789abcdef",
       browserFirmwareReleaseCheckPassed: true,
     },
@@ -307,6 +313,9 @@ function createInvalidReport() {
     ci: {
       ...createValidReport().ci,
       runUrl: "https://github.com/juichi50iii/KobitoKey_QWERTY/actions/runs/123",
+      runHeadSha: "89abcdef0123456789abcdef0123456789abcdef",
+      status: "in_progress",
+      conclusion: "failure",
       appCommitSha: "0000000000000000000000000000000000000000",
     },
     github: {

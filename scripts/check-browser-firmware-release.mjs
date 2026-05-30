@@ -321,7 +321,7 @@ const checks = [
         'actionLabel="選択キーの動作を変更"',
         'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}',
         'saveLabel = "Combo の編集を保存"',
-        'actionLabel="Combo 動作を変更"',
+        'actionLabel="Combo の動作を変更"',
         "トラックボール編集を保存",
         "キー差分を Firmware へ取り込む",
         "Combo 差分を Firmware へ取り込む",
@@ -339,6 +339,7 @@ const checks = [
         "キーに適用",
         "選択したキー動作を入力",
         "Combo を更新",
+        "Combo 動作を変更",
         "トラックボール設定を更新",
         "Binding に反映",
         "Binding を入力欄に反映",
@@ -757,9 +758,9 @@ const checks = [
         "OK browser firmware public release self-test passed",
       ]) &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
-      allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
+      allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
@@ -835,6 +836,9 @@ const checks = [
         "production.frontendOAuthClientIdPresent must be true",
         "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
         "ci.appCommitSha must not be a placeholder SHA",
+        "ci.runHeadSha must match ci.appCommitSha",
+        "ci.status must be completed",
+        "ci.conclusion must be success",
         "securityHeadersChecked must be true",
         "apiSecurityHeadersChecked must be true",
         "ci.browserFirmwareReleaseCheckPassed must be true",
@@ -916,6 +920,9 @@ const checks = [
         "production.workerOAuthDeviceFlowStarted must be true",
         "production.frontendOAuthClientIdPresent must be true",
         "ci.runUrl must point to s-hiraoku/kobitokey-studio Actions run",
+        "ci.runHeadSha must match ci.appCommitSha",
+        "ci.status must be completed",
+        "ci.conclusion must be success",
         "github.repository must not be the template owner/repo placeholder",
         "commit.managedFiles must not contain duplicate paths",
         "commit.managedFiles must contain only managed firmware files",
@@ -993,6 +1000,10 @@ const checks = [
         "artifactProofForUf2",
         "requireArtifactProof",
         "BROWSER_FIRMWARE_E2E_${side.toUpperCase()}_UF2 must match a UF2 entry from the GitHub artifact zip",
+        "actionsRunIdFromUrl",
+        "BROWSER_FIRMWARE_E2E_CI_RUN_URL must point to ${repository} Actions run",
+        "fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY)}`",
+        "runHeadSha: appCiRun.head_sha || \"\"",
         "collectCommitFilenames",
         "headBranch: run.head_branch || \"\"",
         "collectGitHubArtifactDetails",
@@ -1011,6 +1022,9 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL",
         "BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL requires --no-validate",
         "left UF2 hash mismatch",
+        "app CI run head sha was not collected from GitHub API",
+        "app CI run status was not collected from GitHub API",
+        "app CI run conclusion was not collected from GitHub API",
         "collector should reject UF2 files that do not match the GitHub artifact zip",
         "collector UF2 artifact mismatch rejection was not explained",
         "BROWSER_FIRMWARE_E2E_RIGHT_UF2 must match a UF2 entry from the GitHub artifact zip",
@@ -1061,6 +1075,9 @@ const checks = [
         '"tester"',
         '"fetchUrl"',
         '"appCommitSha"',
+        '"runHeadSha"',
+        '"status"',
+        '"conclusion"',
         '"securityHeadersChecked"',
         '"apiSecurityHeadersChecked"',
         '"browserFirmwareReleaseCheckPassed"',

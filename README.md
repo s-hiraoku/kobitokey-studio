@@ -178,8 +178,9 @@ and the report URL must use the expected public production origin
 `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` for a future custom domain). The
 report `production.fetchUrl` must match `production.url`, so a test fetch
 override cannot be used as public evidence. The report `ci.runUrl` must point to
-the `s-hiraoku/kobitokey-studio` Actions run, `production.appCommitSha` must
-match `ci.appCommitSha`, and `ci.appCommitSha` must match the current git `HEAD`:
+the `s-hiraoku/kobitokey-studio` Actions run, `ci.runHeadSha` must match
+`ci.appCommitSha`, the CI run must be completed/success, `production.appCommitSha`
+must match `ci.appCommitSha`, and `ci.appCommitSha` must match the current git `HEAD`:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json

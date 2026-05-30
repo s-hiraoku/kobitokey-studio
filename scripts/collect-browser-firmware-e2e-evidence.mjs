@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { unzipSync } from "fflate";
 
+const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
   printUsage();
@@ -38,9 +39,11 @@ const commitSha = requireEnv("BROWSER_FIRMWARE_E2E_COMMIT_SHA");
 const runId = Number(requireEnv("BROWSER_FIRMWARE_E2E_RUN_ID"));
 const leftUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_LEFT_UF2");
 const rightUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_RIGHT_UF2");
+const ciRunUrl = requireEnv("BROWSER_FIRMWARE_E2E_CI_RUN_URL");
 
 const production = await collectProductionEvidence(productionUrl, productionFetchUrl, oauthClientId);
 const appCommitSha = process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA || production.appCommitSha || readGitHeadSha();
+const appCiRun = await fetchGitHubJson(`/repos/${APP_REPOSITORY}/actions/runs/${actionsRunIdFromUrl(ciRunUrl, APP_REPOSITORY)}`, token);
 const commit = await fetchGitHubJson(`/repos/${repository}/commits/${commitSha}`, token);
 const run = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}`, token);
 const actionsArtifacts = await fetchGitHubJson(`/repos/${repository}/actions/runs/${runId}/artifacts`, token);
@@ -61,7 +64,10 @@ const report = {
   tester: requireEnv("BROWSER_FIRMWARE_E2E_TESTER"),
   production,
   ci: {
-    runUrl: requireEnv("BROWSER_FIRMWARE_E2E_CI_RUN_URL"),
+    runUrl: ciRunUrl,
+    runHeadSha: appCiRun.head_sha || "",
+    status: appCiRun.status || "",
+    conclusion: appCiRun.conclusion || "",
     appCommitSha,
     browserFirmwareReleaseCheckPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_CI_PASSED"),
   },
@@ -576,6 +582,28 @@ function requireArtifactProof(proof, side, uf2) {
       `BROWSER_FIRMWARE_E2E_${side.toUpperCase()}_UF2 must match a UF2 entry from the GitHub artifact zip by basename and SHA-256: ${uf2.name}`,
     );
   }
+}
+
+function actionsRunIdFromUrl(value, repository) {
+  try {
+    const url = new URL(value);
+    const [owner, repo] = repository.split("/");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (
+      url.protocol === "https:" &&
+      url.hostname === "github.com" &&
+      parts[0] === owner &&
+      parts[1] === repo &&
+      parts[2] === "actions" &&
+      parts[3] === "runs" &&
+      /^[1-9]\d*$/.test(parts[4])
+    ) {
+      return Number(parts[4]);
+    }
+  } catch {
+    // handled below
+  }
+  throw new Error(`BROWSER_FIRMWARE_E2E_CI_RUN_URL must point to ${repository} Actions run`);
 }
 
 function collectCommitFilenames(commit) {

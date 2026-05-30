@@ -3060,14 +3060,14 @@ function isStudioUnlockFailure(message: string): boolean {
 }
 
 const BINDING_KIND_OPTIONS: Array<{ value: BindingKind; label: string }> = [
-  { value: "key", label: "Key" },
+  { value: "key", label: "通常キー" },
   { value: "layer-tap", label: "Tap/Hold Layer" },
   { value: "mod-tap", label: "Tap/Hold Mod" },
-  { value: "momentary", label: "Momentary" },
-  { value: "to-layer", label: "To Layer" },
+  { value: "momentary", label: "Layer 押下中" },
+  { value: "to-layer", label: "Layer 移動" },
   { value: "mouse", label: "Mouse" },
   { value: "bluetooth", label: "Bluetooth" },
-  { value: "raw", label: "Raw" },
+  { value: "raw", label: "ZMK 直接入力" },
 ];
 
 function KeyboardGrid({
@@ -5331,7 +5331,7 @@ function ComboEditor({
             onChange={(keyPositions) => setForm({ ...form, keyPositions })}
           />
           <BindingEditor
-            actionLabel="Combo 動作を変更"
+            actionLabel="Combo の動作を変更"
             applyOnChange={Boolean(onPreview)}
             binding={form.binding}
             currentBinding={combo.binding}
@@ -5466,7 +5466,7 @@ function BindingEditor({
       )}
 
       <ChoiceStrip
-        label="Type"
+        label="動作タイプ"
         choices={BINDING_KIND_OPTIONS}
         selectedValue={form.kind}
         onSelect={(kind) => setForm(withBindingKindDefaults(form, kind as BindingKind))}
@@ -5548,7 +5548,7 @@ function BindingValuePicker({
     case "key":
       return (
         <KeyPalette
-          label="Key"
+          label="キー"
           selectedValue={form.primary}
           onSelect={(primary) => onChange({ ...form, primary })}
         />
@@ -5608,7 +5608,7 @@ function BindingValuePicker({
       return (
         <>
           <ChoiceStrip
-            label="Action"
+            label="操作"
             choices={BLUETOOTH_ACTION_CHOICES}
             selectedValue={form.primary}
             onSelect={(primary) =>
@@ -5632,7 +5632,7 @@ function BindingValuePicker({
     case "raw":
       return (
         <ChoiceStrip
-          label="Special"
+          label="特殊動作"
           choices={SPECIAL_BINDING_CHOICES}
           selectedValue={form.raw}
           onSelect={(raw) => onChange({ ...form, raw })}
@@ -5687,7 +5687,7 @@ function ChoiceStrip({
   selectedValue: string;
 }) {
   return (
-    <div className={`choice-strip${label.toLowerCase() === "type" ? " binding-type-strip" : ""}`}>
+    <div className={`choice-strip${label === "動作タイプ" || label.toLowerCase() === "type" ? " binding-type-strip" : ""}`}>
       <span>{label}</span>
       <div>
         {choices.map((choice) => (

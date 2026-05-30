@@ -8,6 +8,7 @@ import { zipSync } from "fflate";
 
 const commitSha = "0123456789abcdef0123456789abcdef01234567";
 const appCommitSha = "89abcdef0123456789abcdef0123456789abcdef";
+const appCiRunId = 123456789;
 const repository = "juichi50iii/KobitoKey_QWERTY";
 const runId = 123;
 const dir = mkdtempSync(join(tmpdir(), "browser-firmware-collector-"));
@@ -109,6 +110,20 @@ const server = createServer((request, response) => {
       schemaVersion: 1,
       appCommitSha,
     });
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === `/repos/s-hiraoku/kobitokey-studio/actions/runs/${appCiRunId}`) {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      JSON.stringify({
+        id: appCiRunId,
+        html_url: `https://github.com/s-hiraoku/kobitokey-studio/actions/runs/${appCiRunId}`,
+        head_sha: appCommitSha,
+        status: "completed",
+        conclusion: "success",
+      }),
+    );
     return;
   }
 
@@ -270,6 +285,9 @@ try {
   assert(report.production.frontendOAuthClientIdPresent === true, "frontend OAuth client id was not collected from production bundle");
   assert(report.production.workerArtifactRouteChecked === true, "artifact route validation was not checked");
   assert(report.ci.appCommitSha === appCommitSha, "app commit sha was not collected from environment");
+  assert(report.ci.runHeadSha === appCommitSha, "app CI run head sha was not collected from GitHub API");
+  assert(report.ci.status === "completed", "app CI run status was not collected from GitHub API");
+  assert(report.ci.conclusion === "success", "app CI run conclusion was not collected from GitHub API");
   assert(report.commit.sha === commitSha, "commit sha was not collected from GitHub API");
   assert(report.commit.managedFiles.length === 1, "commit changed managed file list was not collected from GitHub API");
   assert(report.commit.managedFiles.includes("config/KobitoKey.keymap"), "keymap managed file missing from report");
@@ -408,7 +426,7 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL: baseUrl,
         BROWSER_FIRMWARE_E2E_GITHUB_TOKEN: "collector-secret",
         BROWSER_FIRMWARE_E2E_TESTER: "release-qa",
-        BROWSER_FIRMWARE_E2E_CI_RUN_URL: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123456789",
+        BROWSER_FIRMWARE_E2E_CI_RUN_URL: `https://github.com/s-hiraoku/kobitokey-studio/actions/runs/${appCiRunId}`,
         BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA: appCommitSha,
         BROWSER_FIRMWARE_E2E_CI_PASSED: "true",
         BROWSER_FIRMWARE_E2E_REPOSITORY: repository,

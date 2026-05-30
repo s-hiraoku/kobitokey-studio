@@ -73,7 +73,7 @@ KobitoKey Studio の画面は、主に 4 つの領域に分かれています。
 | 上部バー | `Firmware` / `Direct` の切り替え、プロジェクト読み込み、接続状態 |
 | 左側 | layer 一覧 |
 | 中央 | 実際の KobitoKey 形状に沿った keymap 表示、Combo overlay、編集 tabs、Build/Flash とリセット actions |
-| 右側 | 選択中 key の binding 編集 |
+| 右側 | 選択中 key の動作編集 |
 | 中央下部 tabs | Combo、Trackball、Diff 操作 |
 
 基本操作は「左で layer を選ぶ → 中央で key を選ぶ → 右で設定する」です。
@@ -189,7 +189,7 @@ Firmware Mode は、次の設定をファイルとして編集します。
 - `config/boards/shields/KobitoKey/KobitoKey_left.overlay`
 - `config/boards/shields/KobitoKey/KobitoKey_right.overlay`
 
-編集後は保存し、GitHub Actions で firmware を build し、生成された左右の UF2 をそれぞれの bootloader volume にコピーします。設定が firmware に焼き込まれるため、Direct Mode が未対応の binding や overlay 設定も扱えます。
+編集後は保存し、GitHub Actions で firmware を build し、生成された左右の UF2 をそれぞれの bootloader volume にコピーします。設定が firmware に焼き込まれるため、Direct Mode が未対応のキー動作や overlay 設定も扱えます。
 
 ### Direct Mode を選ぶ場合
 
@@ -264,9 +264,9 @@ Firmware Mode の編集は、押した時点ではまだローカルファイル
 
 変更後は、対象 key の表示と右側の preview が意図した動作になっているか確認します。複雑な ZMK 構文は label が短縮表示されることがありますが、tooltip や inspector では元の ZMK 構文を確認できます。
 
-### 3.3 Binding picker の使い分け
+### 3.3 動作 picker の使い分け
 
-| 種類 | 使う binding | 入力内容 |
+| 種類 | 使う ZMK 構文 | 入力内容 |
 | --- | --- | --- |
 | 通常キー | `&kp KEY` | 文字、数字、記号、navigation、function、media/system key |
 | Layer Tap | `&lt LAYER KEY` | tap 時の key と hold 時の layer |
@@ -277,11 +277,11 @@ Firmware Mode の編集は、押した時点ではまだローカルファイル
 | Bluetooth | `&bt COMMAND VALUE` | profile 選択や clear など |
 | Raw | 任意の ZMK 構文 | picker 未対応の動作を直接入力 |
 
-Raw は、KobitoKey Studio がまだ構造化 UI を持たない binding を扱うための逃げ道です。ZMK の構文を理解している場合だけ使ってください。
+Raw は、KobitoKey Studio がまだ構造化 UI を持たないキー動作を扱うための逃げ道です。ZMK の構文を理解している場合だけ使ってください。
 
-### 3.4 よく使う binding 例
+### 3.4 よく使う動作例
 
-| やりたいこと | binding 例 | 補足 |
+| やりたいこと | ZMK 構文例 | 補足 |
 | --- | --- | --- |
 | `A` を入力する | `&kp A` | 通常の key press |
 | 押している間だけ layer 1 にする | `&mo 1` | 親指 key などに向いています |
@@ -292,24 +292,24 @@ Raw は、KobitoKey Studio がまだ構造化 UI を持たない binding を扱�
 | 何もしない key にする | `&none` | 誤入力を防ぐときに使います |
 | 下の layer を透過する | `&trans` | layer の一部だけ下位 layer を使うときに使います |
 
-`&none` と `&trans` は似ていますが意味が違います。`&none` は押しても何もしません。`&trans` はその layer では定義せず、下の layer の同じ位置の binding を使います。
+`&none` と `&trans` は似ていますが意味が違います。`&none` は押しても何もしません。`&trans` はその layer では定義せず、下の layer の同じ位置の動作を使います。
 
 ### 3.5 Combo を編集する
 
 1. Firmware Mode で中央下部の `Combos` tab を開きます。
 2. 既存 Combo を選ぶか、`追加` を押します。
-3. `binding` には発火させたい Combo の動作を設定します。
+3. Combo 成立時に発火させたい動作を設定します。
 4. key grid で 2 つ以上の key position を選びます。
 5. `timeoutMs` を設定します。
-6. Combo の動作は `Combo 動作を変更` で下書きに入れ、`Combo の編集を保存` で編集内容に保存します。
+6. Combo の動作は `Combo の動作を変更` で下書きに入れ、`Combo の編集を保存` で編集内容に保存します。
 
 Combo の key position は、手入力ではなく画面上の 1-40 の key grid から選べます。実際に押す組み合わせに対応する位置を選び、中央の Combo overlay で位置関係を確認してください。
 
-Combo 設定で特に大事なのは、`binding`、`key positions`、有効 layer、`timeoutMs` です。Combo 一覧と詳細には、その Combo が全 layer で有効か、特定 layer だけで有効かが表示されます。
+Combo 設定で特に大事なのは、成立時の動作、`key positions`、有効 layer、`timeoutMs` です。Combo 一覧と詳細には、その Combo が全 layer で有効か、特定 layer だけで有効かが表示されます。
 
 | 項目 | 意味 | 設定の考え方 |
 | --- | --- | --- |
-| `binding` | Combo が成立したときに実行する動作 | `&kp ESC`、`&kp TAB`、`&mo 1` など |
+| 動作 | Combo が成立したときに実行する動作 | `&kp ESC`、`&kp TAB`、`&mo 1` など |
 | `key positions` | 同時押しする key の位置 | 2 つ以上を選びます |
 | `layers` | Combo が有効な layer。未指定なら全 layer | `1 2` |
 | `timeoutMs` | 同時押しと判定する時間 | 短いほど誤爆しにくく、長いほど成立しやすい |
@@ -350,7 +350,7 @@ Firmware Mode のトラックボール設定は overlay ファイルへ反映さ
 - 変更した覚えのない layer が変わっていないか
 - left / right overlay のどちらが変わったか
 - Combo の key position が意図した位置か
-- Raw binding に typo がないか
+- ZMK 直接入力の構文に typo がないか
 - `&none` と `&trans` を取り違えていないか
 
 ## 4. Firmware を build して UF2 を書き込む
@@ -467,7 +467,7 @@ Bluetooth Direct は実験的対応です。試す場合は「接続方法」で
 
 Direct Mode で対応している主なキー動作は次です。
 
-| Binding | 用途 |
+| ZMK 構文 | 用途 |
 | --- | --- |
 | `&kp KEY` | 通常 key press |
 | `&kt KEY` | key toggle |
@@ -549,7 +549,7 @@ ZMK Studio 対応 firmware がない、または Direct Mode で未対応のキ�
 3. `Combos` を開きます。
 4. `追加` で Combo を作ります。
 5. key grid で同時押し key を選びます。
-6. binding と timeout を設定します。
+6. Combo の動作と timeout を設定します。
 7. `Diff` を確認します。
 8. ブラウザ版は `Commit & Build`、Tauri 版は保存して build します。
 9. build + UF2 書き込みで反映します。

@@ -44,6 +44,11 @@ requireValue(
 );
 requireSha(report.ci?.appCommitSha, "ci.appCommitSha must be a 40-character SHA");
 requireNonPlaceholderHash(report.ci?.appCommitSha, "ci.appCommitSha must not be a placeholder SHA");
+requireSha(report.ci?.runHeadSha, "ci.runHeadSha must be a 40-character SHA");
+requireNonPlaceholderHash(report.ci?.runHeadSha, "ci.runHeadSha must not be a placeholder SHA");
+requireValue(report.ci?.runHeadSha === report.ci?.appCommitSha, "ci.runHeadSha must match ci.appCommitSha");
+requireValue(report.ci?.status === "completed", "ci.status must be completed");
+requireValue(report.ci?.conclusion === "success", "ci.conclusion must be success");
 requireValue(report.production?.appCommitSha === report.ci?.appCommitSha, "production.appCommitSha must match ci.appCommitSha");
 requireValue(report.ci?.browserFirmwareReleaseCheckPassed === true, "ci.browserFirmwareReleaseCheckPassed must be true");
 

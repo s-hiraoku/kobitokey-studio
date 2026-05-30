@@ -17,6 +17,9 @@
   },
   "ci": {
     "runUrl": "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/1",
+    "runHeadSha": "0000000000000000000000000000000000000000",
+    "status": "",
+    "conclusion": "",
     "appCommitSha": "0000000000000000000000000000000000000000",
     "browserFirmwareReleaseCheckPassed": false
   },
