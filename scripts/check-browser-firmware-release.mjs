@@ -646,6 +646,7 @@ const checks = [
         "production-url argument must match e2e report production.url",
         "BROWSER_FIRMWARE_PRODUCTION_URL must match e2e report production.url",
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
+        "external E2E evidence validation",
         "e2e report production.url must use the expected public production origin",
         "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
@@ -664,6 +665,9 @@ const checks = [
         "e2e report production.url must use the expected public production origin",
         "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
+        "Expected public release gate to validate external evidence before production preflight",
+        "Expected invalid external evidence to stop before production preflight",
+        "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&
       allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&

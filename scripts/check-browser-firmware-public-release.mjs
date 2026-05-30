@@ -11,9 +11,9 @@ if (args.includes("--help") || args.includes("-h")) {
   console.log(`Usage: node scripts/check-browser-firmware-public-release.mjs --e2e-report <report.json> [production-url]
 
 Runs the final browser Firmware Mode public release gate:
-  1. merge readiness against origin/main
-  2. production release preflight with GitHub OAuth client id
-  3. external E2E evidence validation
+  1. external E2E evidence validation
+  2. merge readiness against origin/main
+  3. production release preflight with GitHub OAuth client id
 
 Required:
   --e2e-report <report.json>
@@ -106,16 +106,15 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
+run("node", ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
 if (!skipMergeReadiness) {
   run("node", ["scripts/check-browser-firmware-merge-readiness.mjs"]);
 }
-
 run("node", [
   "scripts/check-browser-firmware-production-preflight.mjs",
   "--require-oauth",
   preflightProductionUrl,
 ], reportAppCommitSha ? { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: reportAppCommitSha } : {});
-run("node", ["scripts/check-browser-firmware-external-evidence.mjs", e2eReportPath]);
 
 console.log(`OK ${basename(e2eReportPath)} passed browser firmware public release gate`);
 

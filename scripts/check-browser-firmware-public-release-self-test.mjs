@@ -8,7 +8,9 @@ const dir = mkdtempSync(join(tmpdir(), "browser-firmware-public-release-"));
 
 try {
   const previewReport = join(dir, "preview.json");
+  const invalidPublicOriginReport = join(dir, "invalid-public-origin.json");
   writeFileSync(previewReport, JSON.stringify(createPreviewReport(), null, 2));
+  writeFileSync(invalidPublicOriginReport, JSON.stringify(createInvalidPublicOriginReport(), null, 2));
 
   const missingInputs = await runPublicRelease([], {});
   expectFailure(
@@ -66,6 +68,21 @@ try {
     "Expected public release gate to reject E2E evidence from a different commit",
   );
 
+  const invalidEvidence = await runPublicRelease(
+    ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", invalidPublicOriginReport],
+    { BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client" },
+  );
+  expectFailure(
+    invalidEvidence,
+    ["production.appCommitSha must not be a placeholder SHA"],
+    "Expected public release gate to validate external evidence before production preflight",
+  );
+  expectNoOutput(
+    invalidEvidence,
+    ["production page is missing release security headers"],
+    "Expected invalid external evidence to stop before production preflight",
+  );
+
   console.log("OK browser firmware public release self-test passed");
 } finally {
   rmSync(dir, { recursive: true, force: true });
@@ -82,6 +99,16 @@ function expectFailure(result, expectedMessages, message) {
       process.stdout.write(result.stdout);
       process.stderr.write(result.stderr);
       throw new Error(`${message}: missing "${expected}"`);
+    }
+  }
+}
+
+function expectNoOutput(result, unexpectedMessages, message) {
+  for (const unexpected of unexpectedMessages) {
+    if (result.stdout.includes(unexpected) || result.stderr.includes(unexpected)) {
+      process.stdout.write(result.stdout);
+      process.stderr.write(result.stderr);
+      throw new Error(`${message}: found "${unexpected}"`);
     }
   }
 }
@@ -113,5 +140,12 @@ function runPublicRelease(args, env = {}) {
 function createPreviewReport() {
   const report = JSON.parse(readFileSync(templateReport, "utf8"));
   report.production.url = "https://feature-firmware-mode-kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+  return report;
+}
+
+function createInvalidPublicOriginReport() {
+  const report = JSON.parse(readFileSync(templateReport, "utf8"));
+  report.production.url = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+  report.production.fetchUrl = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
   return report;
 }

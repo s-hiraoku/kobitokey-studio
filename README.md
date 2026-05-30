@@ -169,10 +169,10 @@ BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browse
 ```
 
 For the final public-release decision, use the combined gate with the validated
-external E2E report. This command fails unless merge readiness, the OAuth
-production preflight, and the evidence validator all pass. The production URL
-used for preflight must match `production.url` in the E2E report, and the
-report URL must use the expected public production origin
+external E2E report. This command validates the evidence first, then fails
+unless merge readiness and the OAuth production preflight also pass. The
+production URL used for preflight must match `production.url` in the E2E report,
+and the report URL must use the expected public production origin
 (`https://kobitokey-studio.s-hiraoku.workers.dev` by default, or
 `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` for a future custom domain). The
 report `production.fetchUrl` must match `production.url`, so a test fetch
