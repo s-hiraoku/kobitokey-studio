@@ -56,6 +56,12 @@ if (!process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
 if ((skipMergeReadiness || skipCurrentHead) && !skipReason) {
   issues.push("BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags");
 }
+const worktreeStatus = readGitWorktreeStatus();
+if (worktreeStatus === null) {
+  issues.push("working tree cleanliness could not be verified; run public-release from a git checkout");
+} else if (worktreeStatus) {
+  issues.push("working tree is dirty; commit or stash changes before public release gate");
+}
 if (!e2eReportPath) {
   issues.push("--e2e-report <report.json> or BROWSER_FIRMWARE_E2E_REPORT is required");
 } else if (!existsSync(e2eReportPath)) {
@@ -158,6 +164,14 @@ function readGitHeadSha() {
     stdio: ["ignore", "pipe", "ignore"],
   });
   return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function readGitWorktreeStatus() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
 }
 
 function run(command, commandArgs, extraEnv = {}) {

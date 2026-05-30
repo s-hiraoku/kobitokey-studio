@@ -182,7 +182,9 @@ report `production.fetchUrl` must match `production.url`, so a test fetch
 override cannot be used as public evidence. The report `ci.runUrl` must point to
 the `s-hiraoku/kobitokey-studio` Actions run, `ci.runHeadSha` must match
 `ci.appCommitSha`, the CI run must be completed/success, `production.appCommitSha`
-must match `ci.appCommitSha`, and `ci.appCommitSha` must match the current git `HEAD`:
+must match `ci.appCommitSha`, and `ci.appCommitSha` must match the current git
+`HEAD`. Run it from a clean working tree so the release validators and docs are
+the committed files being released:
 
 ```sh
 BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json

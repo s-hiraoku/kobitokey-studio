@@ -755,6 +755,8 @@ const checks = [
         "BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN",
         "BROWSER_FIRMWARE_RELEASE_SKIP_REASON",
         "BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags",
+        "working tree is dirty; commit or stash changes before public release gate",
+        "readGitWorktreeStatus",
         "external E2E evidence validation",
         "e2e report production.url must use the expected public production origin",
         "production preflight URL must use the expected public production origin",
@@ -777,7 +779,11 @@ const checks = [
         "Expected public release gate to validate external evidence before production preflight",
         "Expected invalid external evidence to stop before production preflight",
         "Expected public release gate to require an explicit reason for skip flags",
+        "Expected public release gate to reject a dirty git worktree",
+        "Expected dirty worktree to stop before production preflight",
         "BROWSER_FIRMWARE_RELEASE_SKIP_REASON is required when using public-release skip flags",
+        "working tree is dirty; commit or stash changes before public release gate",
+        "runDirtyWorktreePublicRelease",
         "production.appCommitSha must not be a placeholder SHA",
         "OK browser firmware public release self-test passed",
       ]) &&
@@ -787,10 +793,10 @@ const checks = [
         'run(process.execPath, [',
       ]) &&
       !files.publicReleaseCheck.includes('run("node"') &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
       allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact", "clean working tree"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",

@@ -1,9 +1,10 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
-const templateReport = "docs/browser-firmware-e2e-evidence.template.json";
+const publicReleaseScript = resolve("scripts/check-browser-firmware-public-release.mjs");
+const templateReport = resolve("docs/browser-firmware-e2e-evidence.template.json");
 const dir = mkdtempSync(join(tmpdir(), "browser-firmware-public-release-"));
 
 try {
@@ -106,6 +107,18 @@ try {
     "Expected public release gate to require an explicit reason for skip flags",
   );
 
+  const dirtyWorktree = await runDirtyWorktreePublicRelease();
+  expectFailure(
+    dirtyWorktree,
+    ["working tree is dirty; commit or stash changes before public release gate"],
+    "Expected public release gate to reject a dirty git worktree",
+  );
+  expectNoOutput(
+    dirtyWorktree,
+    ["production page is missing Content-Security-Policy"],
+    "Expected dirty worktree to stop before production preflight",
+  );
+
   console.log("OK browser firmware public release self-test passed");
 } finally {
   rmSync(dir, { recursive: true, force: true });
@@ -137,9 +150,13 @@ function expectNoOutput(result, unexpectedMessages, message) {
 }
 
 function runPublicRelease(args, env = {}) {
+  return runPublicReleaseInCwd(process.cwd(), args, env);
+}
+
+function runPublicReleaseInCwd(cwd, args, env = {}) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ["scripts/check-browser-firmware-public-release.mjs", ...args], {
-      cwd: process.cwd(),
+    const child = spawn(process.execPath, [publicReleaseScript, ...args], {
+      cwd,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -158,6 +175,37 @@ function runPublicRelease(args, env = {}) {
       resolve({ status: status ?? 1, stdout, stderr });
     });
   });
+}
+
+async function runDirtyWorktreePublicRelease() {
+  const repoDir = mkdtempSync(join(dir, "dirty-release-"));
+  runGit(repoDir, ["init"]);
+  runGit(repoDir, ["config", "user.email", "kobitokey-release-self-test@example.com"]);
+  runGit(repoDir, ["config", "user.name", "KobitoKey Release Self Test"]);
+  writeFileSync(join(repoDir, "README.md"), "release self-test\n");
+  runGit(repoDir, ["add", "README.md"]);
+  runGit(repoDir, ["commit", "-m", "Initial commit"]);
+  writeFileSync(join(repoDir, "dirty.txt"), "not committed\n");
+
+  return runPublicReleaseInCwd(
+    repoDir,
+    ["--skip-merge-readiness", "--skip-current-head", "--e2e-report", templateReport],
+    {
+      BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "dummy-client",
+      BROWSER_FIRMWARE_RELEASE_SKIP_REASON: "self-test dirty worktree",
+    },
+  );
+}
+
+function runGit(cwd, args) {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+  }
 }
 
 function createPreviewReport() {
