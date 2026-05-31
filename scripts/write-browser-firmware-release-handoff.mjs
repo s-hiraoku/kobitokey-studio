@@ -128,7 +128,7 @@ function renderHandoff(status) {
     "Run this only after production deploy and external E2E evidence are complete:",
     "",
     "```sh",
-    "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
+    "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
     "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
     "```",
     "",
