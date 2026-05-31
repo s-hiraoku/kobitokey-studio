@@ -153,14 +153,14 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
     return Promise.reject(new Error("GitHub device flow was cancelled"));
   }
   return new Promise((resolve, reject) => {
-    const timeout = globalThis.setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        globalThis.clearTimeout(timeout);
-        reject(new Error("GitHub device flow was cancelled"));
-      },
-      { once: true },
-    );
+    const onAbort = () => {
+      globalThis.clearTimeout(timeout);
+      reject(new Error("GitHub device flow was cancelled"));
+    };
+    const timeout = globalThis.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }

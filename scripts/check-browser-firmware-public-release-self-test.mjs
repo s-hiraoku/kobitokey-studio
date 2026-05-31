@@ -123,6 +123,7 @@ try {
   console.log("OK browser firmware public release self-test passed");
 } finally {
   rmSync(dir, { recursive: true, force: true });
+  rmSync(cleanRepoDir, { recursive: true, force: true });
 }
 
 function expectFailure(result, expectedMessages, message) {

@@ -1412,21 +1412,21 @@ fn side_file_from_manifest(
 }
 
 fn resolve_manifest_file(base_dir: &Path, file: &str, uf2_files: &[String]) -> Option<String> {
-    let path = base_dir.join(file);
-    if path.exists() {
-        return Some(display_path(&path));
+    let base_dir = base_dir.canonicalize().ok()?;
+    let path = base_dir.join(file).canonicalize().ok()?;
+    if !path.starts_with(&base_dir) {
+        return None;
     }
 
-    uf2_files
-        .iter()
-        .find(|candidate| {
-            candidate == &file
-                || candidate.ends_with(&format!("/{file}"))
-                || Path::new(candidate)
-                    .file_name()
-                    .is_some_and(|name| name == file)
-        })
-        .cloned()
+    uf2_files.iter().find_map(|candidate| {
+        let candidate_path = Path::new(candidate);
+        let candidate_canonical = candidate_path.canonicalize().ok()?;
+        if candidate_canonical == path {
+            Some(display_path(candidate_path))
+        } else {
+            None
+        }
+    })
 }
 
 fn classify_uf2_files_by_name(files: &[String]) -> (Option<String>, Option<String>) {
@@ -2745,6 +2745,29 @@ mod tests {
 
         assert!(output_dir.exists());
         assert!(!output_dir.join("old-run/left.uf2").exists());
+
+        fs::remove_dir_all(root).expect("test artifact dir should be removed");
+    }
+
+    #[test]
+    fn manifest_file_resolution_rejects_paths_outside_artifact_tree() {
+        let root = unique_test_dir("kobitokey-manifest-resolution");
+        let manifest_dir = root.join("artifacts/build");
+        let in_tree_uf2 = manifest_dir.join("left.uf2");
+        let outside_uf2 = root.join("outside.uf2");
+        fs::create_dir_all(&manifest_dir).expect("manifest dir should be created");
+        fs::write(&in_tree_uf2, "in tree").expect("in-tree UF2 should be written");
+        fs::write(&outside_uf2, "outside").expect("outside UF2 should be written");
+        let uf2_files = vec![display_path(&in_tree_uf2), display_path(&outside_uf2)];
+
+        assert_eq!(
+            resolve_manifest_file(&manifest_dir, "left.uf2", &uf2_files),
+            Some(display_path(&in_tree_uf2))
+        );
+        assert_eq!(
+            resolve_manifest_file(&manifest_dir, "../../outside.uf2", &uf2_files),
+            None
+        );
 
         fs::remove_dir_all(root).expect("test artifact dir should be removed");
     }

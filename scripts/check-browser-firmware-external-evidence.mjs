@@ -202,7 +202,7 @@ function requireNonPlaceholderString(value, message) {
   requireValue(
     typeof value === "string" &&
       value.trim().length > 0 &&
-      !/^todo|tbd|placeholder$/i.test(value.trim()) &&
+      !/^(?:todo|tbd|placeholder)(?:\b|$)/i.test(value.trim()) &&
       !/^<[^>]+>$/.test(value.trim()),
     message,
   );
