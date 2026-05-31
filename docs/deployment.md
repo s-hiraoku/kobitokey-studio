@@ -87,7 +87,7 @@ npm run check:browser-firmware:release-status -- --json
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
 ```
 
-公開作業を別担当に渡す場合は、同じ判定を Markdown にして、残作業 command と evidence links 付きで共有できます。
+公開作業を別担当に渡す場合は、同じ判定を Markdown にして、残作業 command、evidence links、current app commit / release gate run URL を事前入力する E2E env-template seed command 付きで共有できます。
 
 ```sh
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md

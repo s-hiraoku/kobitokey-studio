@@ -267,14 +267,23 @@ Optional:
 }
 
 function printEnvTemplate() {
-  const currentHead = readOptionalGitValue(["rev-parse", "HEAD"]) || "<kobitokey-studio-app-commit-sha>";
+  const productionUrl =
+    process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_URL?.trim() ||
+    "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+  const ciRunUrl =
+    process.env.BROWSER_FIRMWARE_E2E_CI_RUN_URL?.trim() ||
+    "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>";
+  const currentHead =
+    process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA?.trim() ||
+    readOptionalGitValue(["rev-parse", "HEAD"]) ||
+    "<kobitokey-studio-app-commit-sha>";
   const lines = [
     "# Browser Firmware Mode external E2E evidence environment.",
     "# Fill placeholders before running the collector. Do not commit this file.",
-    `export BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote("https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware")}`,
+    `export BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(productionUrl)}`,
     "export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "export BROWSER_FIRMWARE_E2E_TESTER='<tester name>'",
-    "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>'",
+    `export BROWSER_FIRMWARE_E2E_CI_RUN_URL=${shellQuote(ciRunUrl)}`,
     `export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(currentHead)}`,
     "export BROWSER_FIRMWARE_E2E_REPOSITORY='juichi50iii/KobitoKey_QWERTY'",
     "export BROWSER_FIRMWARE_E2E_BRANCH='<firmware repository branch used by Commit & Build>'",

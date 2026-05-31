@@ -273,6 +273,7 @@ const checks = [
         "scripts/check-browser-firmware-release-status.mjs",
         "nextActions",
         "Evidence Links",
+        "E2E Env Seed",
         "evidenceLinksFor",
         "action.links.map",
         "External E2E Evidence Checklist",
@@ -291,6 +292,8 @@ const checks = [
         "OK browser firmware release handoff self-test passed",
         "Status: NOT READY",
         "[Release Gate Run](https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123)",
+        "BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
+        "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
         "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
         "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md)",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
@@ -1448,6 +1451,7 @@ const checks = [
         "artifact provenance build artifact match state was not collected",
         "public entry link URLs were not collected",
         "automatic public entry link URLs were not collected",
+        "collector env template should allow handoff to prefill the release-gate run URL",
         "OK browser firmware external evidence collector self-test passed",
       ]) &&
       allIncludes(files.externalEvidenceTemplate, [

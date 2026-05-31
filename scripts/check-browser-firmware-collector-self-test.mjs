@@ -286,6 +286,32 @@ try {
   );
   assert(!envTemplate.stdout.includes("collector-secret"), "collector env template should not print secret values");
 
+  const seededEnvTemplate = await runCollectorEnvTemplate({
+    BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://example.com/?mode=firmware",
+    BROWSER_FIRMWARE_E2E_CI_RUN_URL: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/999",
+    BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA: "abc123456789abc123456789abc123456789abcd",
+  });
+  if (seededEnvTemplate.status !== 0) {
+    process.stderr.write(seededEnvTemplate.stderr);
+    process.stdout.write(seededEnvTemplate.stdout);
+    process.exit(seededEnvTemplate.status ?? 1);
+  }
+  assert(
+    seededEnvTemplate.stdout.includes("export BROWSER_FIRMWARE_E2E_PRODUCTION_URL='https://example.com/?mode=firmware'"),
+    "collector env template should allow handoff to prefill production URL",
+  );
+  assert(
+    seededEnvTemplate.stdout.includes(
+      "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/999'",
+    ),
+    "collector env template should allow handoff to prefill the release-gate run URL",
+  );
+  assert(
+    seededEnvTemplate.stdout.includes("export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='abc123456789abc123456789abc123456789abcd'"),
+    "collector env template should allow handoff to prefill the app commit SHA",
+  );
+  assert(!seededEnvTemplate.stdout.includes("collector-secret"), "seeded collector env template should not print secret values");
+
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;
   const fetchOverrideResult = await runCollector(baseUrl, fetchOverrideReportPath, {
@@ -597,13 +623,14 @@ function runCollector(baseUrl, reportPath, options) {
   });
 }
 
-function runCollectorEnvTemplate() {
+function runCollectorEnvTemplate(extraEnv = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, ["scripts/collect-browser-firmware-e2e-evidence.mjs", "--print-env-template"], {
       cwd: process.cwd(),
       env: {
         ...process.env,
         BROWSER_FIRMWARE_E2E_GITHUB_TOKEN: "collector-secret",
+        ...extraEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

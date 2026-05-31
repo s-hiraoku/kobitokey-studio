@@ -147,7 +147,8 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 ```
 
 To create a Markdown handoff for the deploy / QA owner, render the same status
-as a checklist with commands and evidence links:
+as a checklist with commands, evidence links, and a prefilled E2E env-template
+seed command:
 
 ```sh
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md

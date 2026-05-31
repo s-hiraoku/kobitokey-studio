@@ -89,6 +89,7 @@ function renderHandoff(status) {
   const checks = Array.isArray(status.checks) ? status.checks : [];
   const nextActions = Array.isArray(status.nextActions) ? status.nextActions : [];
   const evidenceLinks = evidenceLinksFor(checks, nextActions);
+  const releaseGateRunUrl = evidenceLinks.find((link) => link.label === "Release Gate Run")?.url || "";
   const publicEntryUrls = publicEntryUrlsFor(status.productionUrl);
   const lines = [
     "# Browser Firmware Mode Release Handoff",
@@ -111,6 +112,17 @@ function renderHandoff(status) {
     ...(evidenceLinks.length > 0
       ? evidenceLinks.map((link) => `- [${link.label || "Link"}](${link.url})`)
       : ["No evidence links reported by release-status."]),
+    "",
+    "## E2E Env Seed",
+    "",
+    "Use this to print the external E2E env template with the current app commit and release-gate run prefilled:",
+    "",
+    "```sh",
+    `BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(status.productionUrl || "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware")} \\`,
+    `BROWSER_FIRMWARE_E2E_CI_RUN_URL=${shellQuote(releaseGateRunUrl || "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>")} \\`,
+    `BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(status.headSha || "<kobitokey-studio-app-commit-sha>")} \\`,
+    "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
+    "```",
     "",
     "## Next Actions",
     "",
@@ -227,6 +239,10 @@ function tableCell(value) {
     .replace(/\|/g, "\\|")
     .replace(/\r?\n/g, " ")
     .trim();
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
 function formatError(error) {
