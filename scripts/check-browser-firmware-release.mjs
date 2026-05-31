@@ -18,6 +18,8 @@ const files = {
   releaseStatusSelfTest: read("scripts/check-browser-firmware-release-status-self-test.mjs"),
   releaseHandoff: read("scripts/write-browser-firmware-release-handoff.mjs"),
   releaseHandoffSelfTest: read("scripts/write-browser-firmware-release-handoff-self-test.mjs"),
+  releaseBundle: read("scripts/write-browser-firmware-release-bundle.mjs"),
+  releaseBundleSelfTest: read("scripts/write-browser-firmware-release-bundle-self-test.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
   productionPreflightSelfTest: read("scripts/check-browser-firmware-production-preflight-self-test.mjs"),
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
@@ -80,10 +82,12 @@ const checks = [
         "scripts/check-browser-firmware-public-release-self-test.mjs",
         "scripts/check-browser-firmware-release-status-self-test.mjs",
         "scripts/write-browser-firmware-release-handoff-self-test.mjs",
+        "scripts/write-browser-firmware-release-bundle-self-test.mjs",
         "scripts/deploy-browser-firmware-production-self-test.mjs",
         'scripts/deploy-browser-firmware-production.mjs", "--help"',
         "scripts/collect-browser-firmware-e2e-evidence.mjs",
         "--print-env-template",
+        'scripts/write-browser-firmware-release-bundle.mjs", "--help"',
         'runNode("node_modules/vitest/vitest.mjs", "run")',
         'runNode("node_modules/typescript/bin/tsc")',
         'runNode("node_modules/vite/bin/vite.js", "build")',
@@ -318,13 +322,46 @@ const checks = [
         "source /tmp/browser-firmware-e2e.env",
         "Do not paste GitHub tokens",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "Actions run evidence links", "write:browser-firmware:release-handoff", "validated external E2E report"]) &&
+      allIncludes(files.releaseBundle, [
+        "Browser Firmware Mode Release Bundle",
+        "--status-json <release-status.json>",
+        "--out-dir <dir>",
+        "release-status.json",
+        "release-handoff.md",
+        "browser-firmware-e2e.env",
+        "README.md",
+        "scripts/check-browser-firmware-release-status.mjs",
+        "scripts/write-browser-firmware-release-handoff.mjs",
+        "scripts/collect-browser-firmware-e2e-evidence.mjs",
+        "--print-env-template",
+        "BROWSER_FIRMWARE_E2E_CI_RUN_URL",
+        "BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA",
+        "source browser-firmware-e2e.env",
+        "path/to/browser-firmware-e2e-report.json",
+        "npm run collect:browser-firmware:e2e-report -- --out ${reportPath} --run-ui-smoke",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report ${reportPath}",
+        "npm run check:browser-firmware:public-release -- --e2e-report ${reportPath}",
+        "Do not write GitHub tokens",
+        "releaseGateRunUrlFor",
+      ]) &&
+      allIncludes(files.releaseBundleSelfTest, [
+        "OK browser firmware release bundle self-test passed",
+        "Status: NOT READY",
+        "browser-firmware-e2e.env",
+        "BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
+        "BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='abc123456789abcdef0123456789abcdef012345'",
+        "BROWSER_FIRMWARE_E2E_BRANCH='<firmware repository branch used by Commit & Build>'",
+        "source browser-firmware-e2e.env",
+        "npm run check:browser-firmware:public-release -- --e2e-report path/to/browser-firmware-e2e-report.json",
+        "Do not write GitHub tokens",
+      ]) &&
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "Actions run evidence links", "write:browser-firmware:release-handoff", "write:browser-firmware:release-bundle", "browser-firmware-e2e.env", "validated external E2E report"]) &&
       allIncludes(files.readme, [
         "run release-status without an E2E report first",
         "npm run check:browser-firmware:release-status -- --json",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "Actions run の evidence links", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "Actions run の evidence links", "write:browser-firmware:release-handoff", "write:browser-firmware:release-bundle", "browser-firmware-e2e.env", "current app commit の検証済み外部 E2E report"]) &&
       allIncludes(files.docsDeployment, [
         "npm run check:browser-firmware:release-status -- --json",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
@@ -408,6 +445,8 @@ const checks = [
         "check:browser-firmware:release-status",
         "npm run check:browser-firmware:release-status -- --json",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+        "write:browser-firmware:release-bundle",
+        "browser-firmware-e2e.env",
         "check:browser-firmware:production-release-preflight",
         "collect:browser-firmware:e2e-report",
         "check:browser-firmware:public-release",
@@ -1056,7 +1095,9 @@ const checks = [
       scriptIncludes("check:browser-firmware:public-release", "node scripts/check-browser-firmware-public-release.mjs") &&
       scriptIncludes("check:browser-firmware:public-release-self-test", "node scripts/check-browser-firmware-public-release-self-test.mjs") &&
       scriptIncludes("check:browser-firmware:production-preflight-self-test", "node scripts/check-browser-firmware-production-preflight-self-test.mjs") &&
+      scriptIncludes("check:browser-firmware:release-bundle-self-test", "node scripts/write-browser-firmware-release-bundle-self-test.mjs") &&
       scriptIncludes("collect:browser-firmware:e2e-report", "node scripts/collect-browser-firmware-e2e-evidence.mjs") &&
+      scriptIncludes("write:browser-firmware:release-bundle", "node scripts/write-browser-firmware-release-bundle.mjs") &&
       allIncludes(files.publicReleaseCheck, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required",
         "--e2e-report <report.json>",

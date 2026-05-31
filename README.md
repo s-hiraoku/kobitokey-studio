@@ -161,6 +161,14 @@ seed command:
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
 ```
 
+For final QA, a single bundle command writes the machine-readable status,
+handoff, prefilled `browser-firmware-e2e.env`, and a short README into one
+directory:
+
+```sh
+npm run write:browser-firmware:release-bundle -- --out-dir /tmp/browser-firmware-release-bundle
+```
+
 If GitHub API rate limits block the Actions release-gate lookup, set
 `BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` to a token that can read this
 repository's Actions runs. If you already have a validated external E2E report
