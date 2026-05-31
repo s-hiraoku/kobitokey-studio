@@ -18,6 +18,16 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (request.method === "GET" && url.pathname.startsWith("/rate-limit-header/")) {
+    response.writeHead(403, {
+      "Content-Type": "application/json",
+      "X-RateLimit-Remaining": "0",
+      "X-RateLimit-Reset": String(Math.floor(Date.now() / 1000) + 60),
+    });
+    response.end(JSON.stringify({ message: "Forbidden" }));
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/") {
     response.writeHead(200, {
       "Content-Type": "text/html",
@@ -365,6 +375,17 @@ try {
   }
   expectExcludes(rateLimitedJson.stdout, "preflight-client");
   expectExcludes(rateLimitedJson.stdout, "release-status-token");
+
+  const headerRateLimitedJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, `${baseUrl}/rate-limit-header`, [
+    "--json",
+    "--e2e-report",
+    e2eReportPath,
+  ]);
+  if (headerRateLimitedJson.status !== 0) {
+    process.stderr.write(headerRateLimitedJson.stderr);
+    process.stdout.write(headerRateLimitedJson.stdout);
+    throw new Error("Expected release status to detect GitHub rate limits from response headers");
+  }
 
   const missingOAuthJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"], {
     omitOAuthClientId: true,

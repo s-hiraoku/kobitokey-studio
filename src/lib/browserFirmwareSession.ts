@@ -2,6 +2,7 @@ import type { FirmwareBuildStatus } from "./firmwareReleaseFlow";
 import { parseGitHubRepositoryRef } from "./githubFirmware";
 
 export const BROWSER_FIRMWARE_SESSION_KEY = "kobitokey.browserFirmwareSession.v1";
+const DEFAULT_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
 
 export type BrowserFirmwareSession = {
   branch: string;
@@ -89,10 +90,10 @@ function sanitizeCommitSha(value: unknown): string | null {
 
 function sanitizeRepoUrl(value: unknown): string {
   if (typeof value !== "string") {
-    return "https://github.com/juichi50iii/KobitoKey_QWERTY";
+    return DEFAULT_REPO_URL;
   }
   const repoUrl = value.trim();
-  return parseGitHubRepositoryRef(repoUrl) ? repoUrl : "https://github.com/juichi50iii/KobitoKey_QWERTY";
+  return parseGitHubRepositoryRef(repoUrl) ? repoUrl : DEFAULT_REPO_URL;
 }
 
 function sanitizeGitHubCommitUrl(value: unknown, repoRef: { owner: string; repo: string }, commitSha: string): string {

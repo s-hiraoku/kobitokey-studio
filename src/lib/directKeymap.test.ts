@@ -522,6 +522,34 @@ describe("direct keymap conversion", () => {
     ]);
   });
 
+  it("treats empty Direct combo layers as all layers when comparing firmware combos", () => {
+    const firmwareCombos = parseKeymap(comboFixtureSource()).combos;
+    const directCombos: Array<KeymapCombo & { layerMask: number }> = [
+      {
+        id: "direct_combo_1",
+        binding: "&kp RET",
+        keyPositions: [1, 2],
+        layers: [],
+        layerMask: 0xffffffff,
+        timeoutMs: 35,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+      {
+        id: "direct_combo_2",
+        binding: "&kp B",
+        keyPositions: [3, 4],
+        layers: [],
+        layerMask: 0xffffffff,
+        timeoutMs: 70,
+        blockStart: 0,
+        blockEnd: 0,
+      },
+    ];
+
+    expect(diffDirectCombosAgainstFirmware(directCombos, firmwareCombos)).toEqual([]);
+  });
+
   it("applies Direct combo diffs back to firmware source", () => {
     const source = comboFixtureSource();
     const directCombos: KeymapCombo[] = [

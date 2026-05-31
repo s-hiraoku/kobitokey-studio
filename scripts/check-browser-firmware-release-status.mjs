@@ -552,7 +552,7 @@ async function fetchGitHubJson(url) {
   const response = await fetch(url, { headers });
   if (!response.ok) {
     const body = await response.text();
-    if (response.status === 403 && body.toLowerCase().includes("rate limit")) {
+    if (response.status === 403 && isGitHubRateLimitResponse(response, body)) {
       throw new Error(
         "GitHub API 403 rate limit: set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN for release-status checks",
       );
@@ -560,6 +560,35 @@ async function fetchGitHubJson(url) {
     throw new Error(`GitHub API ${response.status}: ${body}`);
   }
   return response.json();
+}
+
+function isGitHubRateLimitResponse(response, body) {
+  if (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after")) {
+    return true;
+  }
+  return parseGitHubErrorMessage(body).toLowerCase().includes("rate limit");
+}
+
+function parseGitHubErrorMessage(body) {
+  try {
+    const parsed = JSON.parse(body);
+    const messages = [];
+    if (typeof parsed.message === "string") {
+      messages.push(parsed.message);
+    }
+    if (Array.isArray(parsed.errors)) {
+      for (const error of parsed.errors) {
+        if (typeof error === "string") {
+          messages.push(error);
+        } else if (error && typeof error.message === "string") {
+          messages.push(error.message);
+        }
+      }
+    }
+    return messages.join(" ");
+  } catch {
+    return body;
+  }
 }
 
 function record(name, status, detail, action = "", commands = [], links = []) {

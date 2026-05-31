@@ -290,7 +290,8 @@ function sameComparableCombo(left: DirectFirmwareComboSnapshot, right: DirectFir
 }
 
 function sameComparableLayers(left: number[] | undefined, right: number[] | undefined): boolean {
-  return (left?.join(" ") ?? "all") === (right?.join(" ") ?? "all");
+  const normalize = (layers: number[] | undefined) => (layers && layers.length > 0 ? layers.join(" ") : "all");
+  return normalize(left) === normalize(right);
 }
 
 function comboLayersToMask(layers: number[] | undefined): number {

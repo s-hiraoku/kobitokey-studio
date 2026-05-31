@@ -1,4 +1,5 @@
 import type { ProjectFiles } from "./projectFiles";
+import { isGitHubPathSegment } from "./githubValidation";
 
 export type GitHubRepositoryRef = {
   owner: string;
@@ -110,8 +111,4 @@ function encodeGitHubPath(path: string): string {
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-}
-
-function isGitHubPathSegment(value: string): boolean {
-  return /^[A-Za-z0-9_.-]+$/.test(value) && !value.startsWith(".") && !value.endsWith(".");
 }

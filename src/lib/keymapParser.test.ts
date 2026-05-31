@@ -65,6 +65,7 @@ describe("parseKeymap", () => {
         timeoutMs: 35,
       }),
     ]);
+    expect(parsed.combos[0].layers).toBeUndefined();
     expect(parsed.layers[0].blockEnd).toBeGreaterThan(parsed.layers[0].blockStart);
     expect(parsed.combos[0].blockEnd).toBeGreaterThan(parsed.combos[0].blockStart);
   });

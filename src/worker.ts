@@ -1,3 +1,5 @@
+import { isGitHubPathSegment } from "./lib/githubValidation";
+
 type WorkerEnv = {
   ASSETS: {
     fetch: (request: Request) => Promise<Response>;
@@ -217,10 +219,6 @@ function methodNotAllowed(): Response {
   const response = json({ error: "method_not_allowed" }, 405);
   response.headers.set("Allow", "POST");
   return response;
-}
-
-function isGitHubPathSegment(value: string): boolean {
-  return /^[A-Za-z0-9_.-]+$/.test(value) && !value.startsWith(".") && !value.endsWith(".");
 }
 
 function withSecurityHeaders(response: Response, request: Request): Response {

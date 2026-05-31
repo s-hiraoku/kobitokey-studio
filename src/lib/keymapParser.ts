@@ -109,7 +109,7 @@ function parseCombos(source: string): KeymapCombo[] {
       id,
       binding,
       keyPositions,
-      layers,
+      ...(layers.length > 0 ? { layers } : {}),
       timeoutMs,
       blockStart: combosBlock.bodyStart + (match.index ?? 0),
       blockEnd: combosBlock.bodyStart + (match.index ?? 0) + match[0].length,
