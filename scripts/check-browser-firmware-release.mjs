@@ -179,7 +179,8 @@ const checks = [
         "warningCount: warnings.length",
         "nextActions",
         "commands",
-        "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally",
+        "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID",
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "deploy_browser_firmware_worker",
         "collect:browser-firmware:e2e-report",
         "--print-env-template",
@@ -218,6 +219,8 @@ const checks = [
         "Expected rate-limited release status fallback to have no blockers with validated external E2E evidence",
         "Expected rate-limited release status to prove release gate from external E2E evidence",
         "Expected rate-limited release status to warn that the deploy workflow job was not checked",
+        "Expected missing-OAuth nextAction to set both local OAuth client id environment variables",
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "Expected release status --json to include actionable nextActions for external E2E evidence",
         "nextAction.commands.includes",
         "source /tmp/browser-firmware-e2e.env",
@@ -236,6 +239,7 @@ const checks = [
       allIncludes(files.releaseHandoffSelfTest, [
         "OK browser firmware release handoff self-test passed",
         "Status: NOT READY",
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "source /tmp/browser-firmware-e2e.env",
         "Do not paste GitHub tokens",
       ]) &&

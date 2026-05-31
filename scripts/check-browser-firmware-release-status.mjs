@@ -87,10 +87,13 @@ record(
     : "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is missing",
   process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
     ? ""
-    : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy. The same public client id must be embedded in the deployed frontend bundle.",
+    : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID to the same public GitHub OAuth App client id locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy. The same public client id must be embedded in the deployed frontend bundle.",
   process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
     ? []
-    : ["export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'"],
+    : [
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+      ],
 );
 record(
   "Cloudflare token env",

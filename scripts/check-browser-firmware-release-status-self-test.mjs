@@ -256,25 +256,58 @@ try {
   expectExcludes(rateLimitedJson.stdout, "preflight-client");
   expectExcludes(rateLimitedJson.stdout, "release-status-token");
 
+  const missingOAuthJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"], {
+    omitOAuthClientId: true,
+  });
+  if (missingOAuthJson.status !== 1) {
+    process.stderr.write(missingOAuthJson.stderr);
+    process.stdout.write(missingOAuthJson.stdout);
+    throw new Error("Expected release status to fail when OAuth client id env is missing");
+  }
+  let missingOAuthStatus;
+  try {
+    missingOAuthStatus = JSON.parse(missingOAuthJson.stdout);
+  } catch (error) {
+    process.stdout.write(missingOAuthJson.stdout);
+    throw new Error(`Expected missing-OAuth release status --json output to parse: ${String(error)}`);
+  }
+  const oauthAction = missingOAuthStatus.nextActions.find((nextAction) => nextAction.name === "OAuth client id env");
+  if (
+    !oauthAction ||
+    !oauthAction.action.includes("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID") ||
+    !oauthAction.commands.includes("export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'") ||
+    !oauthAction.commands.includes("export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'")
+  ) {
+    process.stdout.write(missingOAuthJson.stdout);
+    throw new Error("Expected missing-OAuth nextAction to set both local OAuth client id environment variables");
+  }
+  expectExcludes(missingOAuthJson.stdout, "preflight-client");
+  expectExcludes(missingOAuthJson.stdout, "release-status-token");
+
   console.log("OK browser firmware release status self-test passed");
 } finally {
   rmSync(tempDir, { recursive: true, force: true });
   await new Promise((resolve) => server.close(resolve));
 }
 
-function runReleaseStatus(productionUrl, githubApiBaseUrl, extraArgs = []) {
+function runReleaseStatus(productionUrl, githubApiBaseUrl, extraArgs = [], options = {}) {
   return new Promise((resolve) => {
+    const env = {
+      ...process.env,
+      BROWSER_FIRMWARE_MAIN_REF: "HEAD",
+      BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY: "true",
+      BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL: githubApiBaseUrl,
+      BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN: "release-status-token",
+      CLOUDFLARE_API_TOKEN: "dummy-token",
+    };
+    if (!options.omitOAuthClientId) {
+      env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID = "preflight-client";
+    } else {
+      delete env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID;
+    }
     const child = spawn(process.execPath, ["scripts/check-browser-firmware-release-status.mjs", productionUrl, ...extraArgs], {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client",
-        BROWSER_FIRMWARE_MAIN_REF: "HEAD",
-        BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY: "true",
-        BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL: githubApiBaseUrl,
-        BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN: "release-status-token",
-        CLOUDFLARE_API_TOKEN: "dummy-token",
-      },
+      env,
     });
     let stdout = "";
     let stderr = "";

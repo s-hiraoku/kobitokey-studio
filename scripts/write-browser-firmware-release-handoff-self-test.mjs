@@ -57,6 +57,7 @@ function assertHandoff(markdown) {
     "Commit: abc1234 (abc123456789abcdef0123456789abcdef012345)",
     "Summary: 3 blocker(s), 2 warning(s)",
     "| BLOCKER | OAuth client id env |",
+    "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "### BLOCKER external E2E evidence",
     "source /tmp/browser-firmware-e2e.env",
     "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
@@ -89,8 +90,11 @@ function createStatusFixture() {
       {
         name: "OAuth client id env",
         status: "blocker",
-        action: "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret.",
-        commands: ["export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'"],
+        action: "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID to the same public GitHub OAuth App client id locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret.",
+        commands: [
+          "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+          "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        ],
       },
       {
         name: "external E2E evidence",
