@@ -95,10 +95,10 @@ UI 証跡では `ui.publicEntryLinksPassed` を `true` にし、`ui.publicEntryU
 
 ## 6. 最終 gate を通す
 
-作業ツリーが clean な状態で、外部 E2E 証跡と production preflight を同じ production URL / commit で照合します。
+作業ツリーが clean な状態で、外部 E2E 証跡、production preflight、`release-status` の `ready: true` を同じ production URL / commit で照合します。
 
 ```sh
 VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
 ```
 
-この gate が通り、`release-status` の `ready` が `true` になった状態を公開判定にします。
+この gate は `release-status` の `ready: true` も同じ E2E report で確認します。通った状態を公開判定にします。

@@ -241,7 +241,8 @@ VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CL
 
 For the final public-release decision, use the combined gate with the validated
 external E2E report. This command validates the evidence first, then fails
-unless merge readiness and the OAuth production preflight also pass. The
+unless merge readiness, the OAuth production preflight, and `release-status`
+`ready: true` with the same E2E report also pass. The
 production URL used for preflight must match `production.url` in the E2E report,
 and the report URL must use the expected public production origin
 (`https://kobitokey-studio.s-hiraoku.workers.dev` by default, or

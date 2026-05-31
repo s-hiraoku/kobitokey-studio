@@ -16,6 +16,7 @@ Runs the final browser Firmware Mode public release gate:
   1. external E2E evidence validation
   2. merge readiness against origin/main
   3. production release preflight with GitHub OAuth client id
+  4. release-status ready=true with the same external E2E evidence
 
 Required:
   --e2e-report <report.json>
@@ -129,6 +130,9 @@ run(process.execPath, [
   "--require-oauth",
   preflightProductionUrl,
 ], reportAppCommitSha ? { BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA: reportAppCommitSha } : {});
+if (!skipMergeReadiness && !skipCurrentHead) {
+  checkReleaseStatusReady({ e2eReportPath, productionUrl: preflightProductionUrl });
+}
 
 console.log(`OK ${basename(e2eReportPath)} passed browser firmware public release gate`);
 
@@ -178,6 +182,42 @@ function readGitWorktreeStatus() {
 
 function scriptPath(filename) {
   return join(scriptDir, filename);
+}
+
+function checkReleaseStatusReady({ e2eReportPath, productionUrl }) {
+  const result = spawnSync(
+    process.execPath,
+    [scriptPath("check-browser-firmware-release-status.mjs"), productionUrl, "--json", "--e2e-report", e2eReportPath],
+    {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const status = parseReleaseStatusJson(result.stdout);
+  if (result.status === 0 && status?.ready === true) {
+    console.log(`OK release-status ready=true for ${status.shortHead || "current HEAD"}`);
+    return;
+  }
+
+  console.error("Browser firmware release-status is not ready:");
+  if (status) {
+    console.error(`- ready=${String(status.ready)} blockerCount=${Number(status.blockerCount ?? 0)} warningCount=${Number(status.warningCount ?? 0)}`);
+    for (const action of status.nextActions ?? []) {
+      console.error(`- ${action.status || "unknown"} ${action.name}: ${action.action || "(no action text)"}`);
+    }
+  } else {
+    process.stderr.write(result.stdout || "");
+    process.stderr.write(result.stderr || "");
+  }
+  process.exit(result.status || 1);
+}
+
+function parseReleaseStatusJson(output) {
+  try {
+    return JSON.parse(output);
+  } catch {
+    return null;
+  }
 }
 
 function run(command, commandArgs, extraEnv = {}) {

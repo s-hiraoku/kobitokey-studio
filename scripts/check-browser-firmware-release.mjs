@@ -1028,7 +1028,7 @@ const checks = [
         "`verifiedAt`",
         "`ui.publicEntryLinksPassed`",
         "`ui.publicEntryUrls`",
-        "`release-status` の `ready` が `true`",
+        "`release-status` の `ready: true`",
       ]) &&
       allIncludes(files.readme, [
         "A passing preview preflight is not production release evidence",
@@ -1065,6 +1065,10 @@ const checks = [
         "working tree is dirty; commit or stash changes before public release gate",
         "readGitWorktreeStatus",
         "external E2E evidence validation",
+        "release-status ready=true",
+        "checkReleaseStatusReady",
+        'scriptPath("check-browser-firmware-release-status.mjs")',
+        "Browser firmware release-status is not ready",
         "e2e report production.url must use the expected public production origin",
         "production preflight URL must use the expected public production origin",
         "e2e report ci.appCommitSha must match the current git HEAD",
@@ -1100,13 +1104,14 @@ const checks = [
       allIncludes(files.publicReleaseCheck, [
         'run(process.execPath, [scriptPath("check-browser-firmware-external-evidence.mjs"), e2eReportPath])',
         'run(process.execPath, [scriptPath("check-browser-firmware-merge-readiness.mjs")])',
+        "checkReleaseStatusReady({ e2eReportPath, productionUrl: preflightProductionUrl })",
         'run(process.execPath, [',
       ]) &&
       !files.publicReleaseCheck.includes('run("node"') &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean", "`release-status` の `ready: true`"]) &&
       allIncludes(files.docsDeployment, ["KobitoKey Studio の Actions run URL / head SHA / status / conclusion", "`Browser firmware release gates` job の success", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "CI run と `Browser firmware release gates` job は completed/success", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致"]) &&
-      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "`Browser firmware release gates` job の success", "CI run と `Browser firmware release gates` job は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean"]) &&
-      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact", "clean working tree"]) &&
+      allIncludes(files.releasePlan, ["check:browser-firmware:public-release", "`production.url` と一致", "expected public production origin", "`production.fetchUrl` は `production.url` と一致", "`ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run", "`ci.runHeadSha` は `ci.appCommitSha` と一致", "`Browser firmware release gates` job の success", "CI run と `Browser firmware release gates` job は completed/success", "`production.appCommitSha` は `ci.appCommitSha` と一致", "`ci.appCommitSha` は現在の git `HEAD` と一致", "同じ GitHub artifact 内の UF2 entry", "作業ツリーが clean", "`release-status` の `ready: true`"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:public-release", "must match `production.url`", "expected public production origin", "production.fetchUrl` must match `production.url", "`s-hiraoku/kobitokey-studio` Actions run", "`ci.runHeadSha` must match", "completed/success", "`production.appCommitSha`", "`ci.appCommitSha` must", "same GitHub artifact", "clean working tree", "`ready: true`"]) &&
       allIncludes(files.productionPreflight, [
         "--require-oauth",
         "BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH",
