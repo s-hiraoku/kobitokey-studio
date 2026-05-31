@@ -87,6 +87,34 @@ if (!missingOAuthDeploy.stderr.includes("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT
   throw new Error("Expected production deploy wrapper to explain missing OAuth client id rejection");
 }
 
+const missingFrontendOAuthDeploy = runFrontendOAuthDeploySelfTest({ frontendClientId: "" });
+if (missingFrontendOAuthDeploy.status === 0) {
+  process.stdout.write(missingFrontendOAuthDeploy.stdout);
+  process.stderr.write(missingFrontendOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to require a frontend OAuth client id before deploy");
+}
+if (!missingFrontendOAuthDeploy.stderr.includes("VITE_GITHUB_OAUTH_CLIENT_ID is required before production deploy")) {
+  process.stdout.write(missingFrontendOAuthDeploy.stdout);
+  process.stderr.write(missingFrontendOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to explain missing frontend OAuth client id rejection");
+}
+
+const mismatchedFrontendOAuthDeploy = runFrontendOAuthDeploySelfTest({ frontendClientId: "different-client" });
+if (mismatchedFrontendOAuthDeploy.status === 0) {
+  process.stdout.write(mismatchedFrontendOAuthDeploy.stdout);
+  process.stderr.write(mismatchedFrontendOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to reject mismatched OAuth client ids before deploy");
+}
+if (
+  !mismatchedFrontendOAuthDeploy.stderr.includes(
+    "VITE_GITHUB_OAUTH_CLIENT_ID must match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID before production deploy",
+  )
+) {
+  process.stdout.write(mismatchedFrontendOAuthDeploy.stdout);
+  process.stderr.write(mismatchedFrontendOAuthDeploy.stderr);
+  throw new Error("Expected production deploy wrapper to explain mismatched OAuth client id rejection");
+}
+
 console.log("OK browser firmware production deploy self-test passed");
 
 function runDirtyDeploySelfTest() {
@@ -138,6 +166,40 @@ function runMissingOAuthDeploySelfTest() {
         env: {
           ...env,
           BROWSER_FIRMWARE_DEPLOY_SKIP_REASON: "self-test missing oauth",
+        },
+        encoding: "utf8",
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function runFrontendOAuthDeploySelfTest({ frontendClientId }) {
+  const dir = mkdtempSync(join(tmpdir(), "browser-firmware-frontend-oauth-deploy-"));
+  try {
+    runGit(dir, ["init"]);
+    runGit(dir, ["config", "user.email", "self-test@example.com"]);
+    runGit(dir, ["config", "user.name", "Browser Firmware Self Test"]);
+    writeFileSync(join(dir, "README.md"), "clean\n");
+    runGit(dir, ["add", "README.md"]);
+    runGit(dir, ["commit", "-m", "initial"]);
+
+    const env = { ...process.env };
+    delete env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH;
+    if (!frontendClientId) {
+      delete env.VITE_GITHUB_OAUTH_CLIENT_ID;
+    }
+    return spawnSync(
+      process.execPath,
+      [deployScript, "--skip-local-check", "--skip-merge-readiness"],
+      {
+        cwd: dir,
+        env: {
+          ...env,
+          BROWSER_FIRMWARE_DEPLOY_SKIP_REASON: "self-test frontend oauth",
+          BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "preflight-client",
+          ...(frontendClientId ? { VITE_GITHUB_OAUTH_CLIENT_ID: frontendClientId } : {}),
         },
         encoding: "utf8",
       },

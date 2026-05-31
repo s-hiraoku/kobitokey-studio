@@ -37,6 +37,10 @@ Environment:
     Required for non-dry-run production deploys. The post-deploy preflight
     verifies the deployed Worker can start GitHub OAuth device flow and the
     frontend bundle embeds the client id.
+  VITE_GITHUB_OAUTH_CLIENT_ID
+    Required for non-dry-run production deploys and must match
+    BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID so the deployed frontend bundle
+    contains the same public GitHub OAuth App client id that preflight checks.
   BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH=true
     Same as --require-oauth.
   BROWSER_FIRMWARE_TMP_DIR or RUNNER_TEMP
@@ -98,8 +102,18 @@ if (!dryRun && isGitWorktreeDirty()) {
   console.error("working tree is dirty; commit or stash changes before production deploy.");
   process.exit(1);
 }
-if (!dryRun && !process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()) {
+const preflightOAuthClientId = process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim() || "";
+const frontendOAuthClientId = process.env.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() || "";
+if (!dryRun && !preflightOAuthClientId) {
   console.error("BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy.");
+  process.exit(1);
+}
+if (!dryRun && !frontendOAuthClientId) {
+  console.error("VITE_GITHUB_OAUTH_CLIENT_ID is required before production deploy.");
+  process.exit(1);
+}
+if (!dryRun && frontendOAuthClientId !== preflightOAuthClientId) {
+  console.error("VITE_GITHUB_OAUTH_CLIENT_ID must match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID before production deploy.");
   process.exit(1);
 }
 

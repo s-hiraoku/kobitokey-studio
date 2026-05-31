@@ -43,7 +43,7 @@ GitHub Actions の `Deploy GitHub Pages` workflow を手動実行し、`deploy_b
 手元で更新する場合は次を使います。
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
 ```
 
 ## 4. production preflight を通す

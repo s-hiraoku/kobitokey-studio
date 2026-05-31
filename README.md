@@ -172,14 +172,15 @@ security headers, missing `/api/release-metadata`, or 405 responses from Worker
 API routes mean production is still on an older deployment.
 
 To deploy the current commit to the production Worker from an authenticated
-machine, use the browser Firmware Mode deploy wrapper. It requires the public
-GitHub OAuth app client id for non-dry-run deploys, runs merge readiness, the
-full local browser Firmware Mode check, a production build, Wrangler deploy,
-and then OAuth production preflight with
+machine, use the browser Firmware Mode deploy wrapper. It requires the same
+public GitHub OAuth app client id in `VITE_GITHUB_OAUTH_CLIENT_ID` and
+`BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` for non-dry-run deploys, runs
+merge readiness, the full local browser Firmware Mode check, a production
+build, Wrangler deploy, and then OAuth production preflight with
 `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` set to the current git `HEAD`:
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
 ```
 
 The plain `npm run deploy` command also routes through the same OAuth-required
@@ -312,7 +313,7 @@ preflight.
 Use the guarded deploy wrapper from an authenticated machine:
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run deploy:browser-firmware
 ```
 
 Or run the same guarded path from GitHub Actions by manually starting

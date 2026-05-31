@@ -115,8 +115,11 @@ const checks = [
         "isGitWorktreeDirty()",
         "working tree is dirty; commit or stash changes before production deploy",
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy",
+        "VITE_GITHUB_OAUTH_CLIENT_ID is required before production deploy",
+        "VITE_GITHUB_OAUTH_CLIENT_ID must match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID before production deploy",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
+        "VITE_GITHUB_OAUTH_CLIENT_ID",
         "--require-oauth",
         "--dry-run",
       ]) &&
@@ -129,19 +132,25 @@ const checks = [
         "Expected production deploy wrapper to explain dirty worktree rejection",
         "Expected production deploy wrapper to require an OAuth client id before deploy",
         "Expected production deploy wrapper to explain missing OAuth client id rejection",
+        "Expected production deploy wrapper to require a frontend OAuth client id before deploy",
+        "Expected production deploy wrapper to reject mismatched OAuth client ids before deploy",
         "production URL must use the expected public production origin",
         "working tree is dirty; commit or stash changes before production deploy",
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is required before production deploy",
+        "VITE_GITHUB_OAUTH_CLIENT_ID is required before production deploy",
+        "VITE_GITHUB_OAUTH_CLIENT_ID must match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID before production deploy",
         "BROWSER_FIRMWARE_DEPLOY_SKIP_REASON is required when using deploy skip flags",
         "OK browser firmware production deploy self-test passed",
       ]) &&
       allIncludes(files.readme, [
         "npm run deploy:browser-firmware",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
+        "VITE_GITHUB_OAUTH_CLIENT_ID",
       ]) &&
       allIncludes(files.docsDeployment, [
         "npm run deploy:browser-firmware",
         "current git HEAD",
+        "VITE_GITHUB_OAUTH_CLIENT_ID",
         "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
         "/api/release-metadata",
       ]),
