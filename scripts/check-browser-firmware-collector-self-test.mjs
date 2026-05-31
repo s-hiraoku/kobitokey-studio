@@ -358,6 +358,28 @@ try {
 
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;
+  const placeholderRunIdResult = await runCollector(baseUrl, join(dir, "placeholder-run-id-report.json"), {
+    runId: "<firmware-build-actions-run-id>",
+    includeManualUiSmoke: true,
+    runUiSmoke: false,
+  });
+  assert(placeholderRunIdResult.status !== 0, "collector should reject placeholder env values before fetching release evidence");
+  assert(
+    placeholderRunIdResult.stderr.includes("BROWSER_FIRMWARE_E2E_RUN_ID must be filled; replace placeholder <firmware-build-actions-run-id>"),
+    "collector placeholder env rejection was not explained",
+  );
+
+  const invalidRunIdResult = await runCollector(baseUrl, join(dir, "invalid-run-id-report.json"), {
+    runId: "not-a-number",
+    includeManualUiSmoke: true,
+    runUiSmoke: false,
+  });
+  assert(invalidRunIdResult.status !== 0, "collector should reject invalid numeric env values before fetching release evidence");
+  assert(
+    invalidRunIdResult.stderr.includes("BROWSER_FIRMWARE_E2E_RUN_ID must be a positive integer"),
+    "collector invalid run id rejection was not explained",
+  );
+
   const fetchOverrideResult = await runCollector(baseUrl, fetchOverrideReportPath, {
     includeManualUiSmoke: true,
     noValidate: false,
@@ -606,7 +628,7 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_REPOSITORY: repository,
         BROWSER_FIRMWARE_E2E_BRANCH: "browser-firmware-release-test",
         BROWSER_FIRMWARE_E2E_COMMIT_SHA: commitSha,
-        BROWSER_FIRMWARE_E2E_RUN_ID: String(runId),
+        BROWSER_FIRMWARE_E2E_RUN_ID: options.runId || String(runId),
         BROWSER_FIRMWARE_E2E_LEFT_UF2: options.leftUf2Path || leftUf2Path,
         BROWSER_FIRMWARE_E2E_RIGHT_UF2: options.rightUf2Path || rightUf2Path,
         BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT: options.flashLeftAt || "2026-05-27T00:10:00Z",

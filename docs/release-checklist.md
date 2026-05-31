@@ -84,6 +84,7 @@ VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CL
 ## 5. 外部 E2E 証跡を作る
 
 QA 端末で本番 URL、GitHub Actions run、artifact、left / right UF2、実機書き込み結果を記録します。
+env template の `<...>` placeholder と numeric run id の未入力は collector が起動直後に拒否します。
 
 ```sh
 npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env

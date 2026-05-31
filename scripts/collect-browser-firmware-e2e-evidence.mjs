@@ -51,7 +51,7 @@ const oauthClientId = requireEnv("BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID");
 const repository = requireEnv("BROWSER_FIRMWARE_E2E_REPOSITORY");
 const branch = requireEnv("BROWSER_FIRMWARE_E2E_BRANCH");
 const commitSha = requireEnv("BROWSER_FIRMWARE_E2E_COMMIT_SHA");
-const runId = Number(requireEnv("BROWSER_FIRMWARE_E2E_RUN_ID"));
+const runId = readPositiveIntegerEnv("BROWSER_FIRMWARE_E2E_RUN_ID");
 const leftUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_LEFT_UF2");
 const rightUf2Path = requireEnv("BROWSER_FIRMWARE_E2E_RIGHT_UF2");
 const ciRunUrl = requireEnv("BROWSER_FIRMWARE_E2E_CI_RUN_URL");
@@ -892,6 +892,18 @@ function requireEnv(name) {
   if (!value) {
     throw new Error(`${name} is required`);
   }
+  if (isPlaceholderValue(value)) {
+    throw new Error(`${name} must be filled; replace placeholder ${value}`);
+  }
+  return value;
+}
+
+function readPositiveIntegerEnv(name) {
+  const raw = requireEnv(name);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
   return value;
 }
 
@@ -938,6 +950,10 @@ function requireFlashCompletedOrder(leftCompletedAt, rightCompletedAt) {
 
 function isIsoTimestamp(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+function isPlaceholderValue(value) {
+  return typeof value === "string" && /^<[^>]+>$/.test(value.trim());
 }
 
 function sameUrl(left, right) {
