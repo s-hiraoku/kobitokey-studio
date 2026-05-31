@@ -88,6 +88,7 @@ function collectReleaseStatus() {
 function renderHandoff(status) {
   const checks = Array.isArray(status.checks) ? status.checks : [];
   const nextActions = Array.isArray(status.nextActions) ? status.nextActions : [];
+  const publicEntryUrls = publicEntryUrlsFor(status.productionUrl);
   const lines = [
     "# Browser Firmware Mode Release Handoff",
     "",
@@ -123,6 +124,19 @@ function renderHandoff(status) {
   }
 
   lines.push(
+    "## External E2E Evidence Checklist",
+    "",
+    "The final evidence report must prove these user-visible release paths on the same production origin:",
+    "",
+    ...publicEntryUrls.map((url) => `- ${url}`),
+    "",
+    "The report must also include the GitHub commit created by Commit & Build, the matching workflow_dispatch run, the downloaded artifact names/IDs/sizes, left/right UF2 hashes, flash method, bootloader marker checks, confirmation prompt acceptance, and keyboard-half checks.",
+    "",
+    "Required report fields include `ui.publicEntryLinksPassed: true` and `ui.publicEntryUrls` with every URL above.",
+    "",
+  );
+
+  lines.push(
     "## Final Gate",
     "",
     "Run this only after production deploy and external E2E evidence are complete:",
@@ -143,6 +157,26 @@ function renderHandoff(status) {
   );
 
   return `${lines.join("\n")}`;
+}
+
+function publicEntryUrlsFor(productionUrl) {
+  const fallbackOrigin = "https://kobitokey-studio.s-hiraoku.workers.dev";
+  let origin = fallbackOrigin;
+  try {
+    if (productionUrl) {
+      origin = new URL(productionUrl).origin;
+    }
+  } catch {
+    origin = fallbackOrigin;
+  }
+  return [
+    "/?mode=firmware",
+    "/?mode=firmware&tab=combos",
+    "/?mode=firmware&tab=trackball",
+    "/?mode=firmware&tab=diff",
+    "/?mode=firmware&tab=build",
+    "/?mode=direct",
+  ].map((path) => new URL(path, origin).href);
 }
 
 function statusLabel(status) {
