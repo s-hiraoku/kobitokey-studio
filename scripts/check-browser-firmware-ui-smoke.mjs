@@ -47,6 +47,7 @@ async function runSmoke() {
     for (const viewport of [
       { name: "desktop", width: 1440, height: 1000 },
       { name: "narrow-desktop", width: 1024, height: 900 },
+      { name: "short-desktop", width: 1280, height: 720 },
     ]) {
       const context = await browser.newContext({ viewport });
       const page = await context.newPage();
@@ -724,6 +725,33 @@ async function inspectBuildFlashBackAction(page, label) {
   const backButton = page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" });
   if ((await backButton.count()) !== 1) {
     failures.push(`${label}: Build & Flash panel should expose a back-to-edit button`);
+    return failures;
+  }
+
+  const clickTarget = await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll(".browser-release-workbench button"));
+    const button = buttons.find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "編集に戻る");
+    if (!button) {
+      return { found: false, hitMatches: false, hitText: "", rect: null };
+    }
+    const rect = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      found: true,
+      hitMatches: hit === button || button.contains(hit),
+      hitText: hit?.textContent?.replace(/\s+/g, " ").trim().slice(0, 80) ?? "",
+      rect: {
+        height: rect.height,
+        width: rect.width,
+        x: rect.x,
+        y: rect.y,
+      },
+    };
+  });
+  if (!clickTarget.found || !clickTarget.hitMatches) {
+    failures.push(
+      `${label}: back-to-edit button should not be covered by another element, hit "${clickTarget.hitText || "none"}" at ${JSON.stringify(clickTarget.rect)}`,
+    );
     return failures;
   }
 

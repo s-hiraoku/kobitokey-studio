@@ -339,6 +339,8 @@ const checks = [
         "inspectBuildFlashBackAction",
         "Build & Flash panel should hide edit tabs",
         "Build & Flash panel should expose a back-to-edit button",
+        "elementFromPoint",
+        "back-to-edit button should not be covered by another element",
         "back-to-edit button should restore edit tabs",
         "back-to-edit button should close the Build & Flash panel",
         "short-desktop",
