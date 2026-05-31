@@ -21,6 +21,7 @@ const unembeddedClientReportPath = join(dir, "unembedded-client-report.json");
 const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
 const artifactMismatchReportPath = join(dir, "artifact-mismatch-report.json");
 const failedReleaseGateReportPath = join(dir, "failed-release-gate-report.json");
+const futureFlashReportPath = join(dir, "future-flash-report.json");
 const fakeUiSmokePath = join(dir, "fake-ui-smoke.mjs");
 let artifactDownloadAuthorization = null;
 let appReleaseGateConclusion = "success";
@@ -293,6 +294,17 @@ try {
     "collector fetch URL override rejection was not explained",
   );
 
+  const futureFlashResult = await runCollector(baseUrl, futureFlashReportPath, {
+    flashRightAt: "2099-01-01T00:00:00Z",
+    includeManualUiSmoke: true,
+    runUiSmoke: false,
+  });
+  assert(futureFlashResult.status !== 0, "collector should reject future flash timestamps before writing evidence");
+  assert(
+    futureFlashResult.stderr.includes("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or before evidence collection time"),
+    "collector future flash timestamp rejection was not explained",
+  );
+
   const mismatchedArtifactResult = await runCollector(baseUrl, artifactMismatchReportPath, {
     includeManualUiSmoke: true,
     rightUf2Path: mismatchedRightUf2Path,
@@ -508,8 +520,8 @@ function runCollector(baseUrl, reportPath, options) {
         BROWSER_FIRMWARE_E2E_RUN_ID: String(runId),
         BROWSER_FIRMWARE_E2E_LEFT_UF2: options.leftUf2Path || leftUf2Path,
         BROWSER_FIRMWARE_E2E_RIGHT_UF2: options.rightUf2Path || rightUf2Path,
-        BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT: "2026-05-27T00:10:00Z",
-        BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT: "2026-05-27T00:12:00Z",
+        BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT: options.flashLeftAt || "2026-05-27T00:10:00Z",
+        BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT: options.flashRightAt || "2026-05-27T00:12:00Z",
         BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED: "true",
         BROWSER_FIRMWARE_E2E_OAUTH_SCOPE_VERIFIED: "true",
         BROWSER_FIRMWARE_E2E_RATE_LIMIT_VERIFIED: "true",

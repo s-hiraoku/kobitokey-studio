@@ -75,10 +75,13 @@ const rightArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, r
 requireArtifactProof(leftArtifactProof, "left", leftUf2);
 requireArtifactProof(rightArtifactProof, "right", rightUf2);
 const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiSmoke(productionUrl);
+const verifiedAt = new Date().toISOString();
+const flashLeftCompletedAt = readFlashCompletedAtEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT", verifiedAt);
+const flashRightCompletedAt = readFlashCompletedAtEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT", verifiedAt);
 
 const report = {
   schemaVersion: 1,
-  verifiedAt: new Date().toISOString(),
+  verifiedAt,
   tester: requireEnv("BROWSER_FIRMWARE_E2E_TESTER"),
   production,
   ci: {
@@ -141,7 +144,7 @@ const report = {
       confirmationPromptAccepted: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_CONFIRMATION_ACCEPTED"),
       keyboardHalfChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_KEYBOARD_HALF_CHECKED"),
       uf2Name: leftUf2.name,
-      completedAt: requireEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT"),
+      completedAt: flashLeftCompletedAt,
     },
     right: {
       completed: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_COMPLETED"),
@@ -150,7 +153,7 @@ const report = {
       confirmationPromptAccepted: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_CONFIRMATION_ACCEPTED"),
       keyboardHalfChecked: readBooleanEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_KEYBOARD_HALF_CHECKED"),
       uf2Name: rightUf2.name,
-      completedAt: requireEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT"),
+      completedAt: flashRightCompletedAt,
     },
   },
   persistence: {
@@ -890,6 +893,21 @@ function readFlashMethodEnv(name) {
     return value;
   }
   throw new Error(`${name} must be direct-copy or download-copy`);
+}
+
+function readFlashCompletedAtEnv(name, verifiedAtValue) {
+  const value = requireEnv(name);
+  if (!isIsoTimestamp(value)) {
+    throw new Error(`${name} must be an ISO timestamp`);
+  }
+  if (Date.parse(value) > Date.parse(verifiedAtValue)) {
+    throw new Error(`${name} must be the same as or before evidence collection time`);
+  }
+  return value;
+}
+
+function isIsoTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 function sameUrl(left, right) {
