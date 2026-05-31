@@ -44,6 +44,8 @@ async function runSmoke() {
 
   const failures = [];
   try {
+    failures.push(...(await inspectPublicEntryLinks(browser)));
+
     for (const viewport of [
       { name: "desktop", width: 1440, height: 1000 },
       { name: "narrow-desktop", width: 1024, height: 900 },
@@ -90,6 +92,120 @@ async function runSmoke() {
   }
 
   console.log("OK browser firmware UI smoke passed");
+}
+
+async function inspectPublicEntryLinks(browser) {
+  const failures = [];
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    const entries = [
+      {
+        label: "firmware keymap entry",
+        path: "/?mode=firmware",
+        expect: {
+          activeMode: "Firmware",
+          selectors: [".firmware-key-inspector", ".keyboard-panel", ".firmware-workbench-actions"],
+          missingSelectors: [".browser-release-workbench"],
+        },
+      },
+      {
+        label: "firmware combo entry",
+        path: "/?mode=firmware&tab=combos",
+        expect: {
+          activeMode: "Firmware",
+          activeTab: "Combos",
+          selectors: [".combo-workbench"],
+        },
+      },
+      {
+        label: "firmware trackball entry",
+        path: "/?mode=firmware&tab=trackball",
+        expect: {
+          activeMode: "Firmware",
+          activeTab: "Trackball",
+          selectors: [".trackball-workbench"],
+        },
+      },
+      {
+        label: "firmware diff entry",
+        path: "/?mode=firmware&tab=diff",
+        expect: {
+          activeMode: "Firmware",
+          activeTab: "Diff",
+          selectors: [".diff-panel"],
+        },
+      },
+      {
+        label: "firmware build entry",
+        path: "/?mode=firmware&tab=build",
+        expect: {
+          activeMode: "Firmware",
+          selectors: [".browser-release-workbench"],
+          missingSelectors: [".workbench-tabs"],
+          text: "GitHub Commit & Build",
+        },
+      },
+      {
+        label: "direct mode entry",
+        path: "/?mode=direct",
+        expect: {
+          activeMode: "Direct",
+          selectors: [".direct-welcome"],
+          missingSelectors: [".firmware-workbench-actions"],
+          text: "キーボードを接続",
+        },
+      },
+    ];
+
+    for (const entry of entries) {
+      const page = await context.newPage();
+      try {
+        page.on("pageerror", (error) => failures.push(`${entry.label}: page error: ${error.message}`));
+        await page.goto(`${BASE_URL}${entry.path}`, { waitUntil: "networkidle" });
+        failures.push(...(await inspectPublicEntryLink(page, entry)));
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await context.close();
+  }
+  return failures;
+}
+
+async function inspectPublicEntryLink(page, entry) {
+  return page.evaluate(({ label, expect }) => {
+    const failures = [];
+    const activeMode = document.querySelector(".mode-toggle button.active")?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    if (!activeMode.includes(expect.activeMode)) {
+      failures.push(`${label}: expected active mode ${expect.activeMode}, got "${activeMode || "-"}"`);
+    }
+
+    if (expect.activeTab) {
+      const activeTab = document.querySelector('.workbench-tablist [role="tab"].active')?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      if (!activeTab.includes(expect.activeTab)) {
+        failures.push(`${label}: expected active tab ${expect.activeTab}, got "${activeTab || "-"}"`);
+      }
+    }
+
+    for (const selector of expect.selectors ?? []) {
+      if (!document.querySelector(selector)) {
+        failures.push(`${label}: missing expected selector ${selector}`);
+      }
+    }
+
+    for (const selector of expect.missingSelectors ?? []) {
+      if (document.querySelector(selector)) {
+        failures.push(`${label}: unexpected selector ${selector}`);
+      }
+    }
+
+    if (expect.text && !document.body.textContent?.includes(expect.text)) {
+      failures.push(`${label}: missing expected text "${expect.text}"`);
+    }
+
+    return failures;
+  }, entry);
 }
 
 async function inspectLayerStructureActions(page, label) {
