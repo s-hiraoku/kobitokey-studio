@@ -296,6 +296,7 @@ function checkExternalEvidence(reportPath) {
       "Generate an external E2E env template with npm run collect:browser-firmware:e2e-report -- --print-env-template, fill it on the QA machine, set BROWSER_FIRMWARE_E2E_BRANCH to the firmware repository branch used by Commit & Build, then collect the report with --out <report.json> --run-ui-smoke after production deploy and real left/right flash verification.",
       [
         "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
+        "source /tmp/browser-firmware-e2e.env",
         "npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
       ],

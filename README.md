@@ -237,7 +237,8 @@ placeholders before collecting evidence:
 
 ```sh
 npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env
-BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json
+source /tmp/browser-firmware-e2e.env
+npm run collect:browser-firmware:e2e-report -- --out path/to/report.json
 ```
 
 Set `BROWSER_FIRMWARE_E2E_BRANCH` to the firmware repository branch used in

@@ -269,6 +269,15 @@ try {
   );
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_LEFT_UF2"), "collector env template is missing left UF2 path");
   assert(envTemplate.stdout.includes("--run-ui-smoke"), "collector env template should recommend running UI smoke");
+  assert(envTemplate.stdout.includes("# source /tmp/browser-firmware-e2e.env"), "collector env template should show how to source the filled env file");
+  assert(
+    envTemplate.stdout.includes("# npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke"),
+    "collector env template should comment the follow-up command so sourcing the env file is safe",
+  );
+  assert(
+    !envTemplate.stdout.includes("\nnpm run collect:browser-firmware:e2e-report -- --out"),
+    "collector env template should not execute the collector when sourced",
+  );
   assert(!envTemplate.stdout.includes("collector-secret"), "collector env template should not print secret values");
 
   const { port } = await listen(server);

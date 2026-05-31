@@ -55,7 +55,8 @@ QA 端末で本番 URL、GitHub Actions run、artifact、left / right UF2、実�
 
 ```sh
 npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env
-BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke
+source /tmp/browser-firmware-e2e.env
+npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke
 ```
 
 `BROWSER_FIRMWARE_E2E_BRANCH` には KobitoKey Studio の branch ではなく、`Commit & Build` で使った firmware repository の branch を入れます。

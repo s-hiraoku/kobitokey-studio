@@ -138,6 +138,7 @@ try {
   expectIncludes(result.stdout, "BROWSER_FIRMWARE_E2E_BRANCH");
   expectIncludes(result.stdout, "firmware repository branch used by Commit & Build");
   expectIncludes(result.stdout, "$ npm run collect:browser-firmware:e2e-report -- --print-env-template");
+  expectIncludes(result.stdout, "$ source /tmp/browser-firmware-e2e.env");
   expectIncludes(result.stdout, "$ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
@@ -185,6 +186,7 @@ try {
         nextAction.action.includes("firmware repository branch used by Commit & Build") &&
         Array.isArray(nextAction.commands) &&
         nextAction.commands.includes("npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env") &&
+        nextAction.commands.includes("source /tmp/browser-firmware-e2e.env") &&
         nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json"),
     )
   ) {

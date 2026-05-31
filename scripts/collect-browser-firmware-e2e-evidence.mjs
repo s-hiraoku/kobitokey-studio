@@ -302,7 +302,9 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS='true'",
     "export BROWSER_FIRMWARE_E2E_NOTES='<optional QA notes without tokens or UF2 bytes>'",
     "",
-    "npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
+    "# After filling placeholders, source this file and run:",
+    "# source /tmp/browser-firmware-e2e.env",
+    "# npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
   ];
   console.log(lines.join("\n"));
 }
