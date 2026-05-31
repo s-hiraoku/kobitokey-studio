@@ -1553,6 +1553,21 @@ select:focus-visible {
   margin-block-start: var(--keyboard-visual-offset-y);
 }
 
+@media (max-height: 760px) and (min-width: 768px) {
+  .keyboard-panel {
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
+  }
+
+  .keyboard-viewport {
+    --keyboard-visual-offset-y: 12px;
+    align-items: flex-start;
+    max-height: clamp(140px, 24vh, 180px);
+    min-height: 140px;
+    padding-block: var(--sp-2);
+  }
+}
+
 .keyboard-layout {
   position: relative;
   width: var(--layout-width);
@@ -2266,7 +2281,9 @@ select:focus-visible {
   /* Only the content of the active workbench tab scrolls; the keyboard
      above stays anchored in view. */
   overflow: auto;
+  scroll-padding-block-end: 48px;
   padding-right: 2px;
+  padding-bottom: 48px;
 }
 
 .workbench-grid {
@@ -2285,7 +2302,9 @@ select:focus-visible {
 .keyboard-panel > .browser-release-workbench {
   align-content: start;
   overflow: auto;
+  scroll-padding-block-end: 48px;
   padding-right: 2px;
+  padding-bottom: 48px;
 }
 @container workbench (min-width: 720px) {
   .build-workbench {
