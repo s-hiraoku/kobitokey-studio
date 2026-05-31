@@ -47,6 +47,10 @@ npm run deploy:browser-firmware
 
 GitHub Actions から production Worker を更新する場合は、`Deploy GitHub Pages` workflow を手動実行し、`deploy_browser_firmware_worker` を有効にします。この job は `Browser firmware release gates` の成功後に `npm run deploy:browser-firmware` を実行し、GitHub environment `browser-firmware-production` に紐づく production URL を更新します。`deploy_browser_firmware_worker` を有効にした手動実行では GitHub Pages deploy は skip され、ブラウザアプリ本体だけを更新します。
 
+```sh
+gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
+```
+
 Repository secrets には次を設定します。
 
 | Secret | 用途 |

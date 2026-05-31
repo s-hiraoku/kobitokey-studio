@@ -7,6 +7,7 @@ import { join } from "node:path";
 const appCommitSha = readGitHeadSha();
 const seenAuthorizations = [];
 const tempDir = mkdtempSync(join(tmpdir(), "browser-firmware-release-status-"));
+let deployWorkerJobConclusion = "success";
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -89,7 +90,7 @@ const server = createServer((request, response) => {
         {
           name: "deploy-browser-firmware-worker",
           status: "completed",
-          conclusion: "success",
+          conclusion: deployWorkerJobConclusion,
         },
       ],
     });
@@ -207,6 +208,35 @@ try {
   expectExcludes(jsonResult.stdout, "release-status-token");
   expectExcludes(jsonResult.stderr, "preflight-client");
   expectExcludes(jsonResult.stderr, "release-status-token");
+
+  deployWorkerJobConclusion = "skipped";
+  const skippedDeployJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"]);
+  deployWorkerJobConclusion = "success";
+  if (skippedDeployJson.status !== 1) {
+    process.stderr.write(skippedDeployJson.stderr);
+    process.stdout.write(skippedDeployJson.stdout);
+    throw new Error("Expected release status fixture with skipped production deploy workflow to fail only because external E2E evidence is missing");
+  }
+  const skippedDeployStatus = parseJsonOutput(
+    skippedDeployJson.stdout,
+    "Expected skipped-deploy release status --json output to parse",
+  );
+  const deployWorkflowAction = skippedDeployStatus.nextActions.find(
+    (nextAction) => nextAction.name === "production Worker deploy workflow",
+  );
+  if (
+    !deployWorkflowAction ||
+    deployWorkflowAction.status !== "warn" ||
+    !deployWorkflowAction.commands.includes(
+      `gh workflow run pages.yml --ref '${skippedDeployStatus.branch}' -f deploy_browser_firmware_worker=true`,
+    ) ||
+    !deployWorkflowAction.commands.includes("npm run check:browser-firmware:release-status -- --json")
+  ) {
+    process.stdout.write(skippedDeployJson.stdout);
+    throw new Error("Expected production deploy workflow warning to include a GitHub CLI dispatch command");
+  }
+  expectExcludes(skippedDeployJson.stdout, "preflight-client");
+  expectExcludes(skippedDeployJson.stdout, "release-status-token");
 
   const e2eReportPath = join(tempDir, "external-e2e.json");
   writeFileSync(e2eReportPath, JSON.stringify(createValidExternalEvidenceReport(), null, 2));

@@ -197,6 +197,10 @@ first: `VITE_GITHUB_OAUTH_CLIENT_ID`, `CLOUDFLARE_ACCOUNT_ID`, and
 `CLOUDFLARE_API_TOKEN`. When this input is enabled, the GitHub Pages deploy job
 is skipped so the manual run updates only the browser app Worker.
 
+```sh
+gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
+```
+
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:
 

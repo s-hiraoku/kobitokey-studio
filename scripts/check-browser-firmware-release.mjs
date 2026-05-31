@@ -144,11 +144,13 @@ const checks = [
       ]) &&
       allIncludes(files.readme, [
         "npm run deploy:browser-firmware",
+        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
       ]) &&
       allIncludes(files.docsDeployment, [
         "npm run deploy:browser-firmware",
+        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
         "current git HEAD",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
@@ -193,6 +195,8 @@ const checks = [
         "firmware repository branch used by Commit & Build",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "gh workflow run pages.yml --ref",
+        "-f deploy_browser_firmware_worker=true",
         "npm run deploy:browser-firmware",
         "VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
@@ -224,6 +228,8 @@ const checks = [
         "Expected rate-limited release status fallback to have no blockers with validated external E2E evidence",
         "Expected rate-limited release status to prove release gate from external E2E evidence",
         "Expected rate-limited release status to warn that the deploy workflow job was not checked",
+        "Expected production deploy workflow warning to include a GitHub CLI dispatch command",
+        "gh workflow run pages.yml --ref",
         "Expected missing-OAuth nextAction to set both local OAuth client id environment variables",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "Expected missing frontend OAuth env to warn before local production deploy",
@@ -327,6 +333,7 @@ const checks = [
       allIncludes(files.docsReleaseChecklist, [
         "permalink: /release-checklist/",
         "deploy_browser_firmware_worker",
+        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
         "--print-env-template",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "CLOUDFLARE_ACCOUNT_ID",
@@ -638,6 +645,7 @@ const checks = [
         "CLOUDFLARE_API_TOKEN",
         "Validate production Worker secrets",
         "browser-firmware-production",
+        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
       ]),
   },
   {

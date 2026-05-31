@@ -38,7 +38,11 @@ GitHub Actions から production Worker を更新する場合は、repository / 
 
 ## 3. production Worker を更新する
 
-GitHub Actions の `Deploy GitHub Pages` workflow を手動実行し、`deploy_browser_firmware_worker` を有効にします。この手動実行では GitHub Pages deploy は skip され、production Worker だけを更新します。
+GitHub Actions の `Deploy GitHub Pages` workflow を手動実行し、`deploy_browser_firmware_worker` を有効にします。この手動実行では GitHub Pages deploy は skip され、production Worker だけを更新します。GitHub CLI を使う場合は次を実行します。
+
+```sh
+gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
+```
 
 手元で更新する場合は次を使います。
 

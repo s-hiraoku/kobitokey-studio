@@ -295,7 +295,10 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
     "warn",
     deploySummary,
     `If deploying through GitHub Actions, open Actions > Deploy GitHub Pages, run workflow on ${branch} with deploy_browser_firmware_worker enabled, after repository secrets VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN are configured. Production preflight remains the source of truth for local deploys.`,
-    ["npm run check:browser-firmware:release-status -- --json"],
+    [
+      `gh workflow run pages.yml --ref ${shellQuote(branch)} -f deploy_browser_firmware_worker=true`,
+      "npm run check:browser-firmware:release-status -- --json",
+    ],
   );
 }
 
@@ -480,4 +483,8 @@ function summarizeProcess(result) {
 
 function formatError(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
