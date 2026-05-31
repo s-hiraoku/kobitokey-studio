@@ -82,7 +82,7 @@ npm run check:browser-firmware:release-status -- --json
 ```
 
 外部 E2E の `nextActions.commands` には、current production URL、app commit SHA、release gate Actions run URL を事前入力した env-template seed command が入ります。
-同じ commands には、E2E report と production deploy / preflight 証跡が揃った後に実行する最終 `check:browser-firmware:public-release` command も含まれます。
+同じ commands には、E2E report と production deploy / preflight 証跡が揃った後に実行する最終 `check:browser-firmware:public-release` command と release bundle command も含まれます。
 
 外部 E2E report を作成済みの場合、または GitHub API rate limit 時に report から release gate 成功を証明したい場合だけ、`--e2e-report` を付けます。
 

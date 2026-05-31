@@ -273,6 +273,7 @@ const checks = [
         "Expected release status --json to include actionable nextActions for external E2E evidence",
         "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
         "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
+        "npm run write:browser-firmware:release-bundle -- --e2e-report path/to/report.json --out-dir /tmp/browser-firmware-release-bundle",
         "nextAction.commands.includes",
         "nextAction.links.some",
         "source /tmp/browser-firmware-e2e.env",

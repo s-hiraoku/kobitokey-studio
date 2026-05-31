@@ -242,6 +242,9 @@ try {
         nextAction.commands.includes(
           "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
         ) &&
+        nextAction.commands.includes(
+          "npm run write:browser-firmware:release-bundle -- --e2e-report path/to/report.json --out-dir /tmp/browser-firmware-release-bundle",
+        ) &&
         Array.isArray(nextAction.links) &&
         nextAction.links.some((link) => link.label === "Production URL" && link.url === `${baseUrl}/?mode=firmware`) &&
         nextAction.links.some((link) => link.label === "Release Plan" && link.url.includes("docs/browser-firmware-release-plan.md")),
