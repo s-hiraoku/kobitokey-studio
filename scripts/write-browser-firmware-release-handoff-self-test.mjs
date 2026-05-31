@@ -65,6 +65,8 @@ function assertHandoff(markdown) {
     "## External E2E Evidence Checklist",
     "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
     "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
+    "ISO UTC flash timestamps",
+    "verifiedAt must be the same as or later than both",
     "`ui.publicEntryLinksPassed: true`",
     "`ui.publicEntryUrls`",
     "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",

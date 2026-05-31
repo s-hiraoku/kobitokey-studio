@@ -13,6 +13,7 @@ try {
   const ambiguousFilenameReportPath = join(dir, "ambiguous-filename.json");
   const artifactMismatchReportPath = join(dir, "artifact-mismatch.json");
   const manifestArtifactMismatchReportPath = join(dir, "manifest-artifact-mismatch.json");
+  const reversedFlashReportPath = join(dir, "reversed-flash.json");
   writeFileSync(validReportPath, JSON.stringify(createValidReport(), null, 2));
   writeFileSync(invalidReportPath, JSON.stringify(createInvalidReport(), null, 2));
   writeFileSync(previewReportPath, JSON.stringify(createPreviewReport(), null, 2));
@@ -20,6 +21,7 @@ try {
   writeFileSync(ambiguousFilenameReportPath, JSON.stringify(createAmbiguousFilenameReport(), null, 2));
   writeFileSync(artifactMismatchReportPath, JSON.stringify(createArtifactMismatchReport(), null, 2));
   writeFileSync(manifestArtifactMismatchReportPath, JSON.stringify(createManifestArtifactMismatchReport(), null, 2));
+  writeFileSync(reversedFlashReportPath, JSON.stringify(createReversedFlashReport(), null, 2));
 
   const valid = runValidator(validReportPath);
   if (valid.status !== 0) {
@@ -146,6 +148,17 @@ try {
   ) {
     console.error("Expected manifest artifact mismatch report to reject cross-artifact manifest proof");
     process.stderr.write(manifestArtifactMismatch.stderr);
+    process.exit(1);
+  }
+
+  const reversedFlash = runValidator(reversedFlashReportPath);
+  if (reversedFlash.status === 0) {
+    console.error("Expected reversed flash timestamp external evidence report to fail");
+    process.exit(1);
+  }
+  if (!reversedFlash.stderr.includes("flash.right.completedAt must be the same as or later than flash.left.completedAt")) {
+    console.error("Expected reversed flash timestamp report to reject right-before-left flash order");
+    process.stderr.write(reversedFlash.stderr);
     process.exit(1);
   }
 
@@ -524,6 +537,24 @@ function createManifestArtifactMismatchReport() {
         artifactId: 789,
         artifactName: "manifest",
       })),
+    },
+  };
+}
+
+function createReversedFlashReport() {
+  const report = createValidReport();
+  return {
+    ...report,
+    flash: {
+      ...report.flash,
+      left: {
+        ...report.flash.left,
+        completedAt: "2026-05-27T00:12:00Z",
+      },
+      right: {
+        ...report.flash.right,
+        completedAt: "2026-05-27T00:10:00Z",
+      },
     },
   };
 }

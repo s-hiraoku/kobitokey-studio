@@ -147,5 +147,5 @@
     "smokeCommand": "npm run check:browser-firmware:ui",
     "smokeViewportCount": 2
   },
-  "notes": "Fill this with the production URL, GitHub run, artifact IDs, artifact sizes, UF2 hashes, and physical flash timestamps. Do not include access tokens or UF2 bytes."
+  "notes": "Fill this with the production URL, GitHub run, artifact IDs, artifact sizes, UF2 hashes, and physical flash timestamps. Use ISO UTC timestamps; flash.right.completedAt must be the same as or later than flash.left.completedAt, and verifiedAt must be the same as or later than both flash timestamps. Do not include access tokens or UF2 bytes."
 }

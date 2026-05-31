@@ -133,7 +133,7 @@ function renderHandoff(status) {
     "",
     ...publicEntryUrls.map((url) => `- ${url}`),
     "",
-    "The report must also include the GitHub commit created by Commit & Build, the matching workflow_dispatch run, the downloaded artifact names/IDs/sizes, left/right UF2 hashes, flash method, bootloader marker checks, confirmation prompt acceptance, and keyboard-half checks.",
+    "The report must also include the GitHub commit created by Commit & Build, the matching workflow_dispatch run, the downloaded artifact names/IDs/sizes, left/right UF2 hashes, flash method, bootloader marker checks, confirmation prompt acceptance, keyboard-half checks, and ISO UTC flash timestamps. The right flash timestamp must be the same as or later than left, and verifiedAt must be the same as or later than both.",
     "",
     "Required report fields include `ui.publicEntryLinksPassed: true` and `ui.publicEntryUrls` with every URL above.",
     "",
