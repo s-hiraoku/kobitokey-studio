@@ -137,6 +137,8 @@ try {
   expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E env template");
   expectIncludes(result.stdout, "BROWSER_FIRMWARE_E2E_BRANCH");
   expectIncludes(result.stdout, "firmware repository branch used by Commit & Build");
+  expectIncludes(result.stdout, "$ npm run collect:browser-firmware:e2e-report -- --print-env-template");
+  expectIncludes(result.stdout, "$ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
   expectExcludes(result.stderr, "preflight-client");
@@ -180,7 +182,10 @@ try {
         nextAction.action.includes("--print-env-template") &&
         nextAction.action.includes("--run-ui-smoke") &&
         nextAction.action.includes("BROWSER_FIRMWARE_E2E_BRANCH") &&
-        nextAction.action.includes("firmware repository branch used by Commit & Build"),
+        nextAction.action.includes("firmware repository branch used by Commit & Build") &&
+        Array.isArray(nextAction.commands) &&
+        nextAction.commands.includes("npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env") &&
+        nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json"),
     )
   ) {
     process.stdout.write(jsonResult.stdout);

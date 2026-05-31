@@ -159,6 +159,7 @@ const checks = [
         "blockerCount: blockers.length",
         "warningCount: warnings.length",
         "nextActions",
+        "commands",
         "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally",
         "deploy_browser_firmware_worker",
         "collect:browser-firmware:e2e-report",
@@ -167,6 +168,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_BRANCH",
         "firmware repository branch used by Commit & Build",
         "VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
         "scripts/check-browser-firmware-merge-readiness.mjs",
         "scripts/check-browser-firmware-production-preflight.mjs",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
@@ -185,16 +187,18 @@ const checks = [
         "Next actions:",
         "BROWSER_FIRMWARE_E2E_BRANCH",
         "firmware repository branch used by Commit & Build",
+        "$ npm run collect:browser-firmware:e2e-report -- --print-env-template",
         "Summary: 1 blocker(s),",
         "Expected release status --json output to parse",
         "Expected release status --json to expose ready=false with one blocker and a numeric warning count",
         "Expected release status --json to include passing production Worker deploy workflow check",
         "Expected release status --json to include actionable nextActions for external E2E evidence",
+        "nextAction.commands.includes",
         "release-status-token",
         "OK browser firmware release status self-test passed",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions"]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions"]),
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands"]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",
