@@ -956,6 +956,7 @@ const checks = [
         "GitHub artifact 名 / id",
         "Flash E2E",
         "目的別公開リンク",
+        "目的別公開リンク URL 一覧",
       ]) &&
       allIncludes(files.docsUsageGuide, ["GitHub artifact 名 / id", "artifact <name> #<id>"]) &&
       allIncludes(files.docsDeployment, [
@@ -965,6 +966,7 @@ const checks = [
         "release metadata missing",
         "Worker API の 405",
         "目的別公開リンク",
+        "目的別公開リンク URL 一覧",
       ]) &&
       allIncludes(files.docsReleaseChecklist, [
         "GitHub Pages の成功だけではブラウザアプリ本体の公開完了とは扱いません",
@@ -981,7 +983,7 @@ const checks = [
         "/api/release-metadata",
         "missing `/api/release-metadata`",
         "405 responses from Worker",
-        "missing public entry link",
+        "missing public entry link URL",
       ]),
   },
   {
@@ -1188,6 +1190,8 @@ const checks = [
         "ui.artifactProvenanceVisible must be true",
         "ui.artifactProvenanceMatchesBuildArtifacts must be true",
         "ui.publicEntryLinksPassed must be true",
+        "ui.publicEntryUrls must list the public guide entry URLs",
+        "ui.publicEntryUrls must include",
       ]) &&
       allIncludes(files.evidenceSelfTest, [
         "Expected valid external evidence report to pass",
@@ -1238,6 +1242,8 @@ const checks = [
         "ui.artifactProvenanceVisible must be true",
         "ui.artifactProvenanceMatchesBuildArtifacts must be true",
         "ui.publicEntryLinksPassed must be true",
+        "ui.publicEntryUrls must contain only absolute https URLs",
+        "ui.publicEntryUrls must use the same production origin as production.url",
         "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
       ]) &&
       allIncludes(files.evidenceCollector, [
@@ -1264,6 +1270,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE",
         "BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS",
         "BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED",
+        "BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS",
         "BROWSER_FIRMWARE_E2E_UI_SMOKE_SCRIPT",
         "BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND",
         "--print-env-template",
@@ -1382,6 +1389,8 @@ const checks = [
         "release wizard precondition UI smoke state was not collected",
         "artifact provenance UI smoke state was not collected",
         "artifact provenance build artifact match state was not collected",
+        "public entry link URLs were not collected",
+        "automatic public entry link URLs were not collected",
         "OK browser firmware external evidence collector self-test passed",
       ]) &&
       allIncludes(files.externalEvidenceTemplate, [
@@ -1431,6 +1440,7 @@ const checks = [
         '"artifactProvenanceVisible"',
         '"artifactProvenanceMatchesBuildArtifacts"',
         '"publicEntryLinksPassed"',
+        '"publicEntryUrls"',
       ]) &&
       externalEvidenceTemplateHasManifestTargets(),
   },

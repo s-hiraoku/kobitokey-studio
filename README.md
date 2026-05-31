@@ -116,7 +116,7 @@ keyboard-half checks, missing flash method proof (`direct-copy` or
 `download-copy`), missing CI proof, missing UI smoke evidence, missing key,
 Combo, Trackball, release wizard precondition, artifact provenance proof,
 manifest left/right target proof, artifact/build provenance match proof, or
-missing public entry link or layer structure action proof:
+missing public entry link URL proof or layer structure action proof:
 
 ```sh
 npm run check:browser-firmware:e2e-report -- path/to/report.json
@@ -281,7 +281,8 @@ On a release QA machine with Chrome/Edge or Playwright Chromium available, run
 the rendered UI smoke for the browser Firmware Mode buttons and right pane. You
 can run it directly, or let the external E2E collector execute it against the
 production URL with `--run-ui-smoke`. The collector invokes the local Node smoke
-script directly and records that command in the evidence report:
+script directly and records that command plus the exact public entry URLs in the
+evidence report:
 
 ```sh
 npm run check:browser-firmware:ui

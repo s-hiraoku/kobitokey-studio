@@ -9,6 +9,14 @@ const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
 const APP_RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
 const UI_SMOKE_SCRIPT = "scripts/check-browser-firmware-ui-smoke.mjs";
 const UI_SMOKE_COMMAND = "node scripts/check-browser-firmware-ui-smoke.mjs";
+const PUBLIC_ENTRY_PATHS = [
+  "/?mode=firmware",
+  "/?mode=firmware&tab=combos",
+  "/?mode=firmware&tab=trackball",
+  "/?mode=firmware&tab=diff",
+  "/?mode=firmware&tab=build",
+  "/?mode=direct",
+];
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
   printUsage();
@@ -66,7 +74,7 @@ const leftArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, le
 const rightArtifactProof = artifactProofForUf2(githubArtifactEntries.uf2Files, rightUf2);
 requireArtifactProof(leftArtifactProof, "left", leftUf2);
 requireArtifactProof(rightArtifactProof, "right", rightUf2);
-const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiSmoke();
+const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiSmoke(productionUrl);
 
 const report = {
   schemaVersion: 1,
@@ -235,6 +243,7 @@ Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE=true
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS=true
   BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED=true
+  BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct'
 
 Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
@@ -302,6 +311,7 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE='true'",
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS='true'",
     "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED='true'",
+    "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct'",
     "export BROWSER_FIRMWARE_E2E_NOTES='<optional QA notes without tokens or UF2 bytes>'",
     "",
     "# After filling placeholders, source this file and run:",
@@ -311,7 +321,7 @@ function printEnvTemplate() {
   console.log(lines.join("\n"));
 }
 
-function readManualUiSmoke() {
+function readManualUiSmoke(productionUrlForEntries) {
   return {
     buildAndFlashSmokePassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_UI_SMOKE_PASSED"),
     tokenNotStoredInLocalStorage: readBooleanEnv("BROWSER_FIRMWARE_E2E_TOKEN_NOT_STORED_IN_LOCAL_STORAGE"),
@@ -327,6 +337,7 @@ function readManualUiSmoke() {
     artifactProvenanceVisible: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE"),
     artifactProvenanceMatchesBuildArtifacts: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS"),
     publicEntryLinksPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED"),
+    publicEntryUrls: readPublicEntryUrlsEnv(productionUrlForEntries),
   };
 }
 
@@ -363,7 +374,24 @@ function runProductionUiSmoke(productionUrlForSmoke) {
     artifactProvenanceVisible: true,
     artifactProvenanceMatchesBuildArtifacts: true,
     publicEntryLinksPassed: true,
+    publicEntryUrls: publicEntryUrlsFor(productionUrlForSmoke),
   };
+}
+
+function readPublicEntryUrlsEnv(productionUrlForEntries) {
+  const raw = process.env.BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS;
+  if (raw?.trim()) {
+    return raw
+      .split(",")
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }
+  return publicEntryUrlsFor(productionUrlForEntries);
+}
+
+function publicEntryUrlsFor(baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  return PUBLIC_ENTRY_PATHS.map((path) => new URL(path, origin).href);
 }
 
 function readUiSmokeCommandEnv() {

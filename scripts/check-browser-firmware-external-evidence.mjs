@@ -3,6 +3,14 @@ import { basename } from "node:path";
 
 const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
 const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
+const REQUIRED_PUBLIC_ENTRY_PATHS = [
+  "/?mode=firmware",
+  "/?mode=firmware&tab=combos",
+  "/?mode=firmware&tab=trackball",
+  "/?mode=firmware&tab=diff",
+  "/?mode=firmware&tab=build",
+  "/?mode=direct",
+];
 const expectedProductionOrigin =
   process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
 const reportPath = process.argv[2];
@@ -142,6 +150,7 @@ requireValue(
   "ui.artifactProvenanceMatchesBuildArtifacts must be true",
 );
 requireValue(report.ui?.publicEntryLinksPassed === true, "ui.publicEntryLinksPassed must be true");
+requirePublicEntryUrls(report.ui?.publicEntryUrls, report.production?.url);
 requireValue(
   ["npm run check:browser-firmware:ui", "node scripts/check-browser-firmware-ui-smoke.mjs"].includes(report.ui?.smokeCommand),
   "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
@@ -215,6 +224,53 @@ function requireExpectedProductionOrigin(value, message) {
     ok = false;
   }
   requireValue(ok, message);
+}
+
+function requirePublicEntryUrls(value, productionUrl) {
+  if (!Array.isArray(value) || value.length === 0) {
+    issues.push("ui.publicEntryUrls must list the public guide entry URLs");
+    return;
+  }
+
+  let productionOrigin = "";
+  try {
+    productionOrigin = new URL(productionUrl).origin;
+  } catch {
+    issues.push("ui.publicEntryUrls cannot be validated without production.url");
+    return;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+  for (const entryUrl of value) {
+    let url;
+    try {
+      url = new URL(entryUrl);
+    } catch {
+      issues.push("ui.publicEntryUrls must contain only absolute https URLs");
+      continue;
+    }
+    if (url.protocol !== "https:") {
+      issues.push("ui.publicEntryUrls must contain only absolute https URLs");
+    }
+    if (url.origin !== productionOrigin) {
+      issues.push("ui.publicEntryUrls must use the same production origin as production.url");
+    }
+    const href = url.href;
+    if (seen.has(href)) {
+      issues.push("ui.publicEntryUrls must not contain duplicate URLs");
+    }
+    seen.add(href);
+    normalized.push(href);
+  }
+
+  const entrySet = new Set(normalized);
+  for (const path of REQUIRED_PUBLIC_ENTRY_PATHS) {
+    const expected = new URL(path, productionOrigin).href;
+    if (!entrySet.has(expected)) {
+      issues.push(`ui.publicEntryUrls must include ${expected}`);
+    }
+  }
 }
 
 function requireSha(value, message) {

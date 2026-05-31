@@ -76,6 +76,8 @@ try {
     "ui.artifactProvenanceVisible must be true",
     "ui.artifactProvenanceMatchesBuildArtifacts must be true",
     "ui.publicEntryLinksPassed must be true",
+    "ui.publicEntryUrls must contain only absolute https URLs",
+    "ui.publicEntryUrls must use the same production origin as production.url",
     "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
   ];
   for (const error of requiredErrors) {
@@ -296,6 +298,7 @@ function createValidReport() {
       artifactProvenanceVisible: true,
       artifactProvenanceMatchesBuildArtifacts: true,
       publicEntryLinksPassed: true,
+      publicEntryUrls: publicEntryUrls(),
       smokeCommand: "npm run check:browser-firmware:ui",
       smokeViewportCount: 2,
     },
@@ -379,9 +382,22 @@ function createInvalidReport() {
       artifactProvenanceVisible: false,
       artifactProvenanceMatchesBuildArtifacts: false,
       publicEntryLinksPassed: false,
+      publicEntryUrls: ["http://example.com/?mode=firmware"],
       smokeCommand: "manual",
     },
   };
+}
+
+function publicEntryUrls() {
+  const origin = "https://kobitokey-studio.s-hiraoku.workers.dev";
+  return [
+    "/?mode=firmware",
+    "/?mode=firmware&tab=combos",
+    "/?mode=firmware&tab=trackball",
+    "/?mode=firmware&tab=diff",
+    "/?mode=firmware&tab=build",
+    "/?mode=direct",
+  ].map((path) => new URL(path, origin).href);
 }
 
 function createPreviewReport() {
