@@ -1403,6 +1403,8 @@ select:focus-visible {
   min-height: 0;
 }
 .keyboard-panel > .firmware-workbench-actions {
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
 }
 
@@ -1507,6 +1509,7 @@ select:focus-visible {
    ---------------------------------------------------------------- */
 .keyboard-viewport {
   position: relative;
+  z-index: 0;
   display: flex;
   justify-content: safe center;
   align-items: safe center;
@@ -2212,6 +2215,8 @@ select:focus-visible {
   white-space: nowrap;
 }
 .workbench-tabs {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -2300,6 +2305,8 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr);
 }
 .keyboard-panel > .browser-release-workbench {
+  position: relative;
+  z-index: 1;
   align-content: start;
   overflow: auto;
   scroll-padding-block-end: 48px;
