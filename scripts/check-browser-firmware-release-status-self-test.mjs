@@ -237,6 +237,9 @@ try {
         nextAction.commands.includes("source /tmp/browser-firmware-e2e.env") &&
         nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json") &&
         nextAction.commands.includes(
+          "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
+        ) &&
+        nextAction.commands.includes(
           "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
         ) &&
         Array.isArray(nextAction.links) &&

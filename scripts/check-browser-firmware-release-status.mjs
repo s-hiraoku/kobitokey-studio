@@ -421,6 +421,7 @@ function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
         "source /tmp/browser-firmware-e2e.env",
         "npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+        "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
         "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
       ],
       [

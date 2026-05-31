@@ -149,6 +149,10 @@ GitHub API rate limit blocks Actions lookup:
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
 ```
 
+The same `nextActions.commands` list also includes the final
+`check:browser-firmware:public-release` command to run after the E2E report and
+production deploy/preflight evidence are complete.
+
 To create a Markdown handoff for the deploy / QA owner, render the same status
 as a checklist with commands, evidence links, and a prefilled E2E env-template
 seed command:
