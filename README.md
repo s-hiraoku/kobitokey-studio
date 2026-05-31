@@ -123,16 +123,24 @@ npm run check:browser-firmware:e2e-report -- path/to/report.json
 ```
 
 To see the current public-release blockers without deploying or printing
-secrets, run:
+secrets, run release-status without an E2E report first:
 
 ```sh
-npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
+npm run check:browser-firmware:release-status
 ```
 
 For automation, add `--json` after `--` to get a machine-readable result with
 `ready`, `blockerCount`, `warningCount`, `nextActions`, copy-ready placeholder
 `commands`, the current-head release gate and production Worker deploy workflow
 status, and per-check statuses:
+
+```sh
+npm run check:browser-firmware:release-status -- --json
+```
+
+After external E2E evidence exists, pass it to let release-status validate the
+current app commit against the report and use the report as a fallback when the
+GitHub API rate limit blocks Actions lookup:
 
 ```sh
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json

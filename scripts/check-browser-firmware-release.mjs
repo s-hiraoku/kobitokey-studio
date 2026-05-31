@@ -266,7 +266,17 @@ const checks = [
         "Do not paste GitHub tokens",
       ]) &&
       allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "validated external E2E report"]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]),
+      allIncludes(files.readme, [
+        "run release-status without an E2E report first",
+        "npm run check:browser-firmware:release-status -- --json",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+      ]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]) &&
+      allIncludes(files.docsDeployment, [
+        "npm run check:browser-firmware:release-status -- --json",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+        "外部 E2E report を作成済みの場合",
+      ]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",
@@ -343,6 +353,8 @@ const checks = [
         "CLOUDFLARE_ACCOUNT_ID",
         "CLOUDFLARE_API_TOKEN",
         "check:browser-firmware:release-status",
+        "npm run check:browser-firmware:release-status -- --json",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
         "check:browser-firmware:production-release-preflight",
         "collect:browser-firmware:e2e-report",
         "check:browser-firmware:public-release",

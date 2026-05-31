@@ -72,10 +72,16 @@ Repository secrets には次を設定します。
 公開直前に足りない証跡や本番更新状態だけを確認したい場合は、deploy せずに次を実行します。
 
 ```sh
-npm run check:browser-firmware:release-status -- --e2e-report path/to/report.json
+npm run check:browser-firmware:release-status
 ```
 
 CI や手元の script で判定する場合は、`--json` を付けると `ready`、`blockerCount`、`warningCount`、`nextActions`、placeholder 付きの `commands`、current HEAD の release gate と production Worker deploy workflow、各 check の status を含む JSON を出力できます。secret 値は含めません。
+
+```sh
+npm run check:browser-firmware:release-status -- --json
+```
+
+外部 E2E report を作成済みの場合、または GitHub API rate limit 時に report から release gate 成功を証明したい場合だけ、`--e2e-report` を付けます。
 
 ```sh
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json

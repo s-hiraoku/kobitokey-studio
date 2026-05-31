@@ -11,12 +11,16 @@ permalink: /release-checklist/
 ## 1. 現在の残件を見る
 
 ```sh
-npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
+npm run check:browser-firmware:release-status -- --json
 ```
 
 `ready` が `false` の場合は `nextActions` に残作業と placeholder 付きの `commands` が出ます。secret 値や token は出力しません。
 GitHub Actions から更新する場合は、current HEAD の release gate と production Worker deploy workflow の状態もここで確認できます。
-GitHub API rate limit で release gate を読めない場合でも、current app commit の検証済み外部 E2E report を `--e2e-report` で渡すと、その report から release gate 成功を証明できます。この場合、deploy workflow job を GitHub から直接読めなかったことは warning として残ります。
+外部 E2E report をまだ作っていない初回確認では `--e2e-report` を付けません。report 作成後、または GitHub API rate limit で release gate を読めない場合は、current app commit の検証済み外部 E2E report を `--e2e-report` で渡します。その report から release gate 成功を証明できる場合、deploy workflow job を GitHub から直接読めなかったことは warning として残ります。
+
+```sh
+npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
+```
 
 公開作業を引き継ぐ場合は、同じ内容を Markdown にします。
 
