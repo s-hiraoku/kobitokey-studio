@@ -84,7 +84,7 @@ record(
     : "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is missing",
   process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
     ? ""
-    : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy.",
+    : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy. The same public client id must be embedded in the deployed frontend bundle.",
 );
 record(
   "Cloudflare token env",
@@ -246,7 +246,7 @@ async function checkGitHubActionsStatus({ branch, headSha }) {
     "production Worker deploy workflow",
     "warn",
     deploySummary,
-    "If deploying through GitHub Actions, run Deploy GitHub Pages manually with deploy_browser_firmware_worker enabled. Production preflight remains the source of truth for local deploys.",
+    `If deploying through GitHub Actions, open Actions > Deploy GitHub Pages, run workflow on ${branch} with deploy_browser_firmware_worker enabled, after repository secrets VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN are configured. Production preflight remains the source of truth for local deploys.`,
   );
 }
 
@@ -262,7 +262,7 @@ function checkProductionPreflight({ headSha, productionUrl }) {
     preflight.status === 0 ? `passed for ${productionUrl}` : summarizeProcess(preflight),
     preflight.status === 0
       ? ""
-      : "Deploy the current commit to the production Worker with npm run deploy:browser-firmware or the Deploy GitHub Pages workflow with deploy_browser_firmware_worker enabled, then rerun release-status.",
+      : "Deploy the current commit to the production Worker with npm run deploy:browser-firmware or Actions > Deploy GitHub Pages with deploy_browser_firmware_worker enabled, then rerun release-status against the same production URL/current HEAD.",
   );
 }
 
@@ -272,7 +272,7 @@ function checkExternalEvidence(reportPath) {
       "external E2E evidence",
       "blocker",
       "--e2e-report or BROWSER_FIRMWARE_E2E_REPORT is required",
-      "Generate an external E2E env template with npm run collect:browser-firmware:e2e-report -- --print-env-template, fill it on the QA machine, then collect the report with --out <report.json> --run-ui-smoke after production deploy and real left/right flash verification.",
+      "Generate an external E2E env template with npm run collect:browser-firmware:e2e-report -- --print-env-template, fill it on the QA machine, set BROWSER_FIRMWARE_E2E_BRANCH to the firmware repository branch used by Commit & Build, then collect the report with --out <report.json> --run-ui-smoke after production deploy and real left/right flash verification.",
     );
     return;
   }

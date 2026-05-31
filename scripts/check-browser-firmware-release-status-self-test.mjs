@@ -135,6 +135,8 @@ try {
   expectIncludes(result.stdout, "BLOCKER external E2E evidence");
   expectIncludes(result.stdout, "Next actions:");
   expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E env template");
+  expectIncludes(result.stdout, "BROWSER_FIRMWARE_E2E_BRANCH");
+  expectIncludes(result.stdout, "firmware repository branch used by Commit & Build");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
   expectExcludes(result.stdout, "preflight-client");
   expectExcludes(result.stderr, "preflight-client");
@@ -176,7 +178,9 @@ try {
         nextAction.name === "external E2E evidence" &&
         nextAction.status === "blocker" &&
         nextAction.action.includes("--print-env-template") &&
-        nextAction.action.includes("--run-ui-smoke"),
+        nextAction.action.includes("--run-ui-smoke") &&
+        nextAction.action.includes("BROWSER_FIRMWARE_E2E_BRANCH") &&
+        nextAction.action.includes("firmware repository branch used by Commit & Build"),
     )
   ) {
     process.stdout.write(jsonResult.stdout);
