@@ -339,7 +339,7 @@ function checkProductionPreflight({ headSha, productionUrl }) {
     preflight.status === 0
       ? []
       : [
-          "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run deploy:browser-firmware",
+          "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run deploy:browser-firmware",
           "npm run check:browser-firmware:release-status -- --json",
         ],
   );
