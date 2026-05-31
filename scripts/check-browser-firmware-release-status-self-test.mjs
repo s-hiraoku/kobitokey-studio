@@ -227,6 +227,9 @@ try {
   if (
     !deployWorkflowAction ||
     deployWorkflowAction.status !== "warn" ||
+    !deployWorkflowAction.action.includes("Export the same public OAuth client id locally") ||
+    !deployWorkflowAction.commands.includes("export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'") ||
+    !deployWorkflowAction.commands.includes("export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'") ||
     !deployWorkflowAction.commands.includes(
       `gh workflow run pages.yml --ref '${skippedDeployStatus.branch}' -f deploy_browser_firmware_worker=true`,
     ) ||

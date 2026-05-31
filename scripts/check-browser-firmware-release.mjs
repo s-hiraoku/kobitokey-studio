@@ -229,6 +229,7 @@ const checks = [
         "Expected rate-limited release status to prove release gate from external E2E evidence",
         "Expected rate-limited release status to warn that the deploy workflow job was not checked",
         "Expected production deploy workflow warning to include a GitHub CLI dispatch command",
+        "Export the same public OAuth client id locally",
         "gh workflow run pages.yml --ref",
         "Expected missing-OAuth nextAction to set both local OAuth client id environment variables",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",

@@ -294,8 +294,10 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
     "production Worker deploy workflow",
     "warn",
     deploySummary,
-    `If deploying through GitHub Actions, open Actions > Deploy GitHub Pages, run workflow on ${branch} with deploy_browser_firmware_worker enabled, after repository secrets VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN are configured. Production preflight remains the source of truth for local deploys.`,
+    `If deploying through GitHub Actions, open Actions > Deploy GitHub Pages, run workflow on ${branch} with deploy_browser_firmware_worker enabled, after repository secrets VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN are configured. Export the same public OAuth client id locally before rerunning release-status. Production preflight remains the source of truth for local deploys.`,
     [
+      "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+      "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       `gh workflow run pages.yml --ref ${shellQuote(branch)} -f deploy_browser_firmware_worker=true`,
       "npm run check:browser-firmware:release-status -- --json",
     ],
