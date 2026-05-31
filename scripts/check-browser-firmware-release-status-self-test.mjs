@@ -245,7 +245,32 @@ try {
   expectExcludes(skippedDeployJson.stdout, "release-status-token");
 
   const e2eReportPath = join(tempDir, "external-e2e.json");
+  const staleE2eReportPath = join(tempDir, "external-e2e-stale.json");
   writeFileSync(e2eReportPath, JSON.stringify(createValidExternalEvidenceReport(), null, 2));
+  writeFileSync(staleE2eReportPath, JSON.stringify(createStaleExternalEvidenceReport(), null, 2));
+  const staleJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, [
+    "--json",
+    "--e2e-report",
+    staleE2eReportPath,
+  ]);
+  if (staleJson.status !== 1) {
+    process.stderr.write(staleJson.stderr);
+    process.stdout.write(staleJson.stdout);
+    throw new Error("Expected release status to reject external E2E evidence from a different app commit");
+  }
+  const staleStatus = parseJsonOutput(staleJson.stdout, "Expected stale-E2E release status --json output to parse");
+  if (
+    !staleStatus.checks.some(
+      (check) =>
+        check.name === "external E2E evidence" &&
+        check.status === "blocker" &&
+        check.detail.includes("ci.appCommitSha must match the current git HEAD") &&
+        check.detail.includes("production.appCommitSha must match the current git HEAD"),
+    )
+  ) {
+    process.stdout.write(staleJson.stdout);
+    throw new Error("Expected release status to explain stale external E2E evidence rejection");
+  }
   const rateLimitedJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, `${baseUrl}/rate-limit`, [
     "--json",
     "--e2e-report",
@@ -651,6 +676,23 @@ function createValidExternalEvidenceReport() {
       smokeViewportCount: 2,
     },
     notes: "Self-test fixture without tokens or UF2 bytes.",
+  };
+}
+
+function createStaleExternalEvidenceReport() {
+  const report = createValidExternalEvidenceReport();
+  const staleAppCommitSha = "abcdefabcdefabcdefabcdefabcdefabcdefabcd";
+  return {
+    ...report,
+    production: {
+      ...report.production,
+      appCommitSha: staleAppCommitSha,
+    },
+    ci: {
+      ...report.ci,
+      runHeadSha: staleAppCommitSha,
+      appCommitSha: staleAppCommitSha,
+    },
   };
 }
 

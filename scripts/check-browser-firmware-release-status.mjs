@@ -142,7 +142,7 @@ record(
 
 await checkGitHubActionsStatus({ branch, headSha, e2eReportPath });
 checkProductionPreflight({ headSha, productionUrl });
-checkExternalEvidence(e2eReportPath);
+checkExternalEvidence({ reportPath: e2eReportPath, headSha, productionUrl });
 
 const blockers = checks.filter((check) => check.status === "blocker");
 const warnings = checks.filter((check) => check.status === "warn");
@@ -373,7 +373,7 @@ function checkProductionPreflight({ headSha, productionUrl }) {
   );
 }
 
-function checkExternalEvidence(reportPath) {
+function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
   if (!reportPath) {
     record(
       "external E2E evidence",
@@ -401,15 +401,63 @@ function checkExternalEvidence(reportPath) {
     return;
   }
   const evidence = run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", reportPath]);
+  const report = evidence.status === 0 ? readExternalEvidenceReport(reportPath) : null;
+  const reportIssues = report ? collectExternalEvidenceScopeIssues({ report, headSha, productionUrl }) : [];
+  const passed = evidence.status === 0 && reportIssues.length === 0;
   record(
     "external E2E evidence",
-    evidence.status === 0 ? "pass" : "blocker",
-    evidence.status === 0 ? `${reportPath} passed evidence validation` : summarizeProcess(evidence),
-    evidence.status === 0
+    passed ? "pass" : "blocker",
+    passed
+      ? `${reportPath} passed evidence validation for current HEAD${isHttpsUrl(productionUrl) ? " and production URL" : ""}`
+      : evidence.status === 0
+        ? `${reportPath} is not valid for this release-status target: ${reportIssues.join("; ")}`
+        : summarizeProcess(evidence),
+    passed
       ? ""
       : "Fix the external E2E report values, regenerate it from production, or rerun check:browser-firmware:e2e-report for detailed validation errors.",
-    evidence.status === 0 ? [] : [`npm run check:browser-firmware:e2e-report -- ${reportPath}`],
+    passed ? [] : [`npm run check:browser-firmware:e2e-report -- ${reportPath}`],
   );
+}
+
+function readExternalEvidenceReport(reportPath) {
+  try {
+    return JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function collectExternalEvidenceScopeIssues({ report, headSha, productionUrl }) {
+  const issues = [];
+  if (report?.ci?.appCommitSha !== headSha) {
+    issues.push("ci.appCommitSha must match the current git HEAD");
+  }
+  if (report?.ci?.runHeadSha !== headSha) {
+    issues.push("ci.runHeadSha must match the current git HEAD");
+  }
+  if (report?.production?.appCommitSha !== headSha) {
+    issues.push("production.appCommitSha must match the current git HEAD");
+  }
+  if (isHttpsUrl(productionUrl) && !sameUrl(report?.production?.url, productionUrl)) {
+    issues.push("production.url must match the release-status production URL");
+  }
+  return issues;
+}
+
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function sameUrl(left, right) {
+  try {
+    return new URL(left).href === new URL(right).href;
+  } catch {
+    return left === right;
+  }
 }
 
 async function fetchGitHubJson(url) {
