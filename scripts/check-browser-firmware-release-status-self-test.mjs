@@ -530,7 +530,7 @@ function createValidExternalEvidenceReport() {
   const firmwareCommit = "0123456789abcdef0123456789abcdef01234567";
   return {
     schemaVersion: 1,
-    verifiedAt: "2026-05-31T00:00:00Z",
+    verifiedAt: "2026-05-31T00:13:00Z",
     tester: "release-status-self-test",
     production: {
       url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",

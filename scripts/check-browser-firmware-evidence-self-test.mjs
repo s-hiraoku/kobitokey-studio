@@ -71,6 +71,7 @@ try {
     "flash.left.method must be direct-copy or download-copy",
     "flash.left.confirmationPromptAccepted must be true",
     "flash.right.keyboardHalfChecked must be true",
+    "verifiedAt must be the same as or later than flash.right.completedAt",
     "ui.tokenClearWorks must be true",
     "ui.referencedLayerDeleteBlocked must be true",
     "ui.artifactProvenanceVisible must be true",
@@ -164,7 +165,7 @@ function createValidReport() {
   const commit = "0123456789abcdef0123456789abcdef01234567";
   return {
     schemaVersion: 1,
-    verifiedAt: "2026-05-27T00:00:00Z",
+    verifiedAt: "2026-05-27T00:13:00Z",
     tester: "release-qa",
     production: {
       url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
@@ -375,6 +376,7 @@ function createInvalidReport() {
         keyboardHalfChecked: false,
       },
     },
+    verifiedAt: "2026-05-27T00:11:00Z",
     ui: {
       ...createValidReport().ui,
       tokenClearWorks: false,

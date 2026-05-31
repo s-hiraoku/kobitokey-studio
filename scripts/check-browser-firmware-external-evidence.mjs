@@ -128,6 +128,18 @@ requireValue(
     Date.parse(report.flash.left.completedAt) <= Date.parse(report.flash.right.completedAt),
   "flash.right.completedAt must be the same as or later than flash.left.completedAt",
 );
+requireValue(
+  !isIsoTimestamp(report.verifiedAt) ||
+    !isIsoTimestamp(report.flash?.left?.completedAt) ||
+    Date.parse(report.verifiedAt) >= Date.parse(report.flash.left.completedAt),
+  "verifiedAt must be the same as or later than flash.left.completedAt",
+);
+requireValue(
+  !isIsoTimestamp(report.verifiedAt) ||
+    !isIsoTimestamp(report.flash?.right?.completedAt) ||
+    Date.parse(report.verifiedAt) >= Date.parse(report.flash.right.completedAt),
+  "verifiedAt must be the same as or later than flash.right.completedAt",
+);
 
 requireValue(report.persistence?.reloadRestoredProgress === true, "persistence.reloadRestoredProgress must be true");
 requireValue(report.persistence?.tokenStored === false, "persistence.tokenStored must be false");
