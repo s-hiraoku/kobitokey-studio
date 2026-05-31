@@ -1406,6 +1406,22 @@ select:focus-visible {
   flex: 0 0 auto;
 }
 
+.keyboard-panel.firmware-build-mode {
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-3);
+}
+
+.keyboard-panel.firmware-build-mode .keyboard-viewport {
+  max-height: clamp(128px, 22vh, 180px);
+  min-height: 128px;
+  align-items: flex-start;
+  padding-block: var(--sp-2);
+}
+
+.keyboard-panel.firmware-build-mode .keyboard-scroll-content {
+  margin-block-start: var(--sp-2);
+}
+
 .direct-connection-bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

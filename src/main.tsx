@@ -850,6 +850,14 @@ function App() {
     setWorkbenchTab(lastEditWorkbenchTab === "build" ? "combos" : lastEditWorkbenchTab);
   }
 
+  function toggleFirmwareBuildFlash() {
+    if (workbenchTab === "build") {
+      closeFirmwareBuildFlash();
+      return;
+    }
+    openFirmwareBuildFlash();
+  }
+
   async function applyBinding(nextBinding: string) {
     if (isDirectMode) {
       stageDirectBinding(nextBinding);
@@ -2548,7 +2556,7 @@ function App() {
           </div>
         </nav>
 
-        <section className="keyboard-panel">
+        <section className={`keyboard-panel ${!isDirectMode && workbenchTab === "build" ? "firmware-build-mode" : ""}`}>
           {isDirectMode ? (
             <DirectConnectionBar
               comboSource={directComboSource}
@@ -2615,7 +2623,7 @@ function App() {
               <FirmwareWorkbenchActions
                 activeTab={workbenchTab}
                 canReset={keymapDiff.length > 0}
-                onBuildFlash={openFirmwareBuildFlash}
+                onBuildFlash={toggleFirmwareBuildFlash}
                 onReset={resetFirmwareEdits}
               />
               {workbenchTab === "build" && !isDesktopRuntime ? (
@@ -4515,6 +4523,24 @@ function WorkbenchTabs({
   );
 }
 
+function BackToEditButton({ onBack }: { onBack: () => void }) {
+  const handlePointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button === 0) {
+        onBack();
+      }
+    },
+    [onBack],
+  );
+
+  return (
+    <button type="button" onClick={onBack} onPointerDown={handlePointerDown}>
+      <Undo2 size={15} />
+      <span className="button-label">編集に戻る</span>
+    </button>
+  );
+}
+
 function ComboWorkbench({
   combos,
   onCreate,
@@ -4643,10 +4669,7 @@ function BrowserFirmwareReleaseWorkbench({
             <p className="eyebrow">Browser Firmware</p>
             <h2>GitHub Commit & Build</h2>
           </div>
-          <button type="button" onClick={onBack}>
-            <Undo2 size={15} />
-            <span className="button-label">編集に戻る</span>
-          </button>
+          <BackToEditButton onBack={onBack} />
         </div>
         <label className="build-repo-field" htmlFor="browser-firmware-repository">
           <span>Firmware repository</span>
@@ -4932,10 +4955,7 @@ function BuildWorkbench({
             <p className="eyebrow">Build</p>
             <h2>GitHub Actions</h2>
           </div>
-          <button type="button" onClick={onBack}>
-            <Undo2 size={15} />
-            <span className="button-label">編集に戻る</span>
-          </button>
+          <BackToEditButton onBack={onBack} />
         </div>
         <label className="build-repo-field" htmlFor="tauri-firmware-repository-url">
           <span>Firmware repository URL</span>
