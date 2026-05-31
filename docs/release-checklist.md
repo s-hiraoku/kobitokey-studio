@@ -34,7 +34,7 @@ GitHub Actions から production Worker を更新する場合は、repository / 
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers deploy |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare Workers deploy |
 
-手元で deploy する場合は、`BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` と Cloudflare の認証状態も確認します。
+手元で deploy する場合は、`VITE_GITHUB_OAUTH_CLIENT_ID` と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` を同じ GitHub OAuth App client id にし、Cloudflare の認証状態も確認します。`release-status` で `frontend OAuth client id env` warning が出る場合は、手元の production deploy は拒否されるため、この 2 つを揃えてから進めます。
 
 ## 3. production Worker を更新する
 
@@ -51,7 +51,7 @@ VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CL
 production deploy 後に、current commit が production に出ていることを確認します。
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
 ```
 
 `release security headers missing`、`release metadata missing`、Worker API の `405` が出る場合は、production Worker がまだ対象 commit に更新されていません。
@@ -77,7 +77,7 @@ npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-u
 作業ツリーが clean な状態で、外部 E2E 証跡と production preflight を同じ production URL / commit で照合します。
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
 ```
 
 この gate が通り、`release-status` の `ready` が `true` になった状態を公開判定にします。

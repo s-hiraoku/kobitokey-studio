@@ -284,6 +284,73 @@ try {
   expectExcludes(missingOAuthJson.stdout, "preflight-client");
   expectExcludes(missingOAuthJson.stdout, "release-status-token");
 
+  const missingFrontendOAuthJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"], {
+    omitFrontendOAuthClientId: true,
+  });
+  if (missingFrontendOAuthJson.status !== 1) {
+    process.stderr.write(missingFrontendOAuthJson.stderr);
+    process.stdout.write(missingFrontendOAuthJson.stdout);
+    throw new Error("Expected release status fixture with missing frontend OAuth env to fail only because external E2E evidence is missing");
+  }
+  const missingFrontendOAuthStatus = parseJsonOutput(
+    missingFrontendOAuthJson.stdout,
+    "Expected missing-frontend-OAuth release status --json output to parse",
+  );
+  const missingFrontendOAuthAction = missingFrontendOAuthStatus.nextActions.find(
+    (nextAction) => nextAction.name === "frontend OAuth client id env",
+  );
+  const missingFrontendOAuthCheck = missingFrontendOAuthStatus.checks.find(
+    (check) => check.name === "frontend OAuth client id env",
+  );
+  if (
+    !missingFrontendOAuthCheck ||
+    missingFrontendOAuthCheck.status !== "warn" ||
+    !missingFrontendOAuthCheck.detail.includes("VITE_GITHUB_OAUTH_CLIENT_ID is missing") ||
+    !missingFrontendOAuthAction ||
+    missingFrontendOAuthAction.status !== "warn" ||
+    !missingFrontendOAuthAction.action.includes("local production deploy") ||
+    !missingFrontendOAuthAction.commands.includes("export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'")
+  ) {
+    process.stdout.write(missingFrontendOAuthJson.stdout);
+    throw new Error("Expected missing frontend OAuth env to warn before local production deploy");
+  }
+  expectExcludes(missingFrontendOAuthJson.stdout, "preflight-client");
+  expectExcludes(missingFrontendOAuthJson.stdout, "release-status-token");
+
+  const mismatchedFrontendOAuthJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"], {
+    frontendOAuthClientId: "different-client",
+  });
+  if (mismatchedFrontendOAuthJson.status !== 1) {
+    process.stderr.write(mismatchedFrontendOAuthJson.stderr);
+    process.stdout.write(mismatchedFrontendOAuthJson.stdout);
+    throw new Error("Expected release status fixture with mismatched frontend OAuth env to fail only because external E2E evidence is missing");
+  }
+  const mismatchedFrontendOAuthStatus = parseJsonOutput(
+    mismatchedFrontendOAuthJson.stdout,
+    "Expected mismatched-frontend-OAuth release status --json output to parse",
+  );
+  const mismatchedFrontendOAuthAction = mismatchedFrontendOAuthStatus.nextActions.find(
+    (nextAction) => nextAction.name === "frontend OAuth client id env",
+  );
+  const mismatchedFrontendOAuthCheck = mismatchedFrontendOAuthStatus.checks.find(
+    (check) => check.name === "frontend OAuth client id env",
+  );
+  if (
+    !mismatchedFrontendOAuthCheck ||
+    mismatchedFrontendOAuthCheck.status !== "warn" ||
+    !mismatchedFrontendOAuthCheck.detail.includes("does not match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID") ||
+    !mismatchedFrontendOAuthAction ||
+    mismatchedFrontendOAuthAction.status !== "warn" ||
+    !mismatchedFrontendOAuthAction.action.includes("same public GitHub OAuth App client id") ||
+    !mismatchedFrontendOAuthAction.commands.includes("export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'")
+  ) {
+    process.stdout.write(mismatchedFrontendOAuthJson.stdout);
+    throw new Error("Expected mismatched frontend OAuth env to warn before local production deploy");
+  }
+  expectExcludes(mismatchedFrontendOAuthJson.stdout, "preflight-client");
+  expectExcludes(mismatchedFrontendOAuthJson.stdout, "different-client");
+  expectExcludes(mismatchedFrontendOAuthJson.stdout, "release-status-token");
+
   console.log("OK browser firmware release status self-test passed");
 } finally {
   rmSync(tempDir, { recursive: true, force: true });
@@ -302,8 +369,14 @@ function runReleaseStatus(productionUrl, githubApiBaseUrl, extraArgs = [], optio
     };
     if (!options.omitOAuthClientId) {
       env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID = "preflight-client";
+      if (options.omitFrontendOAuthClientId) {
+        delete env.VITE_GITHUB_OAUTH_CLIENT_ID;
+      } else {
+        env.VITE_GITHUB_OAUTH_CLIENT_ID = options.frontendOAuthClientId ?? "preflight-client";
+      }
     } else {
       delete env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID;
+      delete env.VITE_GITHUB_OAUTH_CLIENT_ID;
     }
     const child = spawn(process.execPath, ["scripts/check-browser-firmware-release-status.mjs", productionUrl, ...extraArgs], {
       cwd: process.cwd(),
@@ -323,6 +396,15 @@ function runReleaseStatus(productionUrl, githubApiBaseUrl, extraArgs = [], optio
       resolve({ status, stdout, stderr });
     });
   });
+}
+
+function parseJsonOutput(stdout, errorMessage) {
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    process.stdout.write(stdout);
+    throw new Error(`${errorMessage}: ${String(error)}`);
+  }
 }
 
 function readGitHeadSha() {

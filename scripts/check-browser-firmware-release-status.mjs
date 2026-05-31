@@ -62,6 +62,8 @@ const headSha = git(["rev-parse", "HEAD"]).stdout.trim();
 const shortHead = headSha.slice(0, 7);
 const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim();
 const worktreeStatus = git(["status", "--porcelain"]).stdout.trim();
+const preflightOAuthClientId = process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim() || "";
+const frontendOAuthClientId = process.env.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() || "";
 
 record("current git HEAD", "pass", `${shortHead} on ${branch}`);
 record(
@@ -81,20 +83,36 @@ record(
 );
 record(
   "OAuth client id env",
-  process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim() ? "pass" : "blocker",
-  process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
+  preflightOAuthClientId ? "pass" : "blocker",
+  preflightOAuthClientId
     ? "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is set"
     : "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is missing",
-  process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
+  preflightOAuthClientId
     ? ""
     : "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID to the same public GitHub OAuth App client id locally, or configure the VITE_GITHUB_OAUTH_CLIENT_ID repository secret before the GitHub Actions production Worker deploy. The same public client id must be embedded in the deployed frontend bundle.",
-  process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim()
+  preflightOAuthClientId
     ? []
     : [
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       ],
 );
+if (preflightOAuthClientId) {
+  const frontendOAuthIssue = frontendOAuthClientId
+    ? frontendOAuthClientId === preflightOAuthClientId
+      ? ""
+      : "VITE_GITHUB_OAUTH_CLIENT_ID does not match BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID; local production deploy will be rejected"
+    : "VITE_GITHUB_OAUTH_CLIENT_ID is missing; local production deploy will be rejected";
+  record(
+    "frontend OAuth client id env",
+    frontendOAuthIssue ? "warn" : "pass",
+    frontendOAuthIssue || "VITE_GITHUB_OAUTH_CLIENT_ID matches BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
+    frontendOAuthIssue
+      ? "Set VITE_GITHUB_OAUTH_CLIENT_ID to the same public GitHub OAuth App client id before local production deploy. GitHub Actions deploy uses the VITE_GITHUB_OAUTH_CLIENT_ID repository secret."
+      : "",
+    frontendOAuthIssue ? ["export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'"] : [],
+  );
+}
 record(
   "Cloudflare token env",
   process.env.CLOUDFLARE_API_TOKEN?.trim() ? "pass" : "warn",

@@ -211,7 +211,7 @@ flow, the deployed frontend bundle that powers the GitHub connect button, and
 the deployed app commit reported by `/api/release-metadata`:
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight
 ```
 
 For the final public-release decision, use the combined gate with the validated
@@ -230,7 +230,7 @@ and `ci.appCommitSha` must match the current git `HEAD`. Run it from a clean wor
 so the release validators and docs are the committed files being released:
 
 ```sh
-BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
+VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json
 ```
 
 To reduce manual entry, generate the report from production/GitHub/UF2 inputs
