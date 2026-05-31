@@ -61,7 +61,8 @@ function assertHandoff(markdown) {
     "### BLOCKER external E2E evidence",
     "source /tmp/browser-firmware-e2e.env",
     "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
-    "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release",
+    "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+    "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
     "Do not paste GitHub tokens",
   ]) {
     if (!markdown.includes(expected)) {

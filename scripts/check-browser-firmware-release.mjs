@@ -240,14 +240,17 @@ const checks = [
         "scripts/check-browser-firmware-release-status.mjs",
         "nextActions",
         "Final Gate",
-        "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release",
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
         "Do not paste GitHub tokens",
       ]) &&
       allIncludes(files.releaseHandoffSelfTest, [
         "OK browser firmware release handoff self-test passed",
         "Status: NOT READY",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
-        "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
         "source /tmp/browser-firmware-e2e.env",
         "Do not paste GitHub tokens",
       ]) &&
