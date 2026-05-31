@@ -253,7 +253,6 @@ Optional:
 
 function printEnvTemplate() {
   const currentHead = readOptionalGitValue(["rev-parse", "HEAD"]) || "<kobitokey-studio-app-commit-sha>";
-  const currentBranch = readOptionalGitValue(["rev-parse", "--abbrev-ref", "HEAD"]) || "feature/firmware-mode";
   const lines = [
     "# Browser Firmware Mode external E2E evidence environment.",
     "# Fill placeholders before running the collector. Do not commit this file.",
@@ -263,7 +262,7 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>'",
     `export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(currentHead)}`,
     "export BROWSER_FIRMWARE_E2E_REPOSITORY='juichi50iii/KobitoKey_QWERTY'",
-    `export BROWSER_FIRMWARE_E2E_BRANCH=${shellQuote(currentBranch)}`,
+    "export BROWSER_FIRMWARE_E2E_BRANCH='<firmware repository branch used by Commit & Build>'",
     "export BROWSER_FIRMWARE_E2E_COMMIT_SHA='<firmware-repository-commit-sha-created-by-commit-build>'",
     "export BROWSER_FIRMWARE_E2E_RUN_ID='<firmware-build-actions-run-id>'",
     "export BROWSER_FIRMWARE_E2E_LEFT_UF2='<absolute path to left UF2>'",

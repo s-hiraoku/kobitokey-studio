@@ -56,7 +56,7 @@ requireValue(report.ci?.browserFirmwareReleaseCheckPassed === true, "ci.browserF
 
 requireValue(isRepoSlug(report.github?.repository), "github.repository must be owner/repo");
 requireValue(report.github?.repository !== "owner/repo", "github.repository must not be the template owner/repo placeholder");
-requireNonEmptyString(report.github?.branch, "github.branch is required");
+requireNonPlaceholderString(report.github?.branch, "github.branch is required");
 requireValue(report.github?.oauthDeviceFlowVerified === true, "github.oauthDeviceFlowVerified must be true");
 requireValue(report.github?.oauthScopeVerified === true, "github.oauthScopeVerified must be true");
 requireValue(report.github?.rateLimitBehaviorVerified === true, "github.rateLimitBehaviorVerified must be true");
@@ -177,7 +177,13 @@ function requireNonEmptyString(value, message) {
 }
 
 function requireNonPlaceholderString(value, message) {
-  requireValue(typeof value === "string" && value.trim().length > 0 && !/^todo|tbd|placeholder$/i.test(value.trim()), message);
+  requireValue(
+    typeof value === "string" &&
+      value.trim().length > 0 &&
+      !/^todo|tbd|placeholder$/i.test(value.trim()) &&
+      !/^<[^>]+>$/.test(value.trim()),
+    message,
+  );
 }
 
 function requireHttpsUrl(value, message) {

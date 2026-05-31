@@ -51,6 +51,7 @@ try {
     "ci.releaseGateJobName must be Browser firmware release gates",
     "ci.releaseGateJobConclusion must be success",
     "github.repository must not be the template owner/repo placeholder",
+    "github.branch is required",
     "commit.sha must not be a placeholder SHA",
     "commit.url must point to github.repository and commit.sha",
     "commit.managedFiles must not contain duplicate paths",
@@ -326,7 +327,7 @@ function createInvalidReport() {
     },
     github: {
       repository: "owner/repo",
-      branch: "browser-firmware-release-test",
+      branch: "<firmware repository branch used by Commit & Build>",
       oauthDeviceFlowVerified: true,
       oauthScopeVerified: true,
       rateLimitBehaviorVerified: true,

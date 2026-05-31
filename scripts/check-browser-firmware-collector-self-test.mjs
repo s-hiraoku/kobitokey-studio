@@ -263,6 +263,10 @@ try {
   }
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_PRODUCTION_URL"), "collector env template is missing production URL");
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_CI_RUN_URL"), "collector env template is missing app CI run URL");
+  assert(
+    envTemplate.stdout.includes("firmware repository branch used by Commit & Build"),
+    "collector env template should ask for the firmware repository branch instead of defaulting to the app branch",
+  );
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_LEFT_UF2"), "collector env template is missing left UF2 path");
   assert(envTemplate.stdout.includes("--run-ui-smoke"), "collector env template should recommend running UI smoke");
   assert(!envTemplate.stdout.includes("collector-secret"), "collector env template should not print secret values");
