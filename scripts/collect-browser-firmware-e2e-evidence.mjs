@@ -277,11 +277,16 @@ function printEnvTemplate() {
     process.env.BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA?.trim() ||
     readOptionalGitValue(["rev-parse", "HEAD"]) ||
     "<kobitokey-studio-app-commit-sha>";
+  const oauthClientId =
+    process.env.BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID?.trim() ||
+    process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim() ||
+    process.env.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() ||
+    "<GitHub OAuth App client id>";
   const lines = [
     "# Browser Firmware Mode external E2E evidence environment.",
     "# Fill placeholders before running the collector. Do not commit this file.",
     `export BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(productionUrl)}`,
-    "export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+    `export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=${shellQuote(oauthClientId)}`,
     "export BROWSER_FIRMWARE_E2E_TESTER='<tester name>'",
     `export BROWSER_FIRMWARE_E2E_CI_RUN_URL=${shellQuote(ciRunUrl)}`,
     `export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(currentHead)}`,

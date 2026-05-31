@@ -96,7 +96,7 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
 ```
 
-QA 端末へ渡す一式が必要な場合は、status JSON、handoff、prefill 済み `browser-firmware-e2e.env`、README を同じ directory に出します。
+QA 端末へ渡す一式が必要な場合は、status JSON、handoff、prefill 済み `browser-firmware-e2e.env`、README を同じ directory に出します。`BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` または `VITE_GITHUB_OAUTH_CLIENT_ID` が設定済みなら、E2E env template も同じ公開 OAuth client id を使います。
 
 ```sh
 npm run write:browser-firmware:release-bundle -- --out-dir /tmp/browser-firmware-release-bundle

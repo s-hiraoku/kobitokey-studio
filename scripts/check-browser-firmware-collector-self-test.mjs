@@ -312,6 +312,20 @@ try {
   );
   assert(!seededEnvTemplate.stdout.includes("collector-secret"), "seeded collector env template should not print secret values");
 
+  const oauthSeededEnvTemplate = await runCollectorEnvTemplate({
+    BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "prefill-oauth-client",
+  });
+  if (oauthSeededEnvTemplate.status !== 0) {
+    process.stderr.write(oauthSeededEnvTemplate.stderr);
+    process.stdout.write(oauthSeededEnvTemplate.stdout);
+    process.exit(oauthSeededEnvTemplate.status ?? 1);
+  }
+  assert(
+    oauthSeededEnvTemplate.stdout.includes("export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='prefill-oauth-client'"),
+    "collector env template should prefill the E2E OAuth client id from the production preflight OAuth client id",
+  );
+  assert(!oauthSeededEnvTemplate.stdout.includes("collector-secret"), "OAuth-seeded collector env template should not print secret values");
+
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;
   const fetchOverrideResult = await runCollector(baseUrl, fetchOverrideReportPath, {

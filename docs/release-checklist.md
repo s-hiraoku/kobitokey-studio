@@ -31,7 +31,7 @@ npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.js
 
 handoff には production origin で確認する目的別公開リンク、release gate / deploy workflow の evidence links、current app commit / release gate run URL を事前入力する E2E env-template seed command、外部 E2E report に必要な `ui.publicEntryLinksPassed` / `ui.publicEntryUrls` も含まれます。
 
-QA 担当者へ渡す一式を作る場合は、status JSON、handoff、prefill 済み `browser-firmware-e2e.env`、README を同じ directory に出します。
+QA 担当者へ渡す一式を作る場合は、status JSON、handoff、prefill 済み `browser-firmware-e2e.env`、README を同じ directory に出します。`BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` または `VITE_GITHUB_OAUTH_CLIENT_ID` が設定済みなら、E2E env template も同じ公開 OAuth client id を使います。
 
 ```sh
 npm run write:browser-firmware:release-bundle -- --out-dir /tmp/browser-firmware-release-bundle

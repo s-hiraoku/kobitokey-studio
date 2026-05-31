@@ -10,7 +10,9 @@ try {
   const outDir = join(dir, "bundle");
   writeFileSync(statusPath, JSON.stringify(createStatusFixture(), null, 2));
 
-  const result = runBundle(["--status-json", statusPath, "--out-dir", outDir]);
+  const result = runBundle(["--status-json", statusPath, "--out-dir", outDir], {
+    BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID: "bundle-oauth-client",
+  });
   if (result.status !== 0) {
     process.stderr.write(result.stderr);
     process.stdout.write(result.stdout);
@@ -42,6 +44,7 @@ try {
   for (const expected of [
     "# Browser Firmware Mode external E2E evidence environment.",
     "export BROWSER_FIRMWARE_E2E_PRODUCTION_URL='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware'",
+    "export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='bundle-oauth-client'",
     "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
     "export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='abc123456789abcdef0123456789abcdef012345'",
     "export BROWSER_FIRMWARE_E2E_BRANCH='<firmware repository branch used by Commit & Build>'",
@@ -85,10 +88,14 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-function runBundle(args) {
+function runBundle(args, extraEnv = {}) {
   return spawnSync(process.execPath, ["scripts/write-browser-firmware-release-bundle.mjs", ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...extraEnv,
+    },
   });
 }
 

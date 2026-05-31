@@ -164,7 +164,9 @@ npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.js
 
 For final QA, a single bundle command writes the machine-readable status,
 handoff, prefilled `browser-firmware-e2e.env`, and a short README into one
-directory:
+directory. If `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` or
+`VITE_GITHUB_OAUTH_CLIENT_ID` is already set, the E2E env template reuses that
+same public OAuth client id:
 
 ```sh
 npm run write:browser-firmware:release-bundle -- --out-dir /tmp/browser-firmware-release-bundle
