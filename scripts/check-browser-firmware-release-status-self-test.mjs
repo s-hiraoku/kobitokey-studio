@@ -201,7 +201,10 @@ try {
         nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json") &&
         nextAction.commands.includes(
           "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
-        ),
+        ) &&
+        Array.isArray(nextAction.links) &&
+        nextAction.links.some((link) => link.label === "Production URL" && link.url === `${baseUrl}/?mode=firmware`) &&
+        nextAction.links.some((link) => link.label === "Release Plan" && link.url.includes("docs/browser-firmware-release-plan.md")),
     )
   ) {
     process.stdout.write(jsonResult.stdout);
@@ -236,7 +239,10 @@ try {
     !deployWorkflowAction.commands.includes(
       `gh workflow run pages.yml --ref '${skippedDeployStatus.branch}' -f deploy_browser_firmware_worker=true`,
     ) ||
-    !deployWorkflowAction.commands.includes("npm run check:browser-firmware:release-status -- --json")
+    !deployWorkflowAction.commands.includes("npm run check:browser-firmware:release-status -- --json") ||
+    !Array.isArray(deployWorkflowAction.links) ||
+    !deployWorkflowAction.links.some((link) => link.label === "GitHub Actions Workflow" && link.url.includes("actions/workflows/pages.yml")) ||
+    !deployWorkflowAction.links.some((link) => link.label === "Production URL" && link.url === `${baseUrl}/?mode=firmware`)
   ) {
     process.stdout.write(skippedDeployJson.stdout);
     throw new Error("Expected production deploy workflow warning to include a GitHub CLI dispatch command");

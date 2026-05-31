@@ -116,6 +116,9 @@ function renderHandoff(status) {
       lines.push(`### ${statusLabel(action.status)} ${action.name}`);
       lines.push("");
       lines.push(action.action || "(no action text)");
+      if (Array.isArray(action.links) && action.links.length > 0) {
+        lines.push("", ...action.links.map((link) => `- [${link.label || "Link"}](${link.url})`));
+      }
       if (Array.isArray(action.commands) && action.commands.length > 0) {
         lines.push("", "```sh", ...action.commands, "```");
       }

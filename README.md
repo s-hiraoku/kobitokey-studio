@@ -130,8 +130,8 @@ npm run check:browser-firmware:release-status
 ```
 
 For automation, add `--json` after `--` to get a machine-readable result with
-`ready`, `blockerCount`, `warningCount`, `nextActions`, copy-ready placeholder
-`commands`, the current-head release gate and production Worker deploy workflow
+`ready`, `blockerCount`, `warningCount`, `nextActions`, relevant `links`,
+copy-ready placeholder `commands`, the current-head release gate and production Worker deploy workflow
 status, and per-check statuses:
 
 ```sh

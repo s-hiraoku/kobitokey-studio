@@ -183,6 +183,11 @@ const checks = [
         "warningCount: warnings.length",
         "nextActions",
         "commands",
+        "links",
+        "GITHUB_WORKFLOW_URL",
+        "GITHUB_OAUTH_APPS_URL",
+        "CLOUDFLARE_DASHBOARD_URL",
+        "RELEASE_PLAN_URL",
         "Set BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID and VITE_GITHUB_OAUTH_CLIENT_ID",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "frontend OAuth client id env",
@@ -237,6 +242,9 @@ const checks = [
         "Expected rate-limited release status to prove release gate from external E2E evidence",
         "Expected rate-limited release status to warn that the deploy workflow job was not checked",
         "Expected production deploy workflow warning to include a GitHub CLI dispatch command",
+        "GitHub Actions Workflow",
+        "Production URL",
+        "Release Plan",
         "Export the same public OAuth client id locally",
         "gh workflow run pages.yml --ref",
         "Expected missing-OAuth nextAction to set both local OAuth client id environment variables",
@@ -247,6 +255,7 @@ const checks = [
         "Expected release status --json to include actionable nextActions for external E2E evidence",
         "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
         "nextAction.commands.includes",
+        "nextAction.links.some",
         "source /tmp/browser-firmware-e2e.env",
         "release-status-token",
         "OK browser firmware release status self-test passed",
@@ -257,6 +266,7 @@ const checks = [
         "--out <handoff.md>",
         "scripts/check-browser-firmware-release-status.mjs",
         "nextActions",
+        "action.links.map",
         "External E2E Evidence Checklist",
         "publicEntryUrlsFor",
         "`ui.publicEntryLinksPassed: true`",
@@ -270,6 +280,8 @@ const checks = [
       allIncludes(files.releaseHandoffSelfTest, [
         "OK browser firmware release handoff self-test passed",
         "Status: NOT READY",
+        "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
+        "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md)",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "External E2E Evidence Checklist",
@@ -279,13 +291,13 @@ const checks = [
         "source /tmp/browser-firmware-e2e.env",
         "Do not paste GitHub tokens",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "validated external E2E report"]) &&
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "write:browser-firmware:release-handoff", "validated external E2E report"]) &&
       allIncludes(files.readme, [
         "run release-status without an E2E report first",
         "npm run check:browser-firmware:release-status -- --json",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
       ]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "links", "commands", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]) &&
       allIncludes(files.docsDeployment, [
         "npm run check:browser-firmware:release-status -- --json",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",

@@ -4,6 +4,10 @@ import { existsSync, readFileSync } from "node:fs";
 const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
 const RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
 const DEPLOY_WORKER_JOB_NAME = "deploy-browser-firmware-worker";
+const GITHUB_WORKFLOW_URL = "https://github.com/s-hiraoku/kobitokey-studio/actions/workflows/pages.yml";
+const GITHUB_OAUTH_APPS_URL = "https://github.com/settings/developers";
+const CLOUDFLARE_DASHBOARD_URL = "https://dash.cloudflare.com/";
+const RELEASE_PLAN_URL = "https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md";
 const args = process.argv.slice(2);
 const githubApiBaseUrl =
   process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
@@ -28,7 +32,8 @@ Checks:
 Options:
   --json
     Print a machine-readable status object. Secrets are not included. Each
-    nextActions entry may include copy-ready commands with placeholder values.
+    nextActions entry may include links and copy-ready commands with
+    placeholder values.
 
 Environment:
   BROWSER_FIRMWARE_PRODUCTION_URL
@@ -96,6 +101,7 @@ record(
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       ],
+  preflightOAuthClientId ? [] : [{ label: "GitHub OAuth Apps", url: GITHUB_OAUTH_APPS_URL }],
 );
 if (preflightOAuthClientId) {
   const frontendOAuthIssue = frontendOAuthClientId
@@ -111,6 +117,7 @@ if (preflightOAuthClientId) {
       ? "Set VITE_GITHUB_OAUTH_CLIENT_ID to the same public GitHub OAuth App client id before local production deploy. GitHub Actions deploy uses the VITE_GITHUB_OAUTH_CLIENT_ID repository secret."
       : "",
     frontendOAuthIssue ? ["export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'"] : [],
+    frontendOAuthIssue ? [{ label: "GitHub OAuth Apps", url: GITHUB_OAUTH_APPS_URL }] : [],
   );
 }
 record(
@@ -123,6 +130,7 @@ record(
     ? ""
     : "Set CLOUDFLARE_API_TOKEN for GitHub Actions production Worker deploy, or confirm the local machine has a valid wrangler login.",
   process.env.CLOUDFLARE_API_TOKEN?.trim() ? [] : ["export CLOUDFLARE_API_TOKEN='<Cloudflare API token>'"],
+  process.env.CLOUDFLARE_API_TOKEN?.trim() ? [] : [{ label: "Cloudflare Dashboard", url: CLOUDFLARE_DASHBOARD_URL }],
 );
 
 const mergeReadinessArgs = ["scripts/check-browser-firmware-merge-readiness.mjs"];
@@ -154,6 +162,7 @@ const nextActions = checks
     status: check.status,
     action: check.action,
     ...(check.commands?.length ? { commands: check.commands } : {}),
+    ...(check.links?.length ? { links: check.links } : {}),
   }))
   .filter(Boolean);
 
@@ -184,6 +193,9 @@ if (outputJson) {
     console.log("Next actions:");
     for (const nextAction of nextActions) {
       console.log(`- ${nextAction.name}: ${nextAction.action}`);
+      for (const link of nextAction.links ?? []) {
+        console.log(`  - ${link.label}: ${link.url}`);
+      }
       for (const command of nextAction.commands ?? []) {
         console.log(`  $ ${command}`);
       }
@@ -219,6 +231,7 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
         "export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
       ],
+      [{ label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL }],
     );
     return;
   }
@@ -242,6 +255,7 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
           "export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'",
           "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
         ],
+        [{ label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL }],
       );
       return;
     }
@@ -267,6 +281,7 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
       runSummary,
       "Wait for the current HEAD's Browser firmware release gates job to complete successfully, then rerun release-status.",
       ["npm run check:browser-firmware:release-status -- --json"],
+      [{ label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL }],
     );
   }
 
@@ -301,6 +316,10 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
       `gh workflow run pages.yml --ref ${shellQuote(branch)} -f deploy_browser_firmware_worker=true`,
       "npm run check:browser-firmware:release-status -- --json",
     ],
+    [
+      { label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL },
+      { label: "Production URL", url: productionUrl },
+    ],
   );
 }
 
@@ -321,6 +340,7 @@ function recordGitHubActionsFromExternalEvidence({ reportPath, headSha, error })
     `GitHub API lookup failed: ${formatError(error)}; production Worker deploy workflow was not checked from Actions`,
     "Production preflight and external E2E evidence are the source of truth when GitHub API release-status reads are rate-limited. Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN to also summarize the deploy workflow job.",
     ["export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'"],
+    [{ label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL }],
   );
   return true;
 }
@@ -370,6 +390,12 @@ function checkProductionPreflight({ headSha, productionUrl }) {
           "npm run deploy:browser-firmware",
           "npm run check:browser-firmware:release-status -- --json",
         ],
+    preflight.status === 0
+      ? []
+      : [
+          { label: "Production URL", url: productionUrl },
+          { label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL },
+        ],
   );
 }
 
@@ -387,6 +413,10 @@ function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
         "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
       ],
+      [
+        { label: "Production URL", url: productionUrl },
+        { label: "Release Plan", url: RELEASE_PLAN_URL },
+      ],
     );
     return;
   }
@@ -397,6 +427,7 @@ function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
       `${reportPath} does not exist`,
       "Pass an existing external E2E report path with --e2e-report or BROWSER_FIRMWARE_E2E_REPORT.",
       ["npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json"],
+      [{ label: "Release Plan", url: RELEASE_PLAN_URL }],
     );
     return;
   }
@@ -416,6 +447,7 @@ function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
       ? ""
       : "Fix the external E2E report values, regenerate it from production, or rerun check:browser-firmware:e2e-report for detailed validation errors.",
     passed ? [] : [`npm run check:browser-firmware:e2e-report -- ${reportPath}`],
+    passed ? [] : [{ label: "Release Plan", url: RELEASE_PLAN_URL }],
   );
 }
 
@@ -482,13 +514,14 @@ async function fetchGitHubJson(url) {
   return response.json();
 }
 
-function record(name, status, detail, action = "", commands = []) {
+function record(name, status, detail, action = "", commands = [], links = []) {
   checks.push({
     name,
     status,
     detail: detail.trim().replace(/\s+/g, " "),
     ...(action ? { action: action.trim().replace(/\s+/g, " ") } : {}),
     ...(commands.length ? { commands } : {}),
+    ...(links.length ? { links } : {}),
   });
 }
 
