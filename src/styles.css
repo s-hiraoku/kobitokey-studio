@@ -1413,6 +1413,11 @@ select:focus-visible {
   padding-bottom: var(--sp-3);
 }
 
+.keyboard-panel.firmware-build-mode .panel-heading,
+.keyboard-panel.firmware-build-mode .keyboard-viewport {
+  display: none;
+}
+
 .keyboard-panel.firmware-build-mode .keyboard-viewport {
   max-height: clamp(128px, 22vh, 180px);
   min-height: 128px;
