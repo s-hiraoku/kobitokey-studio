@@ -48,6 +48,8 @@ try {
     "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
     "export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='abc123456789abcdef0123456789abcdef012345'",
     "export BROWSER_FIRMWARE_E2E_BRANCH='<firmware repository branch used by Commit & Build>'",
+    'export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"',
+    'export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"',
     "export BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE='true'",
   ]) {
     assertIncludes(envTemplate, expected);

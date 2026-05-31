@@ -282,6 +282,10 @@ function printEnvTemplate() {
     process.env.BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID?.trim() ||
     process.env.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() ||
     "<GitHub OAuth App client id>";
+  const flashLeftCompletedAt =
+    process.env.BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT?.trim() || "<ISO timestamp after left flash>";
+  const flashRightCompletedAt =
+    process.env.BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT?.trim() || "<ISO timestamp after right flash>";
   const lines = [
     "# Browser Firmware Mode external E2E evidence environment.",
     "# Fill placeholders before running the collector. Do not commit this file.",
@@ -297,8 +301,11 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_LEFT_UF2='<absolute path to left UF2>'",
     "export BROWSER_FIRMWARE_E2E_RIGHT_UF2='<absolute path to right UF2>'",
     "# Flash timestamps must be ISO UTC; right must be the same as or later than left.",
-    "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT='<ISO timestamp after left flash>'",
-    "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT='<ISO timestamp after right flash>'",
+    `export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT=${shellQuote(flashLeftCompletedAt)}`,
+    `export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT=${shellQuote(flashRightCompletedAt)}`,
+    "# To record each timestamp immediately after flashing, run the matching command then rerun the collector:",
+    '# export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"',
+    '# export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"',
     "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD='direct-copy'",
     "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD='direct-copy'",
     "export BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED='true'",

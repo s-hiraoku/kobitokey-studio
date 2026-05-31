@@ -270,6 +270,14 @@ try {
     "collector env template should explain left/right flash timestamp ordering",
   );
   assert(
+    envTemplate.stdout.includes('export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"'),
+    "collector env template should provide a copy-ready UTC command for the left flash timestamp",
+  );
+  assert(
+    envTemplate.stdout.includes('export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"'),
+    "collector env template should provide a copy-ready UTC command for the right flash timestamp",
+  );
+  assert(
     envTemplate.stdout.includes("firmware repository branch used by Commit & Build"),
     "collector env template should ask for the firmware repository branch instead of defaulting to the app branch",
   );
@@ -325,6 +333,28 @@ try {
     "collector env template should prefill the E2E OAuth client id from the production preflight OAuth client id",
   );
   assert(!oauthSeededEnvTemplate.stdout.includes("collector-secret"), "OAuth-seeded collector env template should not print secret values");
+
+  const flashTimestampSeededEnvTemplate = await runCollectorEnvTemplate({
+    BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT: "2026-05-27T00:10:00Z",
+    BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT: "2026-05-27T00:12:00Z",
+  });
+  if (flashTimestampSeededEnvTemplate.status !== 0) {
+    process.stderr.write(flashTimestampSeededEnvTemplate.stderr);
+    process.stdout.write(flashTimestampSeededEnvTemplate.stdout);
+    process.exit(flashTimestampSeededEnvTemplate.status ?? 1);
+  }
+  assert(
+    flashTimestampSeededEnvTemplate.stdout.includes("export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT='2026-05-27T00:10:00Z'"),
+    "collector env template should preserve an existing left flash timestamp",
+  );
+  assert(
+    flashTimestampSeededEnvTemplate.stdout.includes("export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT='2026-05-27T00:12:00Z'"),
+    "collector env template should preserve an existing right flash timestamp",
+  );
+  assert(
+    !flashTimestampSeededEnvTemplate.stdout.includes("collector-secret"),
+    "flash timestamp seeded collector env template should not print secret values",
+  );
 
   const { port } = await listen(server);
   const baseUrl = `http://127.0.0.1:${port}`;

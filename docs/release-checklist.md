@@ -97,7 +97,7 @@ npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-u
 
 UI 証跡では `ui.publicEntryLinksPassed` を `true` にし、`ui.publicEntryUrls` に production origin の `?mode=firmware`、`?mode=firmware&tab=combos`、`?mode=firmware&tab=trackball`、`?mode=firmware&tab=diff`、`?mode=firmware&tab=build`、`?mode=direct` をすべて入れます。
 
-実機確認では、left / right それぞれで bootloader marker、書き込み直前確認、接続中 keyboard half、flash method (`direct-copy` または `download-copy`) を記録します。`flash.left.completedAt`、`flash.right.completedAt`、`verifiedAt` は ISO UTC にし、right の完了時刻は left と同時刻または後、`verifiedAt` は左右の完了時刻と同時刻または後にします。
+実機確認では、left / right それぞれで bootloader marker、書き込み直前確認、接続中 keyboard half、flash method (`direct-copy` または `download-copy`) を記録します。`flash.left.completedAt`、`flash.right.completedAt`、`verifiedAt` は ISO UTC にし、right の完了時刻は left と同時刻または後、`verifiedAt` は左右の完了時刻と同時刻または後にします。env template には、各 flash 直後に `date -u` で UTC timestamp を記録する copy-ready command も含まれます。
 
 ## 6. 最終 gate を通す
 
