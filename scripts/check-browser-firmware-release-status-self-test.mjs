@@ -198,7 +198,10 @@ try {
         Array.isArray(nextAction.commands) &&
         nextAction.commands.includes("npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env") &&
         nextAction.commands.includes("source /tmp/browser-firmware-e2e.env") &&
-        nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json"),
+        nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json") &&
+        nextAction.commands.includes(
+          "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
+        ),
     )
   ) {
     process.stdout.write(jsonResult.stdout);

@@ -239,6 +239,7 @@ const checks = [
         "Expected mismatched frontend OAuth env to warn before local production deploy",
         "different-client",
         "Expected release status --json to include actionable nextActions for external E2E evidence",
+        "npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md",
         "nextAction.commands.includes",
         "source /tmp/browser-firmware-e2e.env",
         "release-status-token",
@@ -980,6 +981,8 @@ const checks = [
         "release security headers missing",
         "release metadata missing",
         "Worker API の `405`",
+        "`ui.publicEntryLinksPassed`",
+        "`ui.publicEntryUrls`",
         "`release-status` の `ready` が `true`",
       ]) &&
       allIncludes(files.readme, [

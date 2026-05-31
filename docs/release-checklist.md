@@ -28,6 +28,8 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
 ```
 
+handoff には production origin で確認する目的別公開リンクと、外部 E2E report に必要な `ui.publicEntryLinksPassed` / `ui.publicEntryUrls` も含まれます。
+
 ## 2. production deploy の secret を設定する
 
 GitHub Actions から production Worker を更新する場合は、repository / environment に次の secret を設定します。
@@ -85,6 +87,8 @@ npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-u
 `BROWSER_FIRMWARE_E2E_BRANCH` には KobitoKey Studio の branch ではなく、`Commit & Build` で使った firmware repository の branch を入れます。
 
 手動で `docs/browser-firmware-e2e-evidence.template.json` を埋める場合は、manifest 分類の証跡として `build.githubArtifactManifests[].targets.left/right` に artifact zip 内の left / right UF2 path を入れます。
+
+UI 証跡では `ui.publicEntryLinksPassed` を `true` にし、`ui.publicEntryUrls` に production origin の `?mode=firmware`、`?mode=firmware&tab=combos`、`?mode=firmware&tab=trackball`、`?mode=firmware&tab=diff`、`?mode=firmware&tab=build`、`?mode=direct` をすべて入れます。
 
 実機確認では、left / right それぞれで bootloader marker、書き込み直前確認、接続中 keyboard half、flash method (`direct-copy` または `download-copy`) を記録します。
 
