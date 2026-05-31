@@ -161,20 +161,19 @@ function renderHandoff(status) {
   lines.push(
     "## Final Gate",
     "",
-    "Run this only after production deploy and external E2E evidence are complete:",
+    "Run this only after production deploy and external E2E evidence are complete. This gate also checks release-status ready=true with the same E2E report:",
     "",
     "```sh",
     "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
-    "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
     "```",
     "",
     "## Notes",
     "",
     "- Replace placeholder values before running commands.",
     "- Do not paste GitHub tokens, OAuth device codes, or UF2 bytes into this handoff.",
-    "- Treat `ready: true` from release-status and the public-release gate success as the publish decision.",
+    "- Treat public-release gate success as the publish decision; it includes release-status `ready: true`.",
     "",
   );
 

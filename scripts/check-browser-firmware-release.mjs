@@ -292,9 +292,11 @@ const checks = [
         "`ui.publicEntryLinksPassed: true`",
         "`ui.publicEntryUrls`",
         "Final Gate",
+        "This gate also checks release-status ready=true with the same E2E report",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
+        "public-release gate success as the publish decision",
         "Do not paste GitHub tokens",
       ]) &&
       allIncludes(files.releaseHandoffSelfTest, [

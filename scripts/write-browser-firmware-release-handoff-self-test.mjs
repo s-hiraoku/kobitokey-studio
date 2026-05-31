@@ -77,7 +77,9 @@ function assertHandoff(markdown) {
     "`ui.publicEntryUrls`",
     "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
     "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+    "This gate also checks release-status ready=true with the same E2E report",
     "npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
+    "public-release gate success as the publish decision",
     "Do not paste GitHub tokens",
   ]) {
     if (!markdown.includes(expected)) {
