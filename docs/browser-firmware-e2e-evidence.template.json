@@ -135,6 +135,7 @@
     "releaseWizardPreconditionsPassed": false,
     "artifactProvenanceVisible": false,
     "artifactProvenanceMatchesBuildArtifacts": false,
+    "publicEntryLinksPassed": false,
     "smokeCommand": "npm run check:browser-firmware:ui",
     "smokeViewportCount": 2
   },

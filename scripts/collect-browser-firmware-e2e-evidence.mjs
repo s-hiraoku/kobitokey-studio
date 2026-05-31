@@ -234,6 +234,7 @@ Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED=true
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE=true
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS=true
+  BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED=true
 
 Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
@@ -300,6 +301,7 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED='true'",
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE='true'",
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS='true'",
+    "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED='true'",
     "export BROWSER_FIRMWARE_E2E_NOTES='<optional QA notes without tokens or UF2 bytes>'",
     "",
     "# After filling placeholders, source this file and run:",
@@ -324,6 +326,7 @@ function readManualUiSmoke() {
     releaseWizardPreconditionsPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED"),
     artifactProvenanceVisible: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE"),
     artifactProvenanceMatchesBuildArtifacts: readBooleanEnv("BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS"),
+    publicEntryLinksPassed: readBooleanEnv("BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED"),
   };
 }
 
@@ -359,6 +362,7 @@ function runProductionUiSmoke(productionUrlForSmoke) {
     releaseWizardPreconditionsPassed: true,
     artifactProvenanceVisible: true,
     artifactProvenanceMatchesBuildArtifacts: true,
+    publicEntryLinksPassed: true,
   };
 }
 

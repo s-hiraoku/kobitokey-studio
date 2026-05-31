@@ -383,6 +383,7 @@ try {
     report.ui.artifactProvenanceMatchesBuildArtifacts === true,
     "artifact provenance build artifact match state was not collected",
   );
+  assert(report.ui.publicEntryLinksPassed === true, "public entry links UI smoke state was not collected");
 
   const autoResult = await runCollector(baseUrl, autoReportPath, { includeManualUiSmoke: false, runUiSmoke: true });
   if (autoResult.status !== 0) {
@@ -410,6 +411,7 @@ try {
     autoReport.ui.artifactProvenanceMatchesBuildArtifacts === true,
     "automatic artifact provenance build artifact match state was not collected",
   );
+  assert(autoReport.ui.publicEntryLinksPassed === true, "automatic public entry links UI smoke state was not collected");
 
   const unembeddedClientResult = await runCollector(baseUrl, unembeddedClientReportPath, {
     includeManualUiSmoke: true,
@@ -531,6 +533,7 @@ function runCollector(baseUrl, reportPath, options) {
               BROWSER_FIRMWARE_E2E_RELEASE_WIZARD_PRECONDITIONS_PASSED: "true",
               BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE: "true",
               BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS: "true",
+              BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED: "true",
             }
           : {}),
       },

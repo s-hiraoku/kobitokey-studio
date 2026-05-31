@@ -635,6 +635,7 @@ function createValidExternalEvidenceReport() {
       releaseWizardPreconditionsPassed: true,
       artifactProvenanceVisible: true,
       artifactProvenanceMatchesBuildArtifacts: true,
+      publicEntryLinksPassed: true,
       smokeCommand: "npm run check:browser-firmware:ui",
       smokeViewportCount: 2,
     },

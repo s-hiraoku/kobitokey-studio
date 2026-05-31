@@ -75,6 +75,7 @@ try {
     "ui.referencedLayerDeleteBlocked must be true",
     "ui.artifactProvenanceVisible must be true",
     "ui.artifactProvenanceMatchesBuildArtifacts must be true",
+    "ui.publicEntryLinksPassed must be true",
     "ui.smokeCommand must be npm run check:browser-firmware:ui or node scripts/check-browser-firmware-ui-smoke.mjs",
   ];
   for (const error of requiredErrors) {
@@ -294,6 +295,7 @@ function createValidReport() {
       releaseWizardPreconditionsPassed: true,
       artifactProvenanceVisible: true,
       artifactProvenanceMatchesBuildArtifacts: true,
+      publicEntryLinksPassed: true,
       smokeCommand: "npm run check:browser-firmware:ui",
       smokeViewportCount: 2,
     },
@@ -376,6 +378,7 @@ function createInvalidReport() {
       referencedLayerDeleteBlocked: false,
       artifactProvenanceVisible: false,
       artifactProvenanceMatchesBuildArtifacts: false,
+      publicEntryLinksPassed: false,
       smokeCommand: "manual",
     },
   };
