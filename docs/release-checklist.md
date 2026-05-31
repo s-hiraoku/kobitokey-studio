@@ -44,6 +44,14 @@ GitHub Actions の `Deploy GitHub Pages` workflow を手動実行し、`deploy_b
 gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
 ```
 
+Actions deploy 後に手元で `release-status` を再確認する場合は、production deploy に使ったものと同じ公開 OAuth client id を local env にも入れてから実行します。
+
+```sh
+export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+npm run check:browser-firmware:release-status -- --json
+```
+
 手元で更新する場合は次を使います。
 
 ```sh

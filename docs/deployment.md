@@ -51,6 +51,14 @@ GitHub Actions から production Worker を更新する場合は、`Deploy GitHu
 gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
 ```
 
+Actions deploy 後に手元で `release-status` や production preflight を再実行する場合は、deploy に使ったものと同じ公開 OAuth client id を local env にも設定します。
+
+```sh
+export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+npm run check:browser-firmware:release-status -- --json
+```
+
 Repository secrets には次を設定します。
 
 | Secret | 用途 |

@@ -147,12 +147,14 @@ const checks = [
         "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       ]) &&
       allIncludes(files.docsDeployment, [
         "npm run deploy:browser-firmware",
         "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
         "current git HEAD",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "GitHub Pages workflow の成功だけでは、ブラウザアプリ本体の公開完了とは扱いません",
         "/api/release-metadata",
       ]),
@@ -328,6 +330,7 @@ const checks = [
         "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
         "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
         "編集に戻る",
+        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
       ]) &&
       allIncludes(files.docsQuickStart, ["../user-guide/", "編集をリセット"]) &&
       allIncludes(files.docsUsageGuide, ["../user-guide/", "編集に戻る"]) &&
@@ -346,6 +349,8 @@ const checks = [
         "release-status",
         "ready",
         "nextActions",
+        "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+        "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       ]),
   },
   {

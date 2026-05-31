@@ -12,7 +12,7 @@ KobitoKey Studio は PC の Chrome / Edge で使う設定ツールです。ま�
 
 | 目的 | アプリを開く | 使う画面 |
 | --- | --- | --- |
-| keymap を編集する | [Firmware Mode / Combos](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos) | Firmware Mode のキー編集と Combo 一覧 |
+| keymap を編集する | [Firmware Mode を開く](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware) | Firmware Mode のキー編集 |
 | Combo を追加・編集する | [Combo 編集を開く](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos) | 中央下部の `Combos` |
 | トラックボール感度を変更する | [Trackball 編集を開く](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball) | 中央下部の `Trackball` |
 | 変更内容を確認する | [Diff を開く](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff) | 中央下部の `Diff` |

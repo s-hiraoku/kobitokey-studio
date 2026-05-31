@@ -201,6 +201,15 @@ is skipped so the manual run updates only the browser app Worker.
 gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
 ```
 
+After an Actions deploy, set the same public OAuth client id locally before
+rerunning `release-status` or the stricter production preflight:
+
+```sh
+export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'
+npm run check:browser-firmware:release-status -- --json
+```
+
 Before merging or opening the release PR, check whether the branch is dirty,
 behind `origin/main`, or has a non-destructive merge conflict with main:
 
