@@ -78,6 +78,7 @@ const uiSmoke = runUiSmoke ? runProductionUiSmoke(productionUrl) : readManualUiS
 const verifiedAt = new Date().toISOString();
 const flashLeftCompletedAt = readFlashCompletedAtEnv("BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT", verifiedAt);
 const flashRightCompletedAt = readFlashCompletedAtEnv("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT", verifiedAt);
+requireFlashCompletedOrder(flashLeftCompletedAt, flashRightCompletedAt);
 
 const report = {
   schemaVersion: 1,
@@ -904,6 +905,12 @@ function readFlashCompletedAtEnv(name, verifiedAtValue) {
     throw new Error(`${name} must be the same as or before evidence collection time`);
   }
   return value;
+}
+
+function requireFlashCompletedOrder(leftCompletedAt, rightCompletedAt) {
+  if (Date.parse(rightCompletedAt) < Date.parse(leftCompletedAt)) {
+    throw new Error("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or later than BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT");
+  }
 }
 
 function isIsoTimestamp(value) {

@@ -22,6 +22,7 @@ const fetchOverrideReportPath = join(dir, "fetch-override-report.json");
 const artifactMismatchReportPath = join(dir, "artifact-mismatch-report.json");
 const failedReleaseGateReportPath = join(dir, "failed-release-gate-report.json");
 const futureFlashReportPath = join(dir, "future-flash-report.json");
+const reversedFlashReportPath = join(dir, "reversed-flash-report.json");
 const fakeUiSmokePath = join(dir, "fake-ui-smoke.mjs");
 let artifactDownloadAuthorization = null;
 let appReleaseGateConclusion = "success";
@@ -303,6 +304,20 @@ try {
   assert(
     futureFlashResult.stderr.includes("BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or before evidence collection time"),
     "collector future flash timestamp rejection was not explained",
+  );
+
+  const reversedFlashResult = await runCollector(baseUrl, reversedFlashReportPath, {
+    flashLeftAt: "2026-05-27T00:12:00Z",
+    flashRightAt: "2026-05-27T00:10:00Z",
+    includeManualUiSmoke: true,
+    runUiSmoke: false,
+  });
+  assert(reversedFlashResult.status !== 0, "collector should reject flash timestamps where right completes before left");
+  assert(
+    reversedFlashResult.stderr.includes(
+      "BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or later than BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT",
+    ),
+    "collector flash timestamp order rejection was not explained",
   );
 
   const mismatchedArtifactResult = await runCollector(baseUrl, artifactMismatchReportPath, {

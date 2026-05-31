@@ -1364,6 +1364,8 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_RIGHT_UF2 must match a UF2 entry from the GitHub artifact zip",
         "collector should reject future flash timestamps before writing evidence",
         "BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or before evidence collection time",
+        "collector should reject flash timestamps where right completes before left",
+        "BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT must be the same as or later than BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT",
         "left UF2 artifact id was not recorded in artifacts proof",
         "right UF2 artifact name was not recorded in artifacts proof",
         "collector should reject production fetch URL overrides during validated runs",
