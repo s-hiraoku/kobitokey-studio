@@ -410,13 +410,14 @@ function checkProductionPreflight({ headSha, productionUrl }) {
 
 function checkExternalEvidence({ reportPath, headSha, productionUrl }) {
   if (!reportPath) {
+    const releaseGateRunUrl = linkUrlForCheck("GitHub Actions release gate", "Release Gate Run");
     record(
       "external E2E evidence",
       "blocker",
       "--e2e-report or BROWSER_FIRMWARE_E2E_REPORT is required",
       "Generate an external E2E env template with npm run collect:browser-firmware:e2e-report -- --print-env-template, fill it on the QA machine, set BROWSER_FIRMWARE_E2E_BRANCH to the firmware repository branch used by Commit & Build, then collect the report with --out <report.json> --run-ui-smoke after production deploy and real left/right flash verification.",
       [
-        "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
+        externalEvidenceSeedCommand({ productionUrl, headSha, releaseGateRunUrl }),
         "source /tmp/browser-firmware-e2e.env",
         "npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-ui-smoke",
         "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
@@ -518,6 +519,23 @@ function workflowRunLinks(label, run) {
         ? `https://github.com/s-hiraoku/kobitokey-studio/actions/runs/${run.id}`
         : "";
   return url ? [{ label, url }] : [];
+}
+
+function linkUrlForCheck(checkName, linkLabel) {
+  const check = checks.find((item) => item.name === checkName);
+  const link = check?.links?.find((item) => item.label === linkLabel);
+  return link?.url || "";
+}
+
+function externalEvidenceSeedCommand({ productionUrl, headSha, releaseGateRunUrl }) {
+  return [
+    `BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(productionUrl)}`,
+    `BROWSER_FIRMWARE_E2E_CI_RUN_URL=${shellQuote(
+      releaseGateRunUrl || "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>",
+    )}`,
+    `BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(headSha)}`,
+    "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
+  ].join(" \\\n  ");
 }
 
 async function fetchGitHubJson(url) {

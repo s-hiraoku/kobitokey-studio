@@ -81,6 +81,8 @@ CI や手元の script で判定する場合は、`--json` を付けると `read
 npm run check:browser-firmware:release-status -- --json
 ```
 
+外部 E2E の `nextActions.commands` には、current production URL、app commit SHA、release gate Actions run URL を事前入力した env-template seed command が入ります。
+
 外部 E2E report を作成済みの場合、または GitHub API rate limit 時に report から release gate 成功を証明したい場合だけ、`--e2e-report` を付けます。
 
 ```sh

@@ -150,7 +150,10 @@ try {
   expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E env template");
   expectIncludes(result.stdout, "BROWSER_FIRMWARE_E2E_BRANCH");
   expectIncludes(result.stdout, "firmware repository branch used by Commit & Build");
-  expectIncludes(result.stdout, "$ npm run collect:browser-firmware:e2e-report -- --print-env-template");
+  expectIncludes(result.stdout, "$ BROWSER_FIRMWARE_E2E_PRODUCTION_URL=");
+  expectIncludes(result.stdout, "BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/12345'");
+  expectIncludes(result.stdout, `BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='${appCommitSha}'`);
+  expectIncludes(result.stdout, "npm run collect:browser-firmware:e2e-report -- --print-env-template");
   expectIncludes(result.stdout, "$ source /tmp/browser-firmware-e2e.env");
   expectIncludes(result.stdout, "$ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json");
   expectIncludes(result.stdout, "Summary: 1 blocker(s),");
@@ -224,7 +227,13 @@ try {
         nextAction.action.includes("BROWSER_FIRMWARE_E2E_BRANCH") &&
         nextAction.action.includes("firmware repository branch used by Commit & Build") &&
         Array.isArray(nextAction.commands) &&
-        nextAction.commands.includes("npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env") &&
+        nextAction.commands.some(
+          (command) =>
+            command.includes("BROWSER_FIRMWARE_E2E_PRODUCTION_URL=") &&
+            command.includes("BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/12345'") &&
+            command.includes(`BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='${appCommitSha}'`) &&
+            command.includes("npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env"),
+        ) &&
         nextAction.commands.includes("source /tmp/browser-firmware-e2e.env") &&
         nextAction.commands.includes("npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json") &&
         nextAction.commands.includes(

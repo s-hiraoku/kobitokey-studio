@@ -138,6 +138,9 @@ status with Actions run evidence links, and per-check statuses:
 npm run check:browser-firmware:release-status -- --json
 ```
 
+The external E2E next action pre-fills the env-template seed with the current
+production URL, app commit SHA, and release-gate Actions run URL when available.
+
 After external E2E evidence exists, pass it to let release-status validate the
 current app commit against the report and use the report as a fallback when the
 GitHub API rate limit blocks Actions lookup:
