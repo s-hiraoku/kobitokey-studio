@@ -266,6 +266,10 @@ try {
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_PRODUCTION_URL"), "collector env template is missing production URL");
   assert(envTemplate.stdout.includes("BROWSER_FIRMWARE_E2E_CI_RUN_URL"), "collector env template is missing app CI run URL");
   assert(
+    envTemplate.stdout.includes("right must be the same as or later than left"),
+    "collector env template should explain left/right flash timestamp ordering",
+  );
+  assert(
     envTemplate.stdout.includes("firmware repository branch used by Commit & Build"),
     "collector env template should ask for the firmware repository branch instead of defaulting to the app branch",
   );

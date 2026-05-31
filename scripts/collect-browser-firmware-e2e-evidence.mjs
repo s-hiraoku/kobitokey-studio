@@ -217,6 +217,7 @@ Required environment:
   BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT
   BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD=direct-copy|download-copy
   BROWSER_FIRMWARE_E2E_FLASH_RIGHT_METHOD=direct-copy|download-copy
+  Flash timestamps must be ISO UTC values; right must be the same as or later than left.
 
 Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_OAUTH_DEVICE_FLOW_VERIFIED=true
@@ -281,6 +282,7 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_RUN_ID='<firmware-build-actions-run-id>'",
     "export BROWSER_FIRMWARE_E2E_LEFT_UF2='<absolute path to left UF2>'",
     "export BROWSER_FIRMWARE_E2E_RIGHT_UF2='<absolute path to right UF2>'",
+    "# Flash timestamps must be ISO UTC; right must be the same as or later than left.",
     "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_AT='<ISO timestamp after left flash>'",
     "export BROWSER_FIRMWARE_E2E_FLASH_RIGHT_AT='<ISO timestamp after right flash>'",
     "export BROWSER_FIRMWARE_E2E_FLASH_LEFT_METHOD='direct-copy'",

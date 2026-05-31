@@ -971,6 +971,7 @@ const checks = [
         "Flash E2E",
         "目的別公開リンク",
         "目的別公開リンク URL 一覧",
+        "ISO UTC の flash 完了時刻",
       ]) &&
       allIncludes(files.docsUsageGuide, ["GitHub artifact 名 / id", "artifact <name> #<id>"]) &&
       allIncludes(files.docsDeployment, [
@@ -981,6 +982,7 @@ const checks = [
         "Worker API の 405",
         "目的別公開リンク",
         "目的別公開リンク URL 一覧",
+        "ISO UTC の flash 完了時刻",
       ]) &&
       allIncludes(files.docsReleaseChecklist, [
         "GitHub Pages の成功だけではブラウザアプリ本体の公開完了とは扱いません",
@@ -1291,6 +1293,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS",
         "BROWSER_FIRMWARE_E2E_UI_SMOKE_SCRIPT",
         "BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND",
+        "right must be the same as or later than left",
         "--print-env-template",
         "# source /tmp/browser-firmware-e2e.env",
         "printEnvTemplate",
@@ -1380,6 +1383,7 @@ const checks = [
         "build artifact manifest left target was not collected",
         "build artifact manifest right target was not collected",
         "collector env template is missing production URL",
+        "collector env template should explain left/right flash timestamp ordering",
         "collector env template should recommend running UI smoke",
         "collector env template should not print secret values",
         "automatic UI smoke result was not collected",
