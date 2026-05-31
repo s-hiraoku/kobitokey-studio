@@ -1356,7 +1356,8 @@ const checks = [
         '"releaseWizardPreconditionsPassed"',
         '"artifactProvenanceVisible"',
         '"artifactProvenanceMatchesBuildArtifacts"',
-      ]),
+      ]) &&
+      externalEvidenceTemplateHasManifestTargets(),
   },
 ];
 
@@ -1382,6 +1383,33 @@ function allIncludes(contents, needles) {
 
 function noIncludes(contents, needles) {
   return needles.every((needle) => !contents.includes(needle));
+}
+
+function externalEvidenceTemplateHasManifestTargets() {
+  let template;
+  try {
+    template = JSON.parse(files.externalEvidenceTemplate);
+  } catch {
+    return false;
+  }
+  const uf2Files = template?.build?.githubArtifactUf2Files;
+  const manifests = template?.build?.githubArtifactManifests;
+  return (
+    Array.isArray(uf2Files) &&
+    uf2Files.every((entry) => !isRecord(entry) || !Object.prototype.hasOwnProperty.call(entry, "targets")) &&
+    Array.isArray(manifests) &&
+    manifests.length > 0 &&
+    manifests.every(
+      (manifest) =>
+        isRecord(manifest?.targets) &&
+        Object.prototype.hasOwnProperty.call(manifest.targets, "left") &&
+        Object.prototype.hasOwnProperty.call(manifest.targets, "right"),
+    )
+  );
+}
+
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function scriptIncludes(scriptName, fragment) {

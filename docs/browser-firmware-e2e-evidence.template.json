@@ -63,11 +63,7 @@
         "artifactName": "",
         "name": "",
         "sizeInBytes": 0,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-        "targets": {
-          "left": null,
-          "right": null
-        }
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
       }
     ],
     "githubArtifactManifests": [
@@ -76,7 +72,11 @@
         "artifactName": "",
         "name": "",
         "sizeInBytes": 0,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "targets": {
+          "left": "firmware/kobitokey_left.uf2",
+          "right": "firmware/kobitokey_right.uf2"
+        }
       }
     ],
     "artifactsExpired": true

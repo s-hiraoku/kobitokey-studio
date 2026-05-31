@@ -67,6 +67,8 @@ npm run collect:browser-firmware:e2e-report -- --out path/to/report.json --run-u
 
 `BROWSER_FIRMWARE_E2E_BRANCH` には KobitoKey Studio の branch ではなく、`Commit & Build` で使った firmware repository の branch を入れます。
 
+手動で `docs/browser-firmware-e2e-evidence.template.json` を埋める場合は、manifest 分類の証跡として `build.githubArtifactManifests[].targets.left/right` に artifact zip 内の left / right UF2 path を入れます。
+
 実機確認では、left / right それぞれで bootloader marker、書き込み直前確認、接続中 keyboard half、flash method (`direct-copy` または `download-copy`) を記録します。
 
 ## 6. 最終 gate を通す
