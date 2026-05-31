@@ -137,6 +137,13 @@ status, and per-check statuses:
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
 ```
 
+To create a Markdown handoff for the deploy / QA owner, render the same status
+as a checklist with commands:
+
+```sh
+npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
+```
+
 If GitHub API rate limits block the Actions release-gate lookup, set
 `BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` to a token that can read this
 repository's Actions runs.

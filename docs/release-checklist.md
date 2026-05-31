@@ -17,6 +17,12 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 `ready` が `false` の場合は `nextActions` に残作業と placeholder 付きの `commands` が出ます。secret 値や token は出力しません。
 GitHub Actions から更新する場合は、current HEAD の release gate と production Worker deploy workflow の状態もここで確認できます。
 
+公開作業を引き継ぐ場合は、同じ内容を Markdown にします。
+
+```sh
+npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
+```
+
 ## 2. production deploy の secret を設定する
 
 GitHub Actions から production Worker を更新する場合は、repository / environment に次の secret を設定します。

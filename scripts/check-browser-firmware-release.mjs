@@ -16,6 +16,8 @@ const files = {
   publicReleaseCheck: read("scripts/check-browser-firmware-public-release.mjs"),
   releaseStatus: read("scripts/check-browser-firmware-release-status.mjs"),
   releaseStatusSelfTest: read("scripts/check-browser-firmware-release-status-self-test.mjs"),
+  releaseHandoff: read("scripts/write-browser-firmware-release-handoff.mjs"),
+  releaseHandoffSelfTest: read("scripts/write-browser-firmware-release-handoff-self-test.mjs"),
   publicReleaseSelfTest: read("scripts/check-browser-firmware-public-release-self-test.mjs"),
   productionPreflightSelfTest: read("scripts/check-browser-firmware-production-preflight-self-test.mjs"),
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
@@ -77,6 +79,7 @@ const checks = [
         "scripts/check-browser-firmware-production-preflight-self-test.mjs",
         "scripts/check-browser-firmware-public-release-self-test.mjs",
         "scripts/check-browser-firmware-release-status-self-test.mjs",
+        "scripts/write-browser-firmware-release-handoff-self-test.mjs",
         "scripts/deploy-browser-firmware-production-self-test.mjs",
         'scripts/deploy-browser-firmware-production.mjs", "--help"',
         "scripts/collect-browser-firmware-e2e-evidence.mjs",
@@ -148,6 +151,8 @@ const checks = [
     pass: () =>
       scriptIncludes("check:browser-firmware:release-status", "node scripts/check-browser-firmware-release-status.mjs") &&
       scriptIncludes("check:browser-firmware:release-status-self-test", "node scripts/check-browser-firmware-release-status-self-test.mjs") &&
+      scriptIncludes("check:browser-firmware:release-handoff-self-test", "node scripts/write-browser-firmware-release-handoff-self-test.mjs") &&
+      scriptIncludes("write:browser-firmware:release-handoff", "node scripts/write-browser-firmware-release-handoff.mjs") &&
       allIncludes(files.releaseStatus, [
         "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID",
         "CLOUDFLARE_API_TOKEN",
@@ -200,8 +205,23 @@ const checks = [
         "release-status-token",
         "OK browser firmware release status self-test passed",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands"]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands"]),
+      allIncludes(files.releaseHandoff, [
+        "Browser Firmware Mode Release Handoff",
+        "--status-json",
+        "--out <handoff.md>",
+        "scripts/check-browser-firmware-release-status.mjs",
+        "nextActions",
+        "Final Gate",
+        "Do not paste GitHub tokens",
+      ]) &&
+      allIncludes(files.releaseHandoffSelfTest, [
+        "OK browser firmware release handoff self-test passed",
+        "Status: NOT READY",
+        "source /tmp/browser-firmware-e2e.env",
+        "Do not paste GitHub tokens",
+      ]) &&
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff"]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",

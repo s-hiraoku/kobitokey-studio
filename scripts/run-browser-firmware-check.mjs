@@ -28,6 +28,7 @@ runNode("scripts/check-browser-firmware-merge-readiness-self-test.mjs");
 runNode("scripts/check-browser-firmware-production-preflight-self-test.mjs");
 runNode("scripts/check-browser-firmware-public-release-self-test.mjs");
 runNode("scripts/check-browser-firmware-release-status-self-test.mjs");
+runNode("scripts/write-browser-firmware-release-handoff-self-test.mjs");
 runNode("scripts/deploy-browser-firmware-production-self-test.mjs");
 runNode("scripts/deploy-browser-firmware-production.mjs", "--help");
 runNode("scripts/collect-browser-firmware-e2e-evidence.mjs", "--help");
