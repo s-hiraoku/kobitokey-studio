@@ -1,11 +1,21 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const appCommitSha = readGitHeadSha();
 const seenAuthorizations = [];
+const tempDir = mkdtempSync(join(tmpdir(), "browser-firmware-release-status-"));
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+
+  if (request.method === "GET" && url.pathname.startsWith("/rate-limit/")) {
+    response.writeHead(403, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ message: "API rate limit exceeded" }));
+    return;
+  }
 
   if (request.method === "GET" && url.pathname === "/") {
     response.writeHead(200, {
@@ -198,8 +208,57 @@ try {
   expectExcludes(jsonResult.stderr, "preflight-client");
   expectExcludes(jsonResult.stderr, "release-status-token");
 
+  const e2eReportPath = join(tempDir, "external-e2e.json");
+  writeFileSync(e2eReportPath, JSON.stringify(createValidExternalEvidenceReport(), null, 2));
+  const rateLimitedJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, `${baseUrl}/rate-limit`, [
+    "--json",
+    "--e2e-report",
+    e2eReportPath,
+  ]);
+  if (rateLimitedJson.status !== 0) {
+    process.stderr.write(rateLimitedJson.stderr);
+    process.stdout.write(rateLimitedJson.stdout);
+    throw new Error("Expected release status to use validated external E2E evidence when GitHub API is rate-limited");
+  }
+  let fallbackJson;
+  try {
+    fallbackJson = JSON.parse(rateLimitedJson.stdout);
+  } catch (error) {
+    process.stdout.write(rateLimitedJson.stdout);
+    throw new Error(`Expected rate-limited release status --json output to parse: ${String(error)}`);
+  }
+  if (fallbackJson.ready !== true || fallbackJson.blockerCount !== 0) {
+    process.stdout.write(rateLimitedJson.stdout);
+    throw new Error("Expected rate-limited release status fallback to have no blockers with validated external E2E evidence");
+  }
+  if (
+    !fallbackJson.checks.some(
+      (check) =>
+        check.name === "GitHub Actions release gate" &&
+        check.status === "pass" &&
+        check.detail.includes("validated with Browser firmware release gates=success"),
+    )
+  ) {
+    process.stdout.write(rateLimitedJson.stdout);
+    throw new Error("Expected rate-limited release status to prove release gate from external E2E evidence");
+  }
+  if (
+    !fallbackJson.checks.some(
+      (check) =>
+        check.name === "production Worker deploy workflow" &&
+        check.status === "warn" &&
+        check.detail.includes("GitHub API lookup failed"),
+    )
+  ) {
+    process.stdout.write(rateLimitedJson.stdout);
+    throw new Error("Expected rate-limited release status to warn that the deploy workflow job was not checked");
+  }
+  expectExcludes(rateLimitedJson.stdout, "preflight-client");
+  expectExcludes(rateLimitedJson.stdout, "release-status-token");
+
   console.log("OK browser firmware release status self-test passed");
 } finally {
+  rmSync(tempDir, { recursive: true, force: true });
   await new Promise((resolve) => server.close(resolve));
 }
 
@@ -288,6 +347,150 @@ function releaseSecurityHeaders() {
     "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
     "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(self), serial=(self), bluetooth=(self)",
+  };
+}
+
+function createValidExternalEvidenceReport() {
+  const firmwareCommit = "0123456789abcdef0123456789abcdef01234567";
+  return {
+    schemaVersion: 1,
+    verifiedAt: "2026-05-31T00:00:00Z",
+    tester: "release-status-self-test",
+    production: {
+      url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      fetchUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      appCommitSha,
+      workerDeviceCodeRouteChecked: true,
+      workerAccessTokenRouteChecked: true,
+      workerUnsupportedScopeRejected: true,
+      workerOAuthDeviceFlowStarted: true,
+      frontendOAuthClientIdPresent: true,
+      workerArtifactRouteChecked: true,
+      securityHeadersChecked: true,
+      apiSecurityHeadersChecked: true,
+    },
+    ci: {
+      runUrl: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/12345",
+      runHeadSha: appCommitSha,
+      status: "completed",
+      conclusion: "success",
+      appCommitSha,
+      releaseGateJobName: "Browser firmware release gates",
+      releaseGateJobConclusion: "success",
+      browserFirmwareReleaseCheckPassed: true,
+    },
+    github: {
+      repository: "juichi50iii/KobitoKey_QWERTY",
+      branch: "browser-firmware-release-test",
+      oauthDeviceFlowVerified: true,
+      oauthScopeVerified: true,
+      rateLimitBehaviorVerified: true,
+    },
+    commit: {
+      sha: firmwareCommit,
+      url: `https://github.com/juichi50iii/KobitoKey_QWERTY/commit/${firmwareCommit}`,
+      managedFiles: ["config/KobitoKey.keymap"],
+    },
+    build: {
+      runId: 67890,
+      runUrl: "https://github.com/juichi50iii/KobitoKey_QWERTY/actions/runs/67890",
+      headSha: firmwareCommit,
+      headBranch: "browser-firmware-release-test",
+      status: "completed",
+      conclusion: "success",
+      event: "workflow_dispatch",
+      artifactDownloaded: true,
+      artifactNames: ["firmware"],
+      githubArtifacts: [{ id: 456, name: "firmware", sizeInBytes: 12345, expired: false }],
+      githubArtifactUf2Files: [
+        {
+          artifactId: 456,
+          artifactName: "firmware",
+          name: "firmware/kobitokey_left.uf2",
+          sizeInBytes: 123,
+          sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        },
+        {
+          artifactId: 456,
+          artifactName: "firmware",
+          name: "firmware/kobitokey_right.uf2",
+          sizeInBytes: 456,
+          sha256: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        },
+      ],
+      githubArtifactManifests: [
+        {
+          artifactId: 456,
+          artifactName: "firmware",
+          name: "firmware/manifest.json",
+          sizeInBytes: 90,
+          sha256: "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+          targets: {
+            left: "firmware/kobitokey_left.uf2",
+            right: "firmware/kobitokey_right.uf2",
+          },
+        },
+      ],
+      artifactsExpired: false,
+    },
+    artifacts: {
+      classificationSource: "manifest",
+      left: {
+        uf2Name: "kobitokey_left.uf2",
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        artifactId: 456,
+        artifactName: "firmware",
+      },
+      right: {
+        uf2Name: "kobitokey_right.uf2",
+        sha256: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        artifactId: 456,
+        artifactName: "firmware",
+      },
+    },
+    flash: {
+      left: {
+        completed: true,
+        method: "direct-copy",
+        bootloaderMarkerChecked: true,
+        confirmationPromptAccepted: true,
+        keyboardHalfChecked: true,
+        uf2Name: "kobitokey_left.uf2",
+        completedAt: "2026-05-31T00:10:00Z",
+      },
+      right: {
+        completed: true,
+        method: "download-copy",
+        bootloaderMarkerChecked: true,
+        confirmationPromptAccepted: true,
+        keyboardHalfChecked: true,
+        uf2Name: "kobitokey_right.uf2",
+        completedAt: "2026-05-31T00:12:00Z",
+      },
+    },
+    persistence: {
+      reloadRestoredProgress: true,
+      tokenStored: false,
+      uf2BytesStored: false,
+    },
+    ui: {
+      buildAndFlashSmokePassed: true,
+      tokenNotStoredInLocalStorage: true,
+      tokenClearWorks: true,
+      buttonLayoutNoOverflow: true,
+      rightPaneDeduplicated: true,
+      layerStructureActionsPassed: true,
+      referencedLayerDeleteBlocked: true,
+      keyBindingEditActionsPassed: true,
+      comboEditActionsPassed: true,
+      trackballEditActionsPassed: true,
+      releaseWizardPreconditionsPassed: true,
+      artifactProvenanceVisible: true,
+      artifactProvenanceMatchesBuildArtifacts: true,
+      smokeCommand: "npm run check:browser-firmware:ui",
+      smokeViewportCount: 2,
+    },
+    notes: "Self-test fixture without tokens or UF2 bytes.",
   };
 }
 

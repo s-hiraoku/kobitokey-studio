@@ -147,7 +147,10 @@ npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.js
 
 If GitHub API rate limits block the Actions release-gate lookup, set
 `BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` to a token that can read this
-repository's Actions runs.
+repository's Actions runs. If you already have a validated external E2E report
+for the current app commit, `release-status --e2e-report` can use that report to
+prove the release-gate job while warning that the deploy workflow job was not
+read directly from GitHub.
 
 After a production deployment, run the lightweight preflight first to catch
 missing Worker routes, missing artifact proxy input validation, or release

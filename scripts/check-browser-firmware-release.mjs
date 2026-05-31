@@ -159,6 +159,11 @@ const checks = [
         "BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN",
         "BROWSER_FIRMWARE_RELEASE_STATUS_ALLOW_DIRTY",
         "BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL",
+        "recordGitHubActionsFromExternalEvidence",
+        "readValidatedExternalEvidenceForHead",
+        "external E2E evidence for current HEAD",
+        "pass a validated --e2e-report for the current HEAD",
+        "production Worker deploy workflow was not checked from Actions",
         "const outputJson = args.includes(\"--json\")",
         "ready: blockers.length === 0",
         "blockerCount: blockers.length",
@@ -199,6 +204,10 @@ const checks = [
         "Expected release status --json output to parse",
         "Expected release status --json to expose ready=false with one blocker and a numeric warning count",
         "Expected release status --json to include passing production Worker deploy workflow check",
+        "Expected release status to use validated external E2E evidence when GitHub API is rate-limited",
+        "Expected rate-limited release status fallback to have no blockers with validated external E2E evidence",
+        "Expected rate-limited release status to prove release gate from external E2E evidence",
+        "Expected rate-limited release status to warn that the deploy workflow job was not checked",
         "Expected release status --json to include actionable nextActions for external E2E evidence",
         "nextAction.commands.includes",
         "source /tmp/browser-firmware-e2e.env",
@@ -220,8 +229,8 @@ const checks = [
         "source /tmp/browser-firmware-e2e.env",
         "Do not paste GitHub tokens",
       ]) &&
-      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff"]) &&
-      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff"]),
+      allIncludes(files.readme, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "validated external E2E report"]) &&
+      allIncludes(files.docsDeployment, ["check:browser-firmware:release-status", "--json", "nextActions", "commands", "write:browser-firmware:release-handoff", "current app commit の検証済み外部 E2E report"]),
   },
   {
     name: "browser firmware mode can open via URL in browser builds",

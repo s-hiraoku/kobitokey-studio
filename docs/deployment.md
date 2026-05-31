@@ -75,7 +75,7 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
 ```
 
-GitHub API rate limit で Actions release gate を読めない場合は、`BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` にこの repository の Actions run を読める token を設定します。この token は release-status の GitHub API 読み取りだけに使い、出力には表示しません。
+GitHub API rate limit で Actions release gate を読めない場合は、`BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN` にこの repository の Actions run を読める token を設定します。この token は release-status の GitHub API 読み取りだけに使い、出力には表示しません。current app commit の検証済み外部 E2E report がある場合は、`release-status --e2e-report` がその report から release gate の成功を証明し、deploy workflow job を GitHub から直接読めなかったことを warning として残します。
 
 deploy wrapper は merge readiness、integrated browser Firmware Mode local check、production build、Wrangler deploy、production preflight を順に実行し、post-deploy preflight では `BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA` を current git HEAD に固定します。非 dry-run の production deploy では dirty worktree と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` 未設定を拒否し、未 commit の差分や OAuth なしの token 手入力専用 UI が current git HEAD の公開済み証跡に混ざらないようにします。
 

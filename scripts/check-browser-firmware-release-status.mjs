@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
 const RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
@@ -19,7 +19,8 @@ printing secrets. This is a readiness dashboard, not a deploy command.
 Checks:
   - current git HEAD and worktree cleanliness
   - merge readiness against origin/main
-  - latest GitHub Actions release-gate job for current HEAD
+  - latest GitHub Actions release-gate job for current HEAD, or validated
+    external E2E evidence for current HEAD when GitHub API reads are rate-limited
   - GitHub Actions production Worker deploy job evidence for current HEAD
   - production preflight against the given URL/current HEAD
   - OAuth client id and external E2E evidence availability
@@ -118,7 +119,7 @@ record(
   mergeReadiness.status === 0 ? [] : ["npm run check:browser-firmware:merge-readiness"],
 );
 
-await checkGitHubActionsStatus({ branch, headSha });
+await checkGitHubActionsStatus({ branch, headSha, e2eReportPath });
 checkProductionPreflight({ headSha, productionUrl });
 checkExternalEvidence(e2eReportPath);
 
@@ -179,18 +180,24 @@ function readOption(name) {
   return index >= 0 && args[index + 1] && !args[index + 1].startsWith("--") ? args[index + 1] : "";
 }
 
-async function checkGitHubActionsStatus({ branch, headSha }) {
+async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
   const runsUrl = `${githubApiBaseUrl.replace(/\/$/, "")}/repos/s-hiraoku/kobitokey-studio/actions/runs?branch=${encodeURIComponent(branch)}&per_page=20`;
   let runs;
   try {
     runs = await fetchGitHubJson(runsUrl);
   } catch (error) {
+    if (recordGitHubActionsFromExternalEvidence({ reportPath: e2eReportPath, headSha, error })) {
+      return;
+    }
     record(
       "GitHub Actions release gate",
       "blocker",
       `could not read workflow runs: ${formatError(error)}`,
-      "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions release-gate lookup.",
-      ["export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'"],
+      "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions release-gate lookup, or pass a validated --e2e-report for the current HEAD.",
+      [
+        "export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'",
+        "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+      ],
     );
     return;
   }
@@ -202,12 +209,18 @@ async function checkGitHubActionsStatus({ branch, headSha }) {
     try {
       jobs = await fetchGitHubJson(run.jobs_url);
     } catch (error) {
+      if (recordGitHubActionsFromExternalEvidence({ reportPath: e2eReportPath, headSha, error })) {
+        return;
+      }
       record(
         "GitHub Actions release gate",
         "blocker",
         `could not read jobs for run ${run.id}: ${formatError(error)}`,
-        "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions jobs lookup.",
-        ["export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'"],
+        "Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN or GITHUB_TOKEN if the GitHub API rate limit is blocking the Actions jobs lookup, or pass a validated --e2e-report for the current HEAD.",
+        [
+          "export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'",
+          "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
+        ],
       );
       return;
     }
@@ -263,6 +276,51 @@ async function checkGitHubActionsStatus({ branch, headSha }) {
     `If deploying through GitHub Actions, open Actions > Deploy GitHub Pages, run workflow on ${branch} with deploy_browser_firmware_worker enabled, after repository secrets VITE_GITHUB_OAUTH_CLIENT_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN are configured. Production preflight remains the source of truth for local deploys.`,
     ["npm run check:browser-firmware:release-status -- --json"],
   );
+}
+
+function recordGitHubActionsFromExternalEvidence({ reportPath, headSha, error }) {
+  const report = readValidatedExternalEvidenceForHead(reportPath, headSha);
+  if (!report) {
+    return false;
+  }
+  const runUrl = report.ci?.runUrl || "external E2E report";
+  record(
+    "GitHub Actions release gate",
+    "pass",
+    `${runUrl} validated with ${RELEASE_GATE_JOB_NAME}=success for current HEAD after GitHub API lookup failed: ${formatError(error)}`,
+  );
+  record(
+    "production Worker deploy workflow",
+    "warn",
+    `GitHub API lookup failed: ${formatError(error)}; production Worker deploy workflow was not checked from Actions`,
+    "Production preflight and external E2E evidence are the source of truth when GitHub API release-status reads are rate-limited. Set BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN to also summarize the deploy workflow job.",
+    ["export BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_TOKEN='<GitHub token with Actions read access>'"],
+  );
+  return true;
+}
+
+function readValidatedExternalEvidenceForHead(reportPath, headSha) {
+  if (!reportPath || !existsSync(reportPath)) {
+    return null;
+  }
+  const validation = run(process.execPath, ["scripts/check-browser-firmware-external-evidence.mjs", reportPath]);
+  if (validation.status !== 0) {
+    return null;
+  }
+  let report;
+  try {
+    report = JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch {
+    return null;
+  }
+  return report?.ci?.appCommitSha === headSha &&
+    report?.ci?.runHeadSha === headSha &&
+    report?.production?.appCommitSha === headSha &&
+    report?.ci?.releaseGateJobName === RELEASE_GATE_JOB_NAME &&
+    report?.ci?.releaseGateJobConclusion === "success" &&
+    report?.ci?.browserFirmwareReleaseCheckPassed === true
+    ? report
+    : null;
 }
 
 function checkProductionPreflight({ headSha, productionUrl }) {
