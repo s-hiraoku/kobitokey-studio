@@ -239,6 +239,9 @@ npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/brows
 BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=github-client-id npm run collect:browser-firmware:e2e-report -- --out path/to/report.json
 ```
 
+Set `BROWSER_FIRMWARE_E2E_BRANCH` to the firmware repository branch used in
+`Commit & Build`, not to this app repository branch.
+
 On a release QA machine with Chrome/Edge or Playwright Chromium available, run
 the rendered UI smoke for the browser Firmware Mode buttons and right pane. You
 can run it directly, or let the external E2E collector execute it against the
