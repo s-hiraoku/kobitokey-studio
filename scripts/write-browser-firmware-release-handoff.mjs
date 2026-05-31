@@ -88,6 +88,7 @@ function collectReleaseStatus() {
 function renderHandoff(status) {
   const checks = Array.isArray(status.checks) ? status.checks : [];
   const nextActions = Array.isArray(status.nextActions) ? status.nextActions : [];
+  const evidenceLinks = evidenceLinksFor(checks, nextActions);
   const publicEntryUrls = publicEntryUrlsFor(status.productionUrl);
   const lines = [
     "# Browser Firmware Mode Release Handoff",
@@ -104,6 +105,12 @@ function renderHandoff(status) {
     "| Status | Check | Detail |",
     "| --- | --- | --- |",
     ...checks.map((check) => `| ${tableCell(statusLabel(check.status))} | ${tableCell(check.name)} | ${tableCell(check.detail)} |`),
+    "",
+    "## Evidence Links",
+    "",
+    ...(evidenceLinks.length > 0
+      ? evidenceLinks.map((link) => `- [${link.label || "Link"}](${link.url})`)
+      : ["No evidence links reported by release-status."]),
     "",
     "## Next Actions",
     "",
@@ -160,6 +167,26 @@ function renderHandoff(status) {
   );
 
   return `${lines.join("\n")}`;
+}
+
+function evidenceLinksFor(checks, nextActions) {
+  const seen = new Set();
+  const links = [];
+  for (const item of [...checks, ...nextActions]) {
+    for (const link of item.links ?? []) {
+      if (!link?.url) {
+        continue;
+      }
+      const label = link.label || item.name || "Link";
+      const key = `${label}\n${link.url}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      links.push({ label, url: link.url });
+    }
+  }
+  return links;
 }
 
 function publicEntryUrlsFor(productionUrl) {

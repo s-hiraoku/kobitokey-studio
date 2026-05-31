@@ -75,7 +75,7 @@ Repository secrets には次を設定します。
 npm run check:browser-firmware:release-status
 ```
 
-CI や手元の script で判定する場合は、`--json` を付けると `ready`、`blockerCount`、`warningCount`、`nextActions`、関連 URL の `links`、placeholder 付きの `commands`、current HEAD の release gate と production Worker deploy workflow、各 check の status を含む JSON を出力できます。secret 値は含めません。
+CI や手元の script で判定する場合は、`--json` を付けると `ready`、`blockerCount`、`warningCount`、`nextActions`、関連 URL の `links`、placeholder 付きの `commands`、current HEAD の release gate と production Worker deploy workflow、Actions run の evidence links、各 check の status を含む JSON を出力できます。secret 値は含めません。
 
 ```sh
 npm run check:browser-firmware:release-status -- --json
@@ -87,7 +87,7 @@ npm run check:browser-firmware:release-status -- --json
 npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json
 ```
 
-公開作業を別担当に渡す場合は、同じ判定を Markdown にして共有できます。
+公開作業を別担当に渡す場合は、同じ判定を Markdown にして、残作業 command と evidence links 付きで共有できます。
 
 ```sh
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md

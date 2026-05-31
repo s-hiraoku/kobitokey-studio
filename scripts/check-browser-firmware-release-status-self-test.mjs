@@ -52,6 +52,7 @@ const server = createServer((request, response) => {
           id: 12345,
           event: "pull_request",
           head_sha: appCommitSha,
+          html_url: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/12345",
           jobs_url: `${origin(request)}/repos/s-hiraoku/kobitokey-studio/actions/runs/12345/jobs`,
           status: "completed",
           conclusion: "success",
@@ -60,6 +61,7 @@ const server = createServer((request, response) => {
           id: 67890,
           event: "workflow_dispatch",
           head_sha: appCommitSha,
+          html_url: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/67890",
           jobs_url: `${origin(request)}/repos/s-hiraoku/kobitokey-studio/actions/runs/67890/jobs`,
           status: "completed",
           conclusion: "success",
@@ -184,6 +186,32 @@ try {
   if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production Worker deploy workflow" && check.status === "pass")) {
     process.stdout.write(jsonResult.stdout);
     throw new Error("Expected release status --json to include passing production Worker deploy workflow check");
+  }
+  const releaseGateCheck = json.checks.find((check) => check.name === "GitHub Actions release gate");
+  if (
+    !releaseGateCheck ||
+    !Array.isArray(releaseGateCheck.links) ||
+    !releaseGateCheck.links.some(
+      (link) =>
+        link.label === "Release Gate Run" &&
+        link.url === "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/12345",
+    )
+  ) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include the release gate run evidence link");
+  }
+  const deployWorkflowCheck = json.checks.find((check) => check.name === "production Worker deploy workflow");
+  if (
+    !deployWorkflowCheck ||
+    !Array.isArray(deployWorkflowCheck.links) ||
+    !deployWorkflowCheck.links.some(
+      (link) =>
+        link.label === "Production Worker Deploy Run" &&
+        link.url === "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/67890",
+    )
+  ) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include the production deploy workflow run evidence link");
   }
   if (
     !Array.isArray(json.nextActions) ||

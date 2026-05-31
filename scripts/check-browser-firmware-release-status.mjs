@@ -270,6 +270,9 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
       "GitHub Actions release gate",
       "pass",
       `${releaseGateRun.run.event} run ${releaseGateRun.run.id} completed with ${RELEASE_GATE_JOB_NAME}=success`,
+      "",
+      [],
+      workflowRunLinks("Release Gate Run", releaseGateRun.run),
     );
   } else {
     const runSummary =
@@ -293,6 +296,9 @@ async function checkGitHubActionsStatus({ branch, headSha, e2eReportPath }) {
       "production Worker deploy workflow",
       "pass",
       `${deployRun.run.event} run ${deployRun.run.id} completed with ${DEPLOY_WORKER_JOB_NAME}=success`,
+      "",
+      [],
+      workflowRunLinks("Production Worker Deploy Run", deployRun.run),
     );
     return;
   }
@@ -333,6 +339,9 @@ function recordGitHubActionsFromExternalEvidence({ reportPath, headSha, error })
     "GitHub Actions release gate",
     "pass",
     `${runUrl} validated with ${RELEASE_GATE_JOB_NAME}=success for current HEAD after GitHub API lookup failed: ${formatError(error)}`,
+    "",
+    [],
+    isHttpUrl(runUrl) ? [{ label: "External E2E CI Run", url: runUrl }] : [],
   );
   record(
     "production Worker deploy workflow",
@@ -490,6 +499,25 @@ function sameUrl(left, right) {
   } catch {
     return left === right;
   }
+}
+
+function isHttpUrl(value) {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function workflowRunLinks(label, run) {
+  const url =
+    typeof run?.html_url === "string" && run.html_url.trim()
+      ? run.html_url.trim()
+      : run?.id
+        ? `https://github.com/s-hiraoku/kobitokey-studio/actions/runs/${run.id}`
+        : "";
+  return url ? [{ label, url }] : [];
 }
 
 async function fetchGitHubJson(url) {

@@ -28,7 +28,7 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
 ```
 
-handoff には production origin で確認する目的別公開リンクと、外部 E2E report に必要な `ui.publicEntryLinksPassed` / `ui.publicEntryUrls` も含まれます。
+handoff には production origin で確認する目的別公開リンク、release gate / deploy workflow の evidence links、外部 E2E report に必要な `ui.publicEntryLinksPassed` / `ui.publicEntryUrls` も含まれます。
 
 ## 2. production deploy の secret を設定する
 

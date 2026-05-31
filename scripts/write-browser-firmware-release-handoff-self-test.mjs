@@ -57,6 +57,8 @@ function assertHandoff(markdown) {
     "Commit: abc1234 (abc123456789abcdef0123456789abcdef012345)",
     "Summary: 3 blocker(s), 2 warning(s)",
     "| BLOCKER | OAuth client id env |",
+    "## Evidence Links",
+    "[Release Gate Run](https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123)",
     "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "### BLOCKER external E2E evidence",
     "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
@@ -130,7 +132,12 @@ function createStatusFixture() {
       { name: "current git HEAD", status: "pass", detail: "abc1234 on feature/firmware-mode" },
       { name: "OAuth client id env", status: "blocker", detail: "BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID is missing" },
       { name: "Cloudflare token env", status: "warn", detail: "CLOUDFLARE_API_TOKEN is not set" },
-      { name: "GitHub Actions release gate", status: "pass", detail: "push run 123 completed with Browser firmware release gates=success" },
+      {
+        name: "GitHub Actions release gate",
+        status: "pass",
+        detail: "push run 123 completed with Browser firmware release gates=success",
+        links: [{ label: "Release Gate Run", url: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123" }],
+      },
     ],
   };
 }

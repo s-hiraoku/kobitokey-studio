@@ -132,7 +132,7 @@ npm run check:browser-firmware:release-status
 For automation, add `--json` after `--` to get a machine-readable result with
 `ready`, `blockerCount`, `warningCount`, `nextActions`, relevant `links`,
 copy-ready placeholder `commands`, the current-head release gate and production Worker deploy workflow
-status, and per-check statuses:
+status with Actions run evidence links, and per-check statuses:
 
 ```sh
 npm run check:browser-firmware:release-status -- --json
@@ -147,7 +147,7 @@ npm run check:browser-firmware:release-status -- --json --e2e-report path/to/rep
 ```
 
 To create a Markdown handoff for the deploy / QA owner, render the same status
-as a checklist with commands:
+as a checklist with commands and evidence links:
 
 ```sh
 npm run write:browser-firmware:release-handoff -- --e2e-report path/to/report.json --out /tmp/browser-firmware-release-handoff.md
