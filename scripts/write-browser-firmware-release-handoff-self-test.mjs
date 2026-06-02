@@ -37,15 +37,34 @@ try {
     throw new Error("Expected handoff help to document status-json and out options");
   }
 
+  const fallbackStatusPath = join(dir, "release-status-without-run-link.json");
+  writeFileSync(fallbackStatusPath, JSON.stringify(createStatusFixtureWithoutReleaseGateLink(), null, 2));
+  const fallbackResult = runHandoff(["--status-json", fallbackStatusPath], {
+    BROWSER_FIRMWARE_E2E_CI_RUN_URL: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/456",
+  });
+  if (fallbackResult.status !== 0) {
+    process.stderr.write(fallbackResult.stderr);
+    process.stdout.write(fallbackResult.stdout);
+    throw new Error("Expected handoff to use env release gate run URL fallback");
+  }
+  assertIncludes(
+    fallbackResult.stdout,
+    "BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/456'",
+  );
+
   console.log("OK browser firmware release handoff self-test passed");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
 
-function runHandoff(args) {
+function runHandoff(args, extraEnv = {}) {
   return spawnSync(process.execPath, ["scripts/write-browser-firmware-release-handoff.mjs", ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...extraEnv,
+    },
   });
 }
 
@@ -92,6 +111,13 @@ function assertHandoff(markdown) {
       process.stdout.write(markdown);
       throw new Error(`Expected handoff to avoid secret-like text: ${unexpected}`);
     }
+  }
+}
+
+function assertIncludes(value, expected) {
+  if (!value.includes(expected)) {
+    process.stdout.write(value);
+    throw new Error(`Expected output to include: ${expected}`);
   }
 }
 
@@ -146,4 +172,12 @@ function createStatusFixture() {
       },
     ],
   };
+}
+
+function createStatusFixtureWithoutReleaseGateLink() {
+  const fixture = createStatusFixture();
+  fixture.checks = fixture.checks.map((check) =>
+    check.name === "GitHub Actions release gate" ? { ...check, links: [] } : check,
+  );
+  return fixture;
 }

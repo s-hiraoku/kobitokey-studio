@@ -197,6 +197,13 @@ function evidenceLinksFor(checks, nextActions) {
       links.push({ label, url: link.url });
     }
   }
+  const releaseGateRunUrl = safeReleaseGateRunUrl(process.env.BROWSER_FIRMWARE_E2E_CI_RUN_URL);
+  if (releaseGateRunUrl) {
+    const key = `Release Gate Run\n${releaseGateRunUrl}`;
+    if (!seen.has(key)) {
+      links.push({ label: "Release Gate Run", url: releaseGateRunUrl });
+    }
+  }
   return links;
 }
 
@@ -242,6 +249,11 @@ function tableCell(value) {
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function safeReleaseGateRunUrl(value) {
+  const url = String(value || "").trim();
+  return /^https:\/\/github\.com\/s-hiraoku\/kobitokey-studio\/actions\/runs\/\d+$/.test(url) ? url : "";
 }
 
 function formatError(error) {

@@ -85,6 +85,27 @@ try {
     throw new Error("Expected release bundle help to document options and generated files");
   }
 
+  const fallbackStatusPath = join(dir, "release-status-without-run-link.json");
+  const fallbackOutDir = join(dir, "bundle-with-fallback-run-url");
+  writeFileSync(fallbackStatusPath, JSON.stringify(createStatusFixtureWithoutReleaseGateLink(), null, 2));
+  const fallbackResult = runBundle(["--status-json", fallbackStatusPath, "--out-dir", fallbackOutDir], {
+    BROWSER_FIRMWARE_E2E_CI_RUN_URL: "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/456",
+  });
+  if (fallbackResult.status !== 0) {
+    process.stderr.write(fallbackResult.stderr);
+    process.stdout.write(fallbackResult.stdout);
+    throw new Error("Expected release bundle writer to use env release gate run URL fallback");
+  }
+  const fallbackCombined = [
+    readFileSync(join(fallbackOutDir, "release-handoff.md"), "utf8"),
+    readFileSync(join(fallbackOutDir, "browser-firmware-e2e.env"), "utf8"),
+    readFileSync(join(fallbackOutDir, "README.md"), "utf8"),
+  ].join("\n");
+  assertIncludes(
+    fallbackCombined,
+    "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/456",
+  );
+
   console.log("OK browser firmware release bundle self-test passed");
 } finally {
   rmSync(dir, { recursive: true, force: true });
@@ -149,4 +170,12 @@ function createStatusFixture() {
       { name: "external E2E evidence", status: "blocker", detail: "--e2e-report is required" },
     ],
   };
+}
+
+function createStatusFixtureWithoutReleaseGateLink() {
+  const fixture = createStatusFixture();
+  fixture.checks = fixture.checks.map((check) =>
+    check.name === "GitHub Actions release gate" ? { ...check, links: [] } : check,
+  );
+  return fixture;
 }

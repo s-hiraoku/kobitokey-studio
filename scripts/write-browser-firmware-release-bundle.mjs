@@ -186,7 +186,12 @@ function releaseGateRunUrlFor(status) {
       }
     }
   }
-  return "";
+  return safeReleaseGateRunUrl(process.env.BROWSER_FIRMWARE_E2E_CI_RUN_URL);
+}
+
+function safeReleaseGateRunUrl(value) {
+  const url = String(value || "").trim();
+  return /^https:\/\/github\.com\/s-hiraoku\/kobitokey-studio\/actions\/runs\/\d+$/.test(url) ? url : "";
 }
 
 function formatError(error) {
