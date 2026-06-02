@@ -7,7 +7,7 @@ const DEPLOY_WORKER_JOB_NAME = "deploy-browser-firmware-worker";
 const GITHUB_WORKFLOW_URL = "https://github.com/s-hiraoku/kobitokey-studio/actions/workflows/pages.yml";
 const GITHUB_OAUTH_APPS_URL = "https://github.com/settings/developers";
 const CLOUDFLARE_DASHBOARD_URL = "https://dash.cloudflare.com/";
-const RELEASE_PLAN_URL = "https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md";
+const RELEASE_PLAN_URL = "https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md";
 const args = process.argv.slice(2);
 const githubApiBaseUrl =
   process.env.BROWSER_FIRMWARE_RELEASE_STATUS_GITHUB_API_BASE_URL?.trim() || "https://api.github.com";

@@ -133,7 +133,7 @@ function createStatusFixture() {
           { label: "Production URL", url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware" },
           {
             label: "Release Plan",
-            url: "https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md",
+            url: "https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md",
           },
         ],
       },

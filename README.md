@@ -225,7 +225,7 @@ first: `VITE_GITHUB_OAUTH_CLIENT_ID`, `CLOUDFLARE_ACCOUNT_ID`, and
 is skipped so the manual run updates only the browser app Worker.
 
 ```sh
-gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true
+gh workflow run pages.yml --ref main -f deploy_browser_firmware_worker=true
 ```
 
 After an Actions deploy, set the same public OAuth client id locally before

@@ -148,14 +148,14 @@ const checks = [
       ]) &&
       allIncludes(files.readme, [
         "npm run deploy:browser-firmware",
-        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
+        "gh workflow run pages.yml --ref main -f deploy_browser_firmware_worker=true",
         "BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
       ]) &&
       allIncludes(files.docsDeployment, [
         "npm run deploy:browser-firmware",
-        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
+        "gh workflow run pages.yml --ref main -f deploy_browser_firmware_worker=true",
         "current git HEAD",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
@@ -311,7 +311,7 @@ const checks = [
         "BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
         "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
         "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
-        "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md)",
+        "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md)",
         "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
         "External E2E Evidence Checklist",
@@ -441,7 +441,7 @@ const checks = [
       allIncludes(files.docsReleaseChecklist, [
         "permalink: /release-checklist/",
         "deploy_browser_firmware_worker",
-        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
+        "gh workflow run pages.yml --ref main -f deploy_browser_firmware_worker=true",
         "--print-env-template",
         "VITE_GITHUB_OAUTH_CLIENT_ID",
         "CLOUDFLARE_ACCOUNT_ID",
@@ -765,7 +765,7 @@ const checks = [
         "CLOUDFLARE_API_TOKEN",
         "Validate production Worker secrets",
         "browser-firmware-production",
-        "gh workflow run pages.yml --ref feature/firmware-mode -f deploy_browser_firmware_worker=true",
+        "gh workflow run pages.yml --ref main -f deploy_browser_firmware_worker=true",
       ]),
   },
   {

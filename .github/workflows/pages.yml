@@ -15,7 +15,6 @@ on:
   push:
     branches:
       - main
-      - feature/firmware-mode
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"

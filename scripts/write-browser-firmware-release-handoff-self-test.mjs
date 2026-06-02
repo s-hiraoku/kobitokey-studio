@@ -66,7 +66,7 @@ function assertHandoff(markdown) {
     "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "### BLOCKER external E2E evidence",
     "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
-    "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md)",
+    "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md)",
     "source /tmp/browser-firmware-e2e.env",
     "## External E2E Evidence Checklist",
     "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
@@ -129,7 +129,7 @@ function createStatusFixture() {
           { label: "Production URL", url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware" },
           {
             label: "Release Plan",
-            url: "https://github.com/s-hiraoku/kobitokey-studio/blob/feature/firmware-mode/docs/browser-firmware-release-plan.md",
+            url: "https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md",
           },
         ],
       },
