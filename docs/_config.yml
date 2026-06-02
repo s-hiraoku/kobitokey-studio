@@ -3,8 +3,10 @@ description: KobitoKey Studio の設定・使い方ガイド
 theme: minima
 
 header_pages:
+  - user-guide.md
   - quick-start.md
   - usage-guide.md
+  - release-checklist.md
   - deployment.md
 
 github_username: s-hiraoku

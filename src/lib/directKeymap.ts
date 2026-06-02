@@ -83,6 +83,7 @@ export type DirectFirmwareComboSnapshot = {
   id: string;
   binding: string;
   keyPositions: number[];
+  layers?: number[];
   timeoutMs: number;
 };
 
@@ -102,7 +103,7 @@ export function firmwareCombosToStudioSet(combos: KeymapCombo[]): StudioComboSet
       keyPositions: combo.keyPositions,
       timeoutMs: combo.timeoutMs || 50,
       requirePriorIdleMs: 0,
-      layerMask: 0xffffffff,
+      layerMask: comboLayersToMask(combo.layers),
       slowRelease: false,
     })),
     maxCombos: combos.length,
@@ -224,6 +225,7 @@ export function applyDirectFirmwareComboDiffsToSource(source: string, diffs: Dir
         id: combo.id,
         binding: diff.directCombo.binding,
         keyPositions: diff.directCombo.keyPositions,
+        layers: diff.directCombo.layers,
         timeoutMs: diff.directCombo.timeoutMs,
       });
     }, source);
@@ -248,6 +250,7 @@ export function applyDirectFirmwareComboDiffsToSource(source: string, diffs: Dir
         id: uniqueComboId(sanitizeLayerId(directCombo.id, diff.comboIndex), existingIds),
         binding: directCombo.binding,
         keyPositions: directCombo.keyPositions,
+        layers: directCombo.layers,
         timeoutMs: directCombo.timeoutMs,
       });
     }, removedSource);
@@ -267,10 +270,12 @@ export function formatStudioBindings(bindings: string[]): string {
 }
 
 function comboSnapshot(combo: KeymapCombo): DirectFirmwareComboSnapshot {
+  const layers = combo.layers && combo.layers.length > 0 ? uniqueSortedNumbers(combo.layers) : layerMaskToLayers(combo);
   return {
     id: combo.id,
     binding: normalizeDirectBindingForDisplay(combo.binding),
     keyPositions: [...combo.keyPositions],
+    ...(layers ? { layers } : {}),
     timeoutMs: combo.timeoutMs || 50,
   };
 }
@@ -279,8 +284,39 @@ function sameComparableCombo(left: DirectFirmwareComboSnapshot, right: DirectFir
   return (
     sameComparableBinding(left.binding, right.binding) &&
     left.keyPositions.join(" ") === right.keyPositions.join(" ") &&
+    sameComparableLayers(left.layers, right.layers) &&
     left.timeoutMs === right.timeoutMs
   );
+}
+
+function sameComparableLayers(left: number[] | undefined, right: number[] | undefined): boolean {
+  const normalize = (layers: number[] | undefined) => (layers && layers.length > 0 ? layers.join(" ") : "all");
+  return normalize(left) === normalize(right);
+}
+
+function comboLayersToMask(layers: number[] | undefined): number {
+  if (!layers || layers.length === 0) {
+    return 0xffffffff;
+  }
+  return uniqueSortedNumbers(layers).reduce((mask, layer) => (layer >= 0 && layer < 32 ? mask | (1 << layer) : mask), 0) >>> 0;
+}
+
+function layerMaskToLayers(combo: KeymapCombo): number[] | undefined {
+  const layerMask = "layerMask" in combo && typeof combo.layerMask === "number" ? combo.layerMask : 0xffffffff;
+  if ((layerMask >>> 0) === 0xffffffff) {
+    return undefined;
+  }
+  const layers: number[] = [];
+  for (let layer = 0; layer < 32; layer += 1) {
+    if ((layerMask & (1 << layer)) !== 0) {
+      layers.push(layer);
+    }
+  }
+  return layers;
+}
+
+function uniqueSortedNumbers(values: number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value >= 0))].sort((left, right) => left - right);
 }
 
 function uniqueComboId(baseId: string, existingIds: string[]): string {
