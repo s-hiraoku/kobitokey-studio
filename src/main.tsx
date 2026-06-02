@@ -4746,13 +4746,13 @@ function BrowserFirmwareReleaseWorkbench({
           ) : null}
         </div>
         {!githubOAuthAvailable ? (
-          <p className="build-status oauth-config-note" id="browser-firmware-oauth-help">
+          <p className="build-note oauth-config-note" id="browser-firmware-oauth-help">
             GitHub OAuth はこの公開 build では未設定です。GitHub token を入力して読み込み、または公開管理者が OAuth client id
             を設定して再デプロイしてください。
           </p>
         ) : null}
         {userCode ? (
-          <p className="build-status">
+          <p className="build-note">
             GitHub device code: <strong>{userCode}</strong>
             {verificationUri ? (
               <>

@@ -3502,14 +3502,30 @@ select:focus-visible {
   line-height: 1.45;
   word-break: break-all;
 }
-.build-status strong {
+.build-note {
+  min-height: 34px;
+  border: 1px solid var(--hairline-soft);
+  border-left: 3px solid var(--pine-bright);
+  border-radius: var(--r-sm);
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+.build-status strong,
+.build-note strong {
   color: var(--ink-strong);
 }
-.build-status a {
+.build-status a,
+.build-note a {
   color: var(--pine-deep);
   font-weight: 800;
 }
-.build-status.oauth-config-note {
+.build-note.oauth-config-note {
   border-color: rgba(168, 58, 43, 0.24);
   background: #fff4ef;
   color: var(--ink-soft);
