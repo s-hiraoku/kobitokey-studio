@@ -44,6 +44,7 @@ import {
   type FirmwareReleaseReadiness,
   type FlashSide,
 } from "./lib/firmwareReleaseFlow";
+import { loadFixtureProject } from "./lib/fixtureProject";
 import {
   readBrowserFirmwareSession,
   writeBrowserFirmwareSession,
@@ -441,6 +442,7 @@ function App() {
     [activeLayerIndex, directKeyDraftList],
   );
   const showDirectEmptyState = isDirectMode && !directKeymap;
+  const showFirmwareEmptyState = !isDirectMode && !files && workbenchTab !== "build";
   const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
   const activeLayerReferences = React.useMemo(
     () => findLayerReferenceSites(parsedKeymap, activeLayerIndex),
@@ -655,16 +657,20 @@ function App() {
   }
 
   async function loadFixture() {
-    const [keymap, leftOverlay, rightOverlay] = await Promise.all([
-      fetch("/fixtures/KobitoKey.keymap").then((response) => response.text()),
-      fetch("/fixtures/KobitoKey_left.overlay").then((response) => response.text()),
-      fetch("/fixtures/KobitoKey_right.overlay").then((response) => response.text()),
-    ]);
-    setFiles({ keymap, leftOverlay, rightOverlay });
-    setSavedKeymap(keymap);
-    setSavedLeftOverlay(leftOverlay);
-    setSavedRightOverlay(rightOverlay);
-    setStatus("fixture を表示中");
+    try {
+      const project = await loadFixtureProject(fetch);
+      setFiles(project);
+      setSavedKeymap(project.keymap);
+      setSavedLeftOverlay(project.leftOverlay);
+      setSavedRightOverlay(project.rightOverlay);
+      setStatus("fixture を表示中");
+    } catch (error) {
+      setFiles(null);
+      setSavedKeymap("");
+      setSavedLeftOverlay("");
+      setSavedRightOverlay("");
+      setStatus(`fixture 読み込み失敗: ${formatError(error)}`);
+    }
   }
 
   async function loadProject() {
@@ -2498,6 +2504,8 @@ function App() {
           onRefresh={refreshStudioPorts}
           onTransportChange={setStudioConnectionKind}
         />
+      ) : showFirmwareEmptyState ? (
+        <FirmwareProjectEmptyState status={status} onBuildFlash={openFirmwareBuildFlash} />
       ) : (
       <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
@@ -3848,6 +3856,28 @@ function DirectConnectionErrorPanel({ issue }: { issue: DirectConnectionIssue })
       </ol>
       <small>{issue.rawMessage}</small>
     </div>
+  );
+}
+
+function FirmwareProjectEmptyState({ onBuildFlash, status }: { onBuildFlash: () => void; status: string }) {
+  return (
+    <section className="direct-welcome">
+      <div className="direct-welcome-card">
+        <div>
+          <p className="eyebrow">Firmware Mode</p>
+          <h2>Firmware ファイルを読み込めませんでした</h2>
+          <p>{status}</p>
+        </div>
+        <div className="runtime-warning">
+          <AlertTriangle size={17} />
+          <span>同梱 fixture が壊れているか、配信アセットから取得できません。</span>
+        </div>
+        <button type="button" className="primary wide-action" onClick={onBuildFlash}>
+          <UploadCloud size={17} />
+          Build & Flash
+        </button>
+      </div>
+    </section>
   );
 }
 
