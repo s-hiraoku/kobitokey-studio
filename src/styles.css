@@ -3509,6 +3509,11 @@ select:focus-visible {
   color: var(--pine-deep);
   font-weight: 800;
 }
+.build-status.oauth-config-note {
+  border-color: rgba(168, 58, 43, 0.24);
+  background: #fff4ef;
+  color: var(--ink-soft);
+}
 
 .build-target {
   margin: var(--sp-2) 0;

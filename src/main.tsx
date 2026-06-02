@@ -2636,6 +2636,7 @@ function App() {
                   commitUrl={browserFirmwareCommitUrl}
                   downloadedSide={browserFirmwareDownloadedSide}
                   flashSide={flashSide}
+                  githubOAuthAvailable={Boolean(githubOAuthClientId())}
                   onBack={closeFirmwareBuildFlash}
                   readiness={browserFirmwareReadiness}
                   repoRef={browserFirmwareRepoRef}
@@ -4601,6 +4602,7 @@ function BrowserFirmwareReleaseWorkbench({
   commitUrl,
   downloadedSide,
   flashSide,
+  githubOAuthAvailable,
   onBack,
   onBranchChange,
   onCancelGithubConnection,
@@ -4633,6 +4635,7 @@ function BrowserFirmwareReleaseWorkbench({
   commitUrl: string;
   downloadedSide: FlashSide | null;
   flashSide: FlashSide;
+  githubOAuthAvailable: boolean;
   onBack: () => void;
   onBranchChange: (value: string) => void;
   onCancelGithubConnection: () => void;
@@ -4722,7 +4725,12 @@ function BrowserFirmwareReleaseWorkbench({
           </small>
         </label>
         <div className="build-actions">
-          <button type="button" onClick={onConnectGithub} disabled={isBusy}>
+          <button
+            type="button"
+            onClick={onConnectGithub}
+            disabled={isBusy || !githubOAuthAvailable}
+            aria-describedby={!githubOAuthAvailable ? "browser-firmware-oauth-help" : undefined}
+          >
             <UploadCloud size={16} />
             <span className="button-label">GitHub で接続</span>
           </button>
@@ -4737,6 +4745,12 @@ function BrowserFirmwareReleaseWorkbench({
             </button>
           ) : null}
         </div>
+        {!githubOAuthAvailable ? (
+          <p className="build-status oauth-config-note" id="browser-firmware-oauth-help">
+            GitHub OAuth はこの公開 build では未設定です。GitHub token を入力して読み込み、または公開管理者が OAuth client id
+            を設定して再デプロイしてください。
+          </p>
+        ) : null}
         {userCode ? (
           <p className="build-status">
             GitHub device code: <strong>{userCode}</strong>
