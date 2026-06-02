@@ -110,6 +110,12 @@ async function checkReleaseMetadata(url) {
   if (!isSha(body?.appCommitSha)) {
     issues.push("release metadata appCommitSha should be a 40-character SHA");
   }
+  if (typeof body?.githubOAuthClientConfigured !== "boolean") {
+    issues.push("release metadata githubOAuthClientConfigured should be a boolean");
+  }
+  if (requireOAuth && body?.githubOAuthClientConfigured !== true) {
+    issues.push("release metadata githubOAuthClientConfigured should be true when OAuth preflight is required");
+  }
   const expectedAppCommitSha = process.env.BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA?.trim();
   if (expectedAppCommitSha && body?.appCommitSha !== expectedAppCommitSha) {
     issues.push("release metadata appCommitSha should match BROWSER_FIRMWARE_PREFLIGHT_APP_COMMIT_SHA");

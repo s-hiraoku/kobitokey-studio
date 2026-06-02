@@ -8,6 +8,7 @@ const appCommitSha = readGitHeadSha();
 const seenAuthorizations = [];
 const tempDir = mkdtempSync(join(tmpdir(), "browser-firmware-release-status-"));
 let deployWorkerJobConclusion = "success";
+let productionOAuthConfigured = true;
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -50,6 +51,7 @@ const server = createServer((request, response) => {
     writeJson(response, 200, {
       schemaVersion: 1,
       appCommitSha,
+      githubOAuthClientConfigured: productionOAuthConfigured,
     });
     return;
   }
@@ -155,6 +157,7 @@ try {
   expectIncludes(result.stdout, "PASS GitHub Actions release gate");
   expectIncludes(result.stdout, "PASS production Worker deploy workflow");
   expectIncludes(result.stdout, "PASS production preflight");
+  expectIncludes(result.stdout, "PASS production OAuth metadata");
   expectIncludes(result.stdout, "BLOCKER external E2E evidence");
   expectIncludes(result.stdout, "Next actions:");
   expectIncludes(result.stdout, "external E2E evidence: Generate an external E2E env template");
@@ -195,6 +198,10 @@ try {
   if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production preflight" && check.status === "pass")) {
     process.stdout.write(jsonResult.stdout);
     throw new Error("Expected release status --json to include passing production preflight check");
+  }
+  if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production OAuth metadata" && check.status === "pass")) {
+    process.stdout.write(jsonResult.stdout);
+    throw new Error("Expected release status --json to include passing production OAuth metadata check");
   }
   if (!Array.isArray(json.checks) || !json.checks.some((check) => check.name === "production Worker deploy workflow" && check.status === "pass")) {
     process.stdout.write(jsonResult.stdout);
@@ -302,6 +309,39 @@ try {
   }
   expectExcludes(skippedDeployJson.stdout, "preflight-client");
   expectExcludes(skippedDeployJson.stdout, "release-status-token");
+
+  productionOAuthConfigured = false;
+  const missingProductionOAuthJson = await runReleaseStatus(`${baseUrl}/?mode=firmware`, baseUrl, ["--json"]);
+  productionOAuthConfigured = true;
+  if (missingProductionOAuthJson.status !== 1) {
+    process.stderr.write(missingProductionOAuthJson.stderr);
+    process.stdout.write(missingProductionOAuthJson.stdout);
+    throw new Error("Expected release status fixture with missing production OAuth metadata to fail");
+  }
+  const missingProductionOAuthStatus = parseJsonOutput(
+    missingProductionOAuthJson.stdout,
+    "Expected missing-production-OAuth release status --json output to parse",
+  );
+  const missingProductionOAuthCheck = missingProductionOAuthStatus.checks.find(
+    (check) => check.name === "production OAuth metadata",
+  );
+  const missingProductionOAuthAction = missingProductionOAuthStatus.nextActions.find(
+    (nextAction) => nextAction.name === "production OAuth metadata",
+  );
+  if (
+    !missingProductionOAuthCheck ||
+    missingProductionOAuthCheck.status !== "blocker" ||
+    !missingProductionOAuthCheck.detail.includes("not configured") ||
+    !missingProductionOAuthAction ||
+    missingProductionOAuthAction.status !== "blocker" ||
+    !missingProductionOAuthAction.action.includes("Set VITE_GITHUB_OAUTH_CLIENT_ID") ||
+    !missingProductionOAuthAction.commands.includes("export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'")
+  ) {
+    process.stdout.write(missingProductionOAuthJson.stdout);
+    throw new Error("Expected missing production OAuth metadata to be a blocker with deploy guidance");
+  }
+  expectExcludes(missingProductionOAuthJson.stdout, "preflight-client");
+  expectExcludes(missingProductionOAuthJson.stdout, "release-status-token");
 
   const e2eReportPath = join(tempDir, "external-e2e.json");
   const staleE2eReportPath = join(tempDir, "external-e2e-stale.json");

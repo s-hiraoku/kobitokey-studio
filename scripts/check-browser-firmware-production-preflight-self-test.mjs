@@ -21,6 +21,7 @@ const goodServer = createServer((request, response) => {
     writeJson(response, 200, {
       schemaVersion: 1,
       appCommitSha,
+      githubOAuthClientConfigured: true,
     });
     return;
   }

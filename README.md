@@ -248,7 +248,9 @@ To prove the deployed OAuth proxy can start the GitHub device flow, pass the
 public OAuth app client id as well. This is the stricter preflight to use for
 the final browser Firmware Mode release gate; it checks both the Worker device
 flow, the deployed frontend bundle that powers the GitHub connect button, and
-the deployed app commit reported by `/api/release-metadata`:
+the deployed app commit reported by `/api/release-metadata`. Release metadata
+also reports whether a GitHub OAuth client id was configured in the production
+build, without printing the client id itself:
 
 ```sh
 VITE_GITHUB_OAUTH_CLIENT_ID=github-client-id BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=github-client-id npm run check:browser-firmware:production-release-preflight

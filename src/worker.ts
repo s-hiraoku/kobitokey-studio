@@ -26,11 +26,15 @@ type ArtifactZipRequest = {
 type JsonReadResult<T> = { ok: true; value: T } | { ok: false; response: Response };
 
 declare const __KOBITOKEY_APP_COMMIT_SHA__: string | undefined;
+declare const __KOBITOKEY_GITHUB_OAUTH_CLIENT_CONFIGURED__: boolean | undefined;
 
 const APP_COMMIT_SHA =
   typeof __KOBITOKEY_APP_COMMIT_SHA__ === "string" && __KOBITOKEY_APP_COMMIT_SHA__.trim()
     ? __KOBITOKEY_APP_COMMIT_SHA__.trim()
     : "development";
+const GITHUB_OAUTH_CLIENT_CONFIGURED =
+  typeof __KOBITOKEY_GITHUB_OAUTH_CLIENT_CONFIGURED__ === "boolean" &&
+  __KOBITOKEY_GITHUB_OAUTH_CLIENT_CONFIGURED__ === true;
 
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
@@ -61,6 +65,7 @@ function releaseMetadata(request: Request): Response {
   return json({
     schemaVersion: 1,
     appCommitSha: APP_COMMIT_SHA,
+    githubOAuthClientConfigured: GITHUB_OAUTH_CLIENT_CONFIGURED,
   });
 }
 

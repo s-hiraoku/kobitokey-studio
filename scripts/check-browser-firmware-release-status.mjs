@@ -150,6 +150,7 @@ record(
 
 await checkGitHubActionsStatus({ branch, headSha, e2eReportPath });
 checkProductionPreflight({ headSha, productionUrl });
+await checkProductionOAuthMetadata({ productionUrl, branch });
 checkExternalEvidence({ reportPath: e2eReportPath, headSha, productionUrl });
 
 const blockers = checks.filter((check) => check.status === "blocker");
@@ -405,6 +406,57 @@ function checkProductionPreflight({ headSha, productionUrl }) {
           { label: "Production URL", url: productionUrl },
           { label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL },
         ],
+  );
+}
+
+async function checkProductionOAuthMetadata({ productionUrl, branch }) {
+  let metadataUrl;
+  try {
+    metadataUrl = new URL("/api/release-metadata", productionUrl);
+  } catch {
+    return;
+  }
+
+  let response;
+  try {
+    response = await fetch(metadataUrl);
+  } catch (error) {
+    record(
+      "production OAuth metadata",
+      "warn",
+      `could not read release metadata: ${formatError(error)}`,
+      "Rerun release-status after production preflight can read /api/release-metadata.",
+      ["npm run check:browser-firmware:release-status -- --json"],
+      [{ label: "Production URL", url: productionUrl }],
+    );
+    return;
+  }
+
+  const body = await response.json().catch(() => null);
+  const configured = body?.githubOAuthClientConfigured;
+  if (configured === true) {
+    record("production OAuth metadata", "pass", "production release metadata reports GitHub OAuth client configured");
+    return;
+  }
+
+  record(
+    "production OAuth metadata",
+    "blocker",
+    configured === false
+      ? "production release metadata reports GitHub OAuth client is not configured"
+      : "production release metadata does not prove GitHub OAuth client configuration",
+    "Set VITE_GITHUB_OAUTH_CLIENT_ID for the production build, redeploy the production Worker from main, then rerun release-status. The public GitHub OAuth client id value is not printed by this check.",
+    [
+      "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+      "export BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
+      `gh workflow run pages.yml --ref ${shellQuote(branch)} -f deploy_browser_firmware_worker=true`,
+      "npm run check:browser-firmware:release-status -- --json",
+    ],
+    [
+      { label: "GitHub OAuth Apps", url: GITHUB_OAUTH_APPS_URL },
+      { label: "GitHub Actions Workflow", url: GITHUB_WORKFLOW_URL },
+      { label: "Production URL", url: productionUrl },
+    ],
   );
 }
 

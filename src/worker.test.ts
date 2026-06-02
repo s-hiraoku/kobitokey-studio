@@ -331,6 +331,7 @@ describe("worker GitHub API proxy", () => {
     await expect(response.json()).resolves.toMatchObject({
       schemaVersion: 1,
       appCommitSha: "development",
+      githubOAuthClientConfigured: false,
     });
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(response.headers.get("Content-Security-Policy")).toContain("connect-src 'self' https://api.github.com");
