@@ -113,6 +113,7 @@ VITE_GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth client id> BROWSER_FIRMWARE_PREFLIGHT_
 ### Environment variables
 
 ブラウザ版 Firmware Mode の `GitHub で接続` ボタンを使うには、GitHub OAuth App の client id を Cloudflare 側に設定します。
+GitHub OAuth App は GitHub の `Settings` → `Developer settings` → `OAuth apps` で作成します。詳細は GitHub Docs の [Creating an OAuth app](https://docs.github.com/en/developers/apps/creating-an-oauth-app) と [Device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を確認してください。`Homepage URL` は `https://kobitokey-studio.s-hiraoku.workers.dev/`、`Authorization callback URL` は同じ production origin 配下の URL にします。Device flow を使うため、OAuth App 設定で `Enable Device Flow` を有効にしてください。device flow では client secret は使わず、公開 client id だけを frontend bundle と production preflight へ渡します。
 
 | 変数 | 用途 |
 | --- | --- |

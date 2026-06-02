@@ -39,6 +39,8 @@ npm run write:browser-firmware:release-bundle -- --out-dir /tmp/browser-firmware
 
 ## 2. production deploy の secret を設定する
 
+GitHub OAuth App は GitHub の `Settings` → `Developer settings` → `OAuth apps` で作成します。詳細は GitHub Docs の [Creating an OAuth app](https://docs.github.com/en/developers/apps/creating-an-oauth-app) と [Device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を確認します。`Homepage URL` は `https://kobitokey-studio.s-hiraoku.workers.dev/`、`Authorization callback URL` は同じ production origin 配下の URL を入れ、`Enable Device Flow` を有効にします。ブラウザ Firmware Mode の device flow は client secret を使わず、公開 client id だけを `VITE_GITHUB_OAUTH_CLIENT_ID` に設定します。
+
 GitHub Actions から production Worker を更新する場合は、repository / environment に次の secret を設定します。
 
 | secret | 用途 |
