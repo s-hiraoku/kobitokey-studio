@@ -316,6 +316,9 @@ input[type="url"] {
 .app-toast.writing svg {
   animation: spin 900ms linear infinite;
 }
+.spin {
+  animation: spin 900ms linear infinite;
+}
 .app-toast.success {
   border-color: var(--pine-line);
   background: #edf6f3;
