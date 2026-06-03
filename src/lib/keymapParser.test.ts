@@ -5,6 +5,7 @@ import {
   deleteCombo,
   deleteLayer,
   findLayerReferenceSites,
+  findOverlayLayerReferenceSites,
   formatBindings,
   nextLayerId,
   parseKeymap,
@@ -162,6 +163,27 @@ describe("keymap updates", () => {
         kind: "combo-layers",
         comboId: "combo_tab",
         layers: [1],
+      },
+    ]);
+  });
+
+  it("finds overlay temp-layer references before deleting the target layer", () => {
+    const references = findOverlayLayerReferenceSites({
+      leftOverlay: `&tb_right_listener {
+        input-processors = <&zip_temp_layer 3 5000>;
+      };`,
+      rightOverlay: `&tb_right_split {
+        input-processors = <&zip_temp_layer 2 5000>;
+      };`,
+      targetLayerIndex: 3,
+    });
+
+    expect(references).toEqual([
+      {
+        kind: "overlay-temp-layer",
+        overlay: "left",
+        processor: "zip_temp_layer",
+        layer: 3,
       },
     ]);
   });

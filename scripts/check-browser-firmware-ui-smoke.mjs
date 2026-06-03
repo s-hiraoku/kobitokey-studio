@@ -925,8 +925,15 @@ async function inspectTrackballEditActions(page, label) {
   if (!initial.editorGroups.includes("Right")) {
     failures.push(`${label}: trackball editor should group fields under Right`);
   }
-  if (!initial.editorGroups.includes("Common")) {
-    failures.push(`${label}: trackball editor should group fields under Common`);
+  if (initial.editorGroups.includes("Common")) {
+    failures.push(`${label}: reduced fixture trackball editor should not show an empty Common group`);
+  }
+  if (
+    initial.inputNames.length !== 2 ||
+    !initial.inputNames.includes("trackball-leftCpi") ||
+    !initial.inputNames.includes("trackball-rightCpi")
+  ) {
+    failures.push(`${label}: reduced fixture trackball editor should expose only left/right CPI inputs`);
   }
 
   await page.locator('input[name="trackball-leftCpi"]').fill(String(nextLeftCpi));
@@ -1000,6 +1007,9 @@ async function readTrackballState(page) {
         node.textContent?.trim() ?? "",
       ),
       diffCount: readDiffCount(),
+      inputNames: Array.from(document.querySelectorAll(".trackball-editor input")).map(
+        (input) => input.getAttribute("name") ?? "",
+      ),
       leftCpi: Number(document.querySelector('input[name="trackball-leftCpi"]')?.value ?? Number.NaN),
     };
   });

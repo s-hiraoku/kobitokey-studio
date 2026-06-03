@@ -45,6 +45,12 @@ export type LayerReferenceSite =
       kind: "combo-layers";
       comboId: string;
       layers: number[];
+    }
+  | {
+      kind: "overlay-temp-layer";
+      overlay: "left" | "right";
+      processor: string;
+      layer: number;
     };
 
 export type KeymapLayerInput = {
@@ -232,6 +238,44 @@ export function findLayerReferenceSites(parsed: ParsedKeymap, targetLayerIndex: 
       references.push({ kind: "combo-layers", comboId: combo.id, layers: combo.layers });
     }
   });
+
+  return references;
+}
+
+export function findOverlayLayerReferenceSites({
+  leftOverlay,
+  rightOverlay,
+  targetLayerIndex,
+}: {
+  leftOverlay: string;
+  rightOverlay: string;
+  targetLayerIndex: number;
+}): LayerReferenceSite[] {
+  if (!Number.isInteger(targetLayerIndex) || targetLayerIndex < 0) {
+    return [];
+  }
+
+  return [
+    ...findOverlayTempLayerReferences(leftOverlay, "left", targetLayerIndex),
+    ...findOverlayTempLayerReferences(rightOverlay, "right", targetLayerIndex),
+  ];
+}
+
+function findOverlayTempLayerReferences(
+  source: string,
+  overlay: "left" | "right",
+  targetLayerIndex: number,
+): LayerReferenceSite[] {
+  const references: LayerReferenceSite[] = [];
+  const tempLayerPattern = /&(?<processor>[A-Za-z_][A-Za-z0-9_-]*temp_layer[A-Za-z0-9_-]*)\s+(?<layer>\d+)\b/g;
+
+  for (const match of source.matchAll(tempLayerPattern)) {
+    const layer = Number(match.groups?.layer);
+    const processor = match.groups?.processor;
+    if (processor && layer === targetLayerIndex) {
+      references.push({ kind: "overlay-temp-layer", overlay, processor, layer });
+    }
+  }
 
   return references;
 }

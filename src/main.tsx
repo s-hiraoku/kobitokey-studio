@@ -44,6 +44,7 @@ import {
   type FirmwareReleaseReadiness,
   type FlashSide,
 } from "./lib/firmwareReleaseFlow";
+import { loadFixtureProject } from "./lib/fixtureProject";
 import {
   readBrowserFirmwareSession,
   writeBrowserFirmwareSession,
@@ -84,6 +85,7 @@ import {
   deleteCombo,
   deleteLayer,
   findLayerReferenceSites,
+  findOverlayLayerReferenceSites,
   nextLayerId,
   parseKeymap,
   updateCombo,
@@ -341,6 +343,8 @@ function App() {
     return initial === "build" ? "combos" : initial;
   });
   const [status, setStatus] = React.useState("fixture を読み込み中");
+  const [fixtureLoading, setFixtureLoading] = React.useState(true);
+  const [fixtureError, setFixtureError] = React.useState("");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
   const [firmwareBuildCheck, setFirmwareBuildCheck] = React.useState<FirmwareBuildCheck | null>(null);
   const [uf2Files, setUf2Files] = React.useState<string[]>([]);
@@ -441,10 +445,20 @@ function App() {
     [activeLayerIndex, directKeyDraftList],
   );
   const showDirectEmptyState = isDirectMode && !directKeymap;
+  const showFirmwareLoadingState = !isDirectMode && fixtureLoading && !files && workbenchTab !== "build";
+  const showFirmwareEmptyState =
+    !isDirectMode && !fixtureLoading && Boolean(fixtureError) && !files && workbenchTab !== "build";
   const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
   const activeLayerReferences = React.useMemo(
-    () => findLayerReferenceSites(parsedKeymap, activeLayerIndex),
-    [activeLayerIndex, parsedKeymap],
+    () => [
+      ...findLayerReferenceSites(parsedKeymap, activeLayerIndex),
+      ...findOverlayLayerReferenceSites({
+        leftOverlay: files?.leftOverlay ?? "",
+        rightOverlay: files?.rightOverlay ?? "",
+        targetLayerIndex: activeLayerIndex,
+      }),
+    ],
+    [activeLayerIndex, files?.leftOverlay, files?.rightOverlay, parsedKeymap],
   );
   const activeLayerDeletionBlockReason = activeLayerIndex === layers.length - 1 && activeLayerReferences.length
     ? `参照中のため削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`
@@ -655,16 +669,27 @@ function App() {
   }
 
   async function loadFixture() {
-    const [keymap, leftOverlay, rightOverlay] = await Promise.all([
-      fetch("/fixtures/KobitoKey.keymap").then((response) => response.text()),
-      fetch("/fixtures/KobitoKey_left.overlay").then((response) => response.text()),
-      fetch("/fixtures/KobitoKey_right.overlay").then((response) => response.text()),
-    ]);
-    setFiles({ keymap, leftOverlay, rightOverlay });
-    setSavedKeymap(keymap);
-    setSavedLeftOverlay(leftOverlay);
-    setSavedRightOverlay(rightOverlay);
-    setStatus("fixture を表示中");
+    setFixtureLoading(true);
+    setFixtureError("");
+    setStatus("fixture を読み込み中");
+    try {
+      const project = await loadFixtureProject(fetch);
+      setFiles(project);
+      setSavedKeymap(project.keymap);
+      setSavedLeftOverlay(project.leftOverlay);
+      setSavedRightOverlay(project.rightOverlay);
+      setStatus("fixture を表示中");
+    } catch (error) {
+      const message = `fixture 読み込み失敗: ${formatError(error)}`;
+      setFiles(null);
+      setSavedKeymap("");
+      setSavedLeftOverlay("");
+      setSavedRightOverlay("");
+      setFixtureError(message);
+      setStatus(message);
+    } finally {
+      setFixtureLoading(false);
+    }
   }
 
   async function loadProject() {
@@ -680,6 +705,7 @@ function App() {
       setSavedKeymap(project.keymap);
       setSavedLeftOverlay(project.leftOverlay);
       setSavedRightOverlay(project.rightOverlay);
+      setFixtureError("");
       setStatus("ローカルプロジェクトを読み込みました");
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -732,6 +758,7 @@ function App() {
       setSavedKeymap(project.keymap);
       setSavedLeftOverlay(project.leftOverlay);
       setSavedRightOverlay(project.rightOverlay);
+      setFixtureError("");
       setStatus(`フォルダ "${handle.name}" を読み込みました`);
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -747,6 +774,7 @@ function App() {
       setSavedKeymap(project.files.keymap);
       setSavedLeftOverlay(project.files.leftOverlay);
       setSavedRightOverlay(project.files.rightOverlay);
+      setFixtureError("");
       setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -1663,7 +1691,7 @@ function App() {
     setStatus(`${combo.id} を削除しました`);
   }
 
-  function applyTrackballSettings(nextSettings: RequiredTrackballSettings) {
+  function applyTrackballSettings(nextSettings: EditableTrackballSettings) {
     if (!files) {
       return;
     }
@@ -1671,49 +1699,49 @@ function App() {
     let leftOverlay = files.leftOverlay;
     let rightOverlay = files.rightOverlay;
 
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "tb_left", "cpi", nextSettings.leftCpi);
-    rightOverlay = updateBlockNumberSetting(rightOverlay, "tb_right", "cpi", nextSettings.rightCpi);
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "pointer_accel", "min-factor", nextSettings.pointerMinFactor);
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "pointer_accel", "max-factor", nextSettings.pointerMaxFactor);
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "tb_left", "cpi", nextSettings.leftCpi);
+    rightOverlay = updateOptionalBlockNumberSetting(rightOverlay, "tb_right", "cpi", nextSettings.rightCpi);
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "pointer_accel", "min-factor", nextSettings.pointerMinFactor);
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "pointer_accel", "max-factor", nextSettings.pointerMaxFactor);
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel",
       "speed-threshold",
       nextSettings.pointerSpeedThreshold,
     );
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel",
       "acceleration-exponent",
       nextSettings.pointerAccelerationExponent,
     );
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel_right",
       "min-factor",
       nextSettings.rightPointerMinFactor,
     );
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel_right",
       "max-factor",
       nextSettings.rightPointerMaxFactor,
     );
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel_right",
       "speed-threshold",
       nextSettings.rightPointerSpeedThreshold,
     );
-    leftOverlay = updateBlockNumberSetting(
+    leftOverlay = updateOptionalBlockNumberSetting(
       leftOverlay,
       "pointer_accel_right",
       "acceleration-exponent",
       nextSettings.rightPointerAccelerationExponent,
     );
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "gesture_keybind", "threshold", nextSettings.gestureThreshold);
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "tab_keybind", "threshold", nextSettings.tabThreshold);
-    leftOverlay = updateBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "gesture_keybind", "threshold", nextSettings.gestureThreshold);
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "tab_keybind", "threshold", nextSettings.tabThreshold);
+    leftOverlay = updateOptionalBlockNumberSetting(leftOverlay, "desktop_keybind", "threshold", nextSettings.desktopThreshold);
 
     setFiles({ ...files, leftOverlay, rightOverlay });
     setStatus("トラックボール編集を保存しました");
@@ -1943,6 +1971,7 @@ function App() {
       setSavedKeymap(project.keymap);
       setSavedLeftOverlay(project.leftOverlay);
       setSavedRightOverlay(project.rightOverlay);
+      setFixtureError("");
       setBrowserFirmwareFilesLoadedFromGitHub(true);
       setBrowserFirmwareCommitSha(null);
       setBrowserFirmwareCommitUrl("");
@@ -2498,6 +2527,10 @@ function App() {
           onRefresh={refreshStudioPorts}
           onTransportChange={setStudioConnectionKind}
         />
+      ) : showFirmwareLoadingState ? (
+        <FirmwareProjectLoadingState status={status} />
+      ) : showFirmwareEmptyState ? (
+        <FirmwareProjectEmptyState status={status} onBuildFlash={openFirmwareBuildFlash} />
       ) : (
       <section className={`workspace ${isDirectMode ? "direct-workspace" : ""}`}>
         <nav className="sidebar" aria-label="Layers">
@@ -2863,7 +2896,7 @@ type ComboFormValue = {
   timeoutMs: number;
 };
 
-type RequiredTrackballSettings = Required<Pick<
+type TrackballSettingKey = keyof Pick<
   TrackballSettings,
   | "leftCpi"
   | "rightCpi"
@@ -2878,7 +2911,17 @@ type RequiredTrackballSettings = Required<Pick<
   | "gestureThreshold"
   | "tabThreshold"
   | "desktopThreshold"
->>;
+>;
+type EditableTrackballSettings = Pick<TrackballSettings, TrackballSettingKey>;
+
+function updateOptionalBlockNumberSetting(
+  source: string,
+  blockName: string,
+  propertyName: string,
+  value: number | undefined,
+): string {
+  return typeof value === "number" ? updateBlockNumberSetting(source, blockName, propertyName, value) : source;
+}
 
 function defaultDirectTrackballSettings(): DirectTrackballSettings {
   return {
@@ -3851,6 +3894,46 @@ function DirectConnectionErrorPanel({ issue }: { issue: DirectConnectionIssue })
   );
 }
 
+function FirmwareProjectLoadingState({ status }: { status: string }) {
+  return (
+    <section className="direct-welcome">
+      <div className="direct-welcome-card">
+        <div>
+          <p className="eyebrow">Firmware Mode</p>
+          <h2>Firmware ファイルを読み込み中</h2>
+          <p>{status}</p>
+        </div>
+        <div className="runtime-warning">
+          <Loader2 size={17} className="spin" />
+          <span>同梱 fixture を確認しています。</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FirmwareProjectEmptyState({ onBuildFlash, status }: { onBuildFlash: () => void; status: string }) {
+  return (
+    <section className="direct-welcome">
+      <div className="direct-welcome-card">
+        <div>
+          <p className="eyebrow">Firmware Mode</p>
+          <h2>Firmware ファイルを読み込めませんでした</h2>
+          <p>{status}</p>
+        </div>
+        <div className="runtime-warning">
+          <AlertTriangle size={17} />
+          <span>同梱 fixture が壊れているか、配信アセットから取得できません。</span>
+        </div>
+        <button type="button" className="primary wide-action" onClick={onBuildFlash}>
+          <UploadCloud size={17} />
+          Build & Flash
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function DirectWelcome({
   bluetoothDevices,
   canUseWebBluetooth,
@@ -4582,7 +4665,7 @@ function TrackballWorkbench({
   onApply,
   settings,
 }: {
-  onApply: (settings: RequiredTrackballSettings) => void;
+  onApply: (settings: EditableTrackballSettings) => void;
   settings: TrackballSettings;
 }) {
   return (
@@ -5829,6 +5912,9 @@ function formatLayerReferenceSummary(references: LayerReferenceSite[]): string {
     if (reference.kind === "combo-binding" || reference.kind === "combo-layers") {
       return `Combo ${reference.comboId}`;
     }
+    if (reference.kind === "overlay-temp-layer") {
+      return `${reference.overlay} overlay / ${reference.processor}`;
+    }
 
     return `Layer ${reference.layerIndex} / Key ${reference.keyIndex + 1}`;
   });
@@ -6105,18 +6191,18 @@ function TrackballEditor({
   onApply,
   settings,
 }: {
-  onApply: (settings: RequiredTrackballSettings) => void;
+  onApply: (settings: EditableTrackballSettings) => void;
   settings: TrackballSettings;
 }) {
-  const [form, setForm] = React.useState<RequiredTrackballSettings>(() => completeTrackballSettings(settings));
+  const [form, setForm] = React.useState<EditableTrackballSettings>(() => settings);
 
   React.useEffect(() => {
-    setForm(completeTrackballSettings(settings));
+    setForm(settings);
   }, [settings]);
 
   const groups: Array<{
     title: string;
-    fields: Array<[keyof RequiredTrackballSettings, string]>;
+    fields: Array<[TrackballSettingKey, string]>;
   }> = [
     {
       title: "Left",
@@ -6147,6 +6233,13 @@ function TrackballEditor({
       ],
     },
   ];
+  const editableGroups = groups
+    .map((group) => ({
+      ...group,
+      fields: group.fields.filter(([key]) => form[key] !== undefined),
+    }))
+    .filter((group) => group.fields.length > 0);
+  const hasEditableFields = editableGroups.length > 0;
 
   return (
     <section>
@@ -6154,7 +6247,7 @@ function TrackballEditor({
       <h2>トラックボール編集</h2>
       <div className="trackball-editor">
         <div className="trackball-editor-groups">
-          {groups.map((group) => (
+          {editableGroups.map((group) => (
             <fieldset className="trackball-setting-group trackball-editor-group" key={group.title}>
               <legend className="trackball-setting-group-heading">
                 <strong>{group.title}</strong>
@@ -6167,7 +6260,7 @@ function TrackballEditor({
                       name={`trackball-${key}`}
                       min={0}
                       type="number"
-                      value={form[key]}
+                      value={form[key] ?? ""}
                       onChange={(event) => setForm({ ...form, [key]: Number(event.target.value) })}
                     />
                   </label>
@@ -6176,30 +6269,13 @@ function TrackballEditor({
             </fieldset>
           ))}
         </div>
-        <button type="button" className="primary" onClick={() => onApply(form)}>
+        {!hasEditableFields ? <p className="empty-note">編集可能な trackball 項目が overlay にありません。</p> : null}
+        <button type="button" className="primary" onClick={() => onApply(form)} disabled={!hasEditableFields}>
           トラックボール編集を保存
         </button>
       </div>
     </section>
   );
-}
-
-function completeTrackballSettings(settings: TrackballSettings): RequiredTrackballSettings {
-  return {
-    leftCpi: settings.leftCpi ?? 200,
-    rightCpi: settings.rightCpi ?? 700,
-    pointerMinFactor: settings.pointerMinFactor ?? 800,
-    pointerMaxFactor: settings.pointerMaxFactor ?? 2500,
-    pointerSpeedThreshold: settings.pointerSpeedThreshold ?? 1400,
-    pointerAccelerationExponent: settings.pointerAccelerationExponent ?? 3,
-    rightPointerMinFactor: settings.rightPointerMinFactor ?? 620,
-    rightPointerMaxFactor: settings.rightPointerMaxFactor ?? 2200,
-    rightPointerSpeedThreshold: settings.rightPointerSpeedThreshold ?? 2500,
-    rightPointerAccelerationExponent: settings.rightPointerAccelerationExponent ?? 3,
-    gestureThreshold: settings.gestureThreshold ?? 4,
-    tabThreshold: settings.tabThreshold ?? 4,
-    desktopThreshold: settings.desktopThreshold ?? 8,
-  };
 }
 
 function downloadText(filename: string, contents: string) {
