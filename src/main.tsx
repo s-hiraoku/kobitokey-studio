@@ -85,6 +85,7 @@ import {
   deleteCombo,
   deleteLayer,
   findLayerReferenceSites,
+  findOverlayLayerReferenceSites,
   nextLayerId,
   parseKeymap,
   updateCombo,
@@ -445,8 +446,15 @@ function App() {
   const showFirmwareEmptyState = !isDirectMode && !files && workbenchTab !== "build";
   const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
   const activeLayerReferences = React.useMemo(
-    () => findLayerReferenceSites(parsedKeymap, activeLayerIndex),
-    [activeLayerIndex, parsedKeymap],
+    () => [
+      ...findLayerReferenceSites(parsedKeymap, activeLayerIndex),
+      ...findOverlayLayerReferenceSites({
+        leftOverlay: files?.leftOverlay ?? "",
+        rightOverlay: files?.rightOverlay ?? "",
+        targetLayerIndex: activeLayerIndex,
+      }),
+    ],
+    [activeLayerIndex, files?.leftOverlay, files?.rightOverlay, parsedKeymap],
   );
   const activeLayerDeletionBlockReason = activeLayerIndex === layers.length - 1 && activeLayerReferences.length
     ? `参照中のため削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`
@@ -5858,6 +5866,9 @@ function formatLayerReferenceSummary(references: LayerReferenceSite[]): string {
   const preview = references.slice(0, 3).map((reference) => {
     if (reference.kind === "combo-binding" || reference.kind === "combo-layers") {
       return `Combo ${reference.comboId}`;
+    }
+    if (reference.kind === "overlay-temp-layer") {
+      return `${reference.overlay} overlay / ${reference.processor}`;
     }
 
     return `Layer ${reference.layerIndex} / Key ${reference.keyIndex + 1}`;
