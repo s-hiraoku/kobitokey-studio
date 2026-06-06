@@ -263,6 +263,7 @@ async function inspectLayerStructureActions(page, label) {
   await page.locator(".physical-key").first().click();
   await setSelectedKeyRawBinding(page, `&mo ${initial.layerCount}`);
   await page.locator(".layer-list button").nth(initial.layerCount).click();
+  await waitForLayerDeleteDisabled(page, true);
   const referencedLastLayer = await readLayerState(page);
   if (referencedLastLayer.deleteDisabled !== true) {
     failures.push(`${label}: delete layer button should be disabled when the last layer is still referenced`);
@@ -274,6 +275,7 @@ async function inspectLayerStructureActions(page, label) {
   await page.locator(".physical-key").first().click();
   await setSelectedKeyRawBinding(page, "&kp Q");
   await page.locator(".layer-list button").nth(initial.layerCount).click();
+  await waitForLayerDeleteDisabled(page, false);
 
   await deleteLayerButton.click();
   const afterDeleteAdded = await readLayerState(page);
@@ -296,7 +298,13 @@ async function setSelectedKeyRawBinding(page, binding) {
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
   await page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" }).click();
-  await page.waitForFunction((expectedBinding) => document.querySelector(".physical-key.selected")?.getAttribute("title") === expectedBinding, binding);
+}
+
+async function waitForLayerDeleteDisabled(page, expectedDisabled) {
+  await page.waitForFunction(
+    (disabled) => document.querySelector('.layer-toolbar button[aria-label="選択中の layer を削除"]')?.disabled === disabled,
+    expectedDisabled,
+  );
 }
 
 async function draftSelectedKeyRawBinding(page, binding) {
