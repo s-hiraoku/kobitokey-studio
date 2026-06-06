@@ -399,6 +399,21 @@ left / reset / right の UF2 が生成されていることを確認してくだ
 
 ブラウザ版は token や artifact bytes を local storage に保存しません。保存するのは repository、branch、commit、run id などの再開用 metadata だけで、壊れた URL や一致しない commit/run link は復元時に破棄します。画面を閉じた後に再開する場合は、GitHub に再接続してから `Artifact 取得` を押すと、保存済み run id から再取得できます。Tauri 版で古い UF2 と混ざる場合は `.kobitokey-studio/artifacts/` の中身を一度整理してから再取得すると、選択ミスを減らせます。
 
+### 4.2.1 Firmware Mode の再開ルート
+
+ブラウザ版 Firmware Mode は、どこまで進んでいるかに合わせて途中から再開できます。
+
+| 今の状態 | 操作 | 補足 |
+| --- | --- | --- |
+| Studio でこれから編集する | `GitHub から読み込み` → 編集 → `Diff 確認済み` → `Commit & Build` → `Artifact 取得` | 変更を repository に commit し、対象 commit の build artifact を使います |
+| 編集と build は完了している | GitHub に接続し、repository / branch / run を確認して `Artifact 取得` | 画面に保存された run metadata があれば、再接続後に artifact を再取得できます |
+| artifact zip を GitHub Actions などから手元に保存済み | zip を展開し、`Artifact フォルダから再開` | GitHub token や commit/run の再接続なしで Flash パネルへ進めます |
+| UF2 ファイルだけ持っている | left / reset / right UF2 を1つのフォルダにまとめ、`Artifact フォルダから再開` | ファイル名から分類できる必要があります |
+
+`Artifact フォルダから再開` は Flash だけをやり直したいときに便利です。GitHub から artifact を再取得しなくても、展開済み artifact フォルダを選べば left / reset / right の UF2 を読み込んで書き込みボタンを有効化できます。
+
+フォルダ再開で選ぶ場所は、`.zip` ファイルではなく展開済みフォルダです。フォルダ内のサブフォルダも再帰的に読みます。現在のフォルダ再開は UF2 ファイル名で分類するため、`left`、`right`、`reset` または `settingsreset` が分かる名前にしてください。manifest にしか side 情報がない artifact は、GitHub run から `Artifact 取得` するルートを使うほうが確実です。
+
 ### 4.3 左右の UF2 を bootloader にコピーする
 
 KobitoKey の firmware は左右別々に書き込みます。

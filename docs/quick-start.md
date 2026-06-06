@@ -89,6 +89,8 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 
 ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
+Studio で編集する場合は `GitHub から読み込み`、編集、`Commit & Build`、`Artifact 取得` の順に進めます。すでに artifact まで作成済みなら、GitHub に再接続して `Artifact 取得` だけやり直せます。artifact zip や UF2 を手元に持っている場合は、zip を展開するか UF2 を1つのフォルダにまとめて、`Artifact フォルダから再開` または `フォルダを選択` から Flash だけ再開できます。
+
 1. KobitoKey Studio の `Build & Flash` ボタンを押します。
 2. GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。
 3. `Commit & Build` を押します。
@@ -99,6 +101,8 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 8. `Right` 側も `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。
 
 ブラウザ版は Finder での手動コピーを通常ルートにしません。Chrome のフォルダ選択で `INFO_UF2.TXT` がある bootloader volume を選び、artifact 内の reset UF2 を先に直接コピーしてから、同じ side の firmware UF2 を直接コピーします。
+
+`Artifact フォルダから再開` は zip ファイルそのものではなく、展開済みフォルダを選びます。フォルダ再開では UF2 ファイル名から left / reset / right を分類するため、名前で判別できる artifact を使ってください。
 
 ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。
 
