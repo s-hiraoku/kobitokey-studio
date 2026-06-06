@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: 'ja' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e89c1f'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='%231b1a17'%3E%E2%8C%A8%3C/text%3E%3C/svg%3E">
+  {% if page.redirect_to %}<link rel="canonical" href="{{ page.redirect_to | absolute_url }}">{% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へスキップ</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="{{ '/' | relative_url }}">
+        <span class="brand-mark" aria-hidden="true">⌨</span>
+        <span class="brand-name">KobitoKey Studio<small>ガイド</small></span>
+      </a>
+
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
+      <label for="nav-toggle" class="nav-burger" aria-label="メニューを開閉">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="site-nav" aria-label="メインナビゲーション">
+        {% assign current = page.url | remove_first: '/index.html' | default: '/' %}
+        {% for item in site.nav %}
+          {% assign is_current = false %}
+          {% if item.url == '/' and page.url == '/' %}{% assign is_current = true %}{% endif %}
+          {% if item.url != '/' and page.url contains item.url %}{% assign is_current = true %}{% endif %}
+          <a href="{{ item.url | relative_url }}"{% if is_current %} aria-current="page"{% endif %}>{{ item.title }}</a>
+        {% endfor %}
+        <a class="nav-cta" href="{{ site.app_url }}" target="_blank" rel="noopener">アプリを開く ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  {{ content }}
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <div>
+        <strong>KobitoKey Studio</strong>
+        <p>キーマップ・Combo・トラックボール・ファームウェアをまとめて設定する専用エディタ</p>
+      </div>
+      <nav aria-label="フッターナビゲーション">
+        <a href="{{ '/firmware-mode/' | relative_url }}">Firmware Mode</a>
+        <a href="{{ '/direct-mode/' | relative_url }}">Direct Mode</a>
+        <a href="{{ '/faq/' | relative_url }}">困ったとき</a>
+        <a href="{{ '/deployment/' | relative_url }}">公開・運用</a>
+        <a href="https://github.com/{{ site.github_username }}/kobitokey-studio" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
