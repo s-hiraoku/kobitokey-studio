@@ -7035,6 +7035,9 @@ async function writeBrowserUf2ToDirectoryHandle(handle: FileSystemDirectoryHandl
     await writable.write(arrayBufferFromBytes(file.bytes));
   } catch (error) {
     await closeWritableQuietly(writable);
+    if (isLikelyBootloaderEjectError(error)) {
+      return { ambiguousEject: true };
+    }
     throw error;
   }
 

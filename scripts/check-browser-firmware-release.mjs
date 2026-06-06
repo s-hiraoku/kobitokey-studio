@@ -1010,6 +1010,7 @@ const checks = [
         "writeBrowserUf2ToDirectoryHandle",
         "assertUf2BootloaderDirectory(handle)",
         "isLikelyBootloaderEjectError",
+        "return { ambiguousEject: true }",
         "FlashConfirmationDialog",
         "firmwareArtifactProvenanceLabel",
         "manifestArtifactName",
