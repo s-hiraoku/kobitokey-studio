@@ -1,0 +1,48 @@
+#include <zephyr/dt-bindings/pinctrl/nrf-pinctrl.h>
+#include "kobitokey.dtsi"
+#include <input/processors.dtsi>
+
+/* 列オフセット */
+&default_transform { col-offset = <5>; };
+
+&pinctrl {
+    spi0_default_r: spi0_default_r { group1 {
+        psels = <NRF_PSEL(SPIM_SCK,  0, 5)>,
+                <NRF_PSEL(SPIM_MOSI, 0, 4)>,
+                <NRF_PSEL(SPIM_MISO, 0, 4)>;
+    }; };
+    spi0_sleep_r: spi0_sleep_r { group1 {
+        psels = <NRF_PSEL(SPIM_SCK,  0, 5)>,
+                <NRF_PSEL(SPIM_MOSI, 0, 4)>,
+                <NRF_PSEL(SPIM_MISO, 0, 4)>;
+        low-power-enable;
+    }; };
+};
+
+&spi0 {
+    status = "okay";
+    compatible = "nordic,nrf-spim";
+    pinctrl-0 = <&spi0_default_r>;
+    pinctrl-1 = <&spi0_sleep_r>;
+    pinctrl-names = "default", "sleep";
+    cs-gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+
+    tb_right: trackball@0 {
+        status = "okay";
+        compatible = "pixart,pmw3610";
+        reg = <0>;
+        spi-max-frequency = <2000000>;
+        irq-gpios = <&gpio0 2 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+        cpi = <700>; /* macOS側の軌跡の速さが真ん中付近で丁度いい感度 */
+
+        evt-type = <INPUT_EV_REL>;
+        x-input-code = <INPUT_REL_X>;
+        y-input-code = <INPUT_REL_Y>;
+    };
+};
+
+&tb_right_split {
+    device = <&tb_right>;
+
+    input-processors = <&zip_xy_transform INPUT_TRANSFORM_Y_INVERT>;
+};

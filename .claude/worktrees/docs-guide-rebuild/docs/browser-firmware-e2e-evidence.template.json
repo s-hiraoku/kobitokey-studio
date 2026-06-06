@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "",
+  "tester": "",
+  "production": {
+    "url": "https://example.com/?mode=firmware",
+    "fetchUrl": "https://example.com/?mode=firmware",
+    "appCommitSha": "0000000000000000000000000000000000000000",
+    "workerDeviceCodeRouteChecked": false,
+    "workerAccessTokenRouteChecked": false,
+    "workerUnsupportedScopeRejected": false,
+    "workerOAuthDeviceFlowStarted": false,
+    "frontendOAuthClientIdPresent": false,
+    "workerArtifactRouteChecked": false,
+    "securityHeadersChecked": false,
+    "apiSecurityHeadersChecked": false
+  },
+  "ci": {
+    "runUrl": "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/1",
+    "runHeadSha": "0000000000000000000000000000000000000000",
+    "status": "",
+    "conclusion": "",
+    "appCommitSha": "0000000000000000000000000000000000000000",
+    "releaseGateJobName": "",
+    "releaseGateJobConclusion": "",
+    "browserFirmwareReleaseCheckPassed": false
+  },
+  "github": {
+    "repository": "owner/repo",
+    "branch": "browser-firmware-release-test",
+    "oauthDeviceFlowVerified": false,
+    "oauthScopeVerified": false,
+    "rateLimitBehaviorVerified": false
+  },
+  "commit": {
+    "sha": "0000000000000000000000000000000000000000",
+    "url": "https://github.com/owner/repo/commit/0000000000000000000000000000000000000000",
+    "managedFiles": [
+      "config/KobitoKey.keymap"
+    ]
+  },
+  "build": {
+    "runId": 1,
+    "runUrl": "https://github.com/owner/repo/actions/runs/1",
+    "headSha": "0000000000000000000000000000000000000000",
+    "headBranch": "",
+    "status": "",
+    "conclusion": "success",
+    "event": "",
+    "artifactDownloaded": false,
+    "artifactNames": [],
+    "githubArtifacts": [
+      {
+        "id": 0,
+        "name": "",
+        "sizeInBytes": 0,
+        "expired": true
+      }
+    ],
+    "githubArtifactUf2Files": [
+      {
+        "artifactId": 0,
+        "artifactName": "",
+        "name": "",
+        "sizeInBytes": 0,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "githubArtifactManifests": [
+      {
+        "artifactId": 0,
+        "artifactName": "",
+        "name": "",
+        "sizeInBytes": 0,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "targets": {
+          "left": "firmware/kobitokey_left.uf2",
+          "right": "firmware/kobitokey_right.uf2"
+        }
+      }
+    ],
+    "artifactsExpired": true
+  },
+  "artifacts": {
+    "classificationSource": "manifest",
+    "left": {
+      "uf2Name": "kobitokey_left.uf2",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "artifactId": 0,
+      "artifactName": ""
+    },
+    "right": {
+      "uf2Name": "kobitokey_right.uf2",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "artifactId": 0,
+      "artifactName": ""
+    }
+  },
+  "flash": {
+    "left": {
+      "completed": false,
+      "method": "direct-copy",
+      "bootloaderMarkerChecked": false,
+      "confirmationPromptAccepted": false,
+      "keyboardHalfChecked": false,
+      "uf2Name": "kobitokey_left.uf2",
+      "completedAt": ""
+    },
+    "right": {
+      "completed": false,
+      "method": "direct-copy",
+      "bootloaderMarkerChecked": false,
+      "confirmationPromptAccepted": false,
+      "keyboardHalfChecked": false,
+      "uf2Name": "kobitokey_right.uf2",
+      "completedAt": ""
+    }
+  },
+  "persistence": {
+    "reloadRestoredProgress": false,
+    "tokenStored": false,
+    "uf2BytesStored": false
+  },
+  "ui": {
+    "buildAndFlashSmokePassed": false,
+    "tokenNotStoredInLocalStorage": false,
+    "tokenClearWorks": false,
+    "buttonLayoutNoOverflow": false,
+    "rightPaneDeduplicated": false,
+    "layerStructureActionsPassed": false,
+    "referencedLayerDeleteBlocked": false,
+    "keyBindingEditActionsPassed": false,
+    "comboEditActionsPassed": false,
+    "trackballEditActionsPassed": false,
+    "releaseWizardPreconditionsPassed": false,
+    "artifactProvenanceVisible": false,
+    "artifactProvenanceMatchesBuildArtifacts": false,
+    "publicEntryLinksPassed": false,
+    "publicEntryUrls": [
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos",
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball",
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff",
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
+      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct"
+    ],
+    "smokeCommand": "npm run check:browser-firmware:ui",
+    "smokeViewportCount": 2
+  },
+  "notes": "Fill this with the production URL, GitHub run, artifact IDs, artifact sizes, UF2 hashes, and physical flash timestamps. Use ISO UTC timestamps; flash.right.completedAt must be the same as or later than flash.left.completedAt, and verifiedAt must be the same as or later than both flash timestamps. Do not include access tokens or UF2 bytes."
+}

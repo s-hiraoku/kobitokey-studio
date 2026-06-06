@@ -1,0 +1,77 @@
+---
+layout: default
+---
+<main id="main" class="guide-page">
+  <div class="wrap guide-grid">
+    <article class="guide-body">
+      <header class="guide-head">
+        {% if page.eyebrow %}<p class="eyebrow">{{ page.eyebrow }}</p>{% endif %}
+        <h1>{{ page.title }}</h1>
+        {% if page.lead %}<p class="lead">{{ page.lead }}</p>{% endif %}
+      </header>
+
+      {% if page.steps %}
+      <ol class="step-jumper" aria-label="このページの流れ">
+        {% for s in page.steps %}<li><a href="#{{ s.id }}">{{ s.label }}</a></li>{% endfor %}
+      </ol>
+      {% endif %}
+
+      {{ content }}
+
+      {% if page.next %}
+      <nav class="next-block" aria-label="次に読む">
+        <span>次に読む</span>
+        <a class="next-card" href="{{ page.next.url | relative_url }}">
+          <strong>{{ page.next.title }}</strong>
+          {% if page.next.desc %}<span>{{ page.next.desc }}</span>{% endif %}
+          <span class="arrow" aria-hidden="true">→</span>
+        </a>
+      </nav>
+      {% endif %}
+    </article>
+
+    <aside class="guide-toc" aria-label="目次">
+      <div class="toc-sticky">
+        <p class="toc-title">このページの目次</p>
+        <nav id="toc"></nav>
+        <a class="toc-app" href="{{ site.app_url }}" target="_blank" rel="noopener">アプリを開く ↗</a>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<script>
+  // 見出しから目次を自動生成し、スクロール位置に応じてハイライトする。
+  (function () {
+    const body = document.querySelector('.guide-body');
+    const toc = document.getElementById('toc');
+    if (!body || !toc) return;
+    const heads = body.querySelectorAll('h2, h3');
+    if (!heads.length) { toc.closest('.guide-toc')?.setAttribute('hidden', ''); return; }
+    const list = document.createElement('ul');
+    heads.forEach((h) => {
+      if (!h.id) h.id = h.textContent.trim().replace(/\s+/g, '-');
+      const li = document.createElement('li');
+      li.className = 'toc-' + h.tagName.toLowerCase();
+      const a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent;
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    toc.appendChild(list);
+
+    const links = new Map();
+    list.querySelectorAll('a').forEach((a) => links.set(a.getAttribute('href').slice(1), a));
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        const a = links.get(e.target.id);
+        if (a && e.isIntersecting) {
+          list.querySelectorAll('a[aria-current]').forEach((x) => x.removeAttribute('aria-current'));
+          a.setAttribute('aria-current', 'true');
+        }
+      });
+    }, { rootMargin: '0px 0px -75% 0px' });
+    heads.forEach((h) => io.observe(h));
+  })();
+</script>
