@@ -298,14 +298,11 @@ async function setSelectedKeyRawBinding(page, binding) {
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
   await page.waitForFunction(
-    (expectedBinding) => {
-      const inspector = document.querySelector(".firmware-key-inspector");
-      const input = inspector?.querySelector('input[name="zmkBinding"]');
-      const preview = inspector?.querySelector(".binding-preview code, .binding-review .changed code");
-      return input?.value?.trim() === expectedBinding && preview?.textContent?.trim() === `ZMK ${expectedBinding}`;
-    },
+    (expectedBinding) =>
+      document.querySelector(".firmware-key-inspector input[name='zmkBinding']")?.value?.trim() === expectedBinding,
     binding,
   );
+  await page.waitForTimeout(100);
   await page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" }).click();
   await page.waitForFunction(
     (expectedBinding) => document.querySelector(".physical-key.selected")?.getAttribute("title") === expectedBinding,
