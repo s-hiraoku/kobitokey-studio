@@ -296,12 +296,12 @@ async function setSelectedKeyRawBinding(page, binding) {
   await page.locator(".firmware-key-inspector .advanced-binding").evaluate((details) => {
     details.setAttribute("open", "");
   });
-  await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
-  await page.waitForFunction(
-    (expectedBinding) =>
-      document.querySelector(".firmware-key-inspector input[name='zmkBinding']")?.value?.trim() === expectedBinding,
-    binding,
-  );
+  const rawBindingInput = page.locator('.firmware-key-inspector input[name="zmkBinding"]');
+  await rawBindingInput.fill(binding);
+  const currentRawBinding = (await rawBindingInput.inputValue()).trim();
+  if (currentRawBinding !== binding) {
+    throw new Error(`raw binding input did not update to ${binding}, got ${currentRawBinding || "-"}`);
+  }
   await page.waitForTimeout(100);
   await page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" }).click();
   await page.waitForFunction(
