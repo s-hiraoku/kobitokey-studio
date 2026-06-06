@@ -473,6 +473,12 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
 
   await installGitHubArtifactRouteMocks(page, { artifactId, artifactName, artifactZip, commitSha, runId });
 
+  if ((await page.locator(".browser-release-workbench").count()) > 0) {
+    await page.locator(".firmware-workbench-actions").getByRole("button", { name: "編集に戻る", exact: true }).click();
+  }
+  failures.push(...(await resetFirmwareEditsIfEnabled(page, label, "artifact provenance setup")));
+  if (failures.length > 0) return failures;
+
   if ((await page.locator(".browser-release-workbench").count()) === 0) {
     await page.getByRole("button", { name: "Build & Flash" }).click();
     await page.getByText("GitHub Commit & Build").waitFor();
