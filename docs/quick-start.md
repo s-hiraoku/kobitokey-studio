@@ -18,7 +18,7 @@ permalink: /quick-start/
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | ✅ GitHub 連携対応 |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 一部ユーザー向け |
 
-ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 の分類まで進めます。
+ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、left / reset / right UF2 の分類まで進めます。
 Tauri デスクトップ版は一部ユーザー向けのローカル作業用です。公開版の手順はブラウザ版を基準にしてください。
 
 スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
@@ -69,7 +69,7 @@ npm run tauri dev
 7. `選択キーに反映` を押します。
 8. `Diff` で変更内容を確認します。
 9. `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。
-10. build 成功後に artifact を取得し、left / right UF2 を順番に書き込みます。
+10. build 成功後に artifact を取得し、左右それぞれで reset UF2、firmware UF2 の順に書き込みます。
 
 Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
 
@@ -93,7 +93,7 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 2. GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。
 3. `Commit & Build` を押します。
 4. build 成功後、`Artifact 取得` を押します。
-5. Studio が manifest または UF2 ファイル名から left / right を分類したことを確認します。
+5. Studio が manifest または UF2 ファイル名から left / reset / right を分類したことを確認します。
 6. 左側を bootloader mode に入れて `Left reset を直接コピー` を押し、`INFO_UF2.TXT` がある bootloader volume を選びます。
 7. reset 後に左側をもう一度 bootloader mode に入れ、同じボタンで `Left firmware を直接コピー` を実行します。
 8. `Right` 側も `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。

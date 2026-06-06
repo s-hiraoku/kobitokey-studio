@@ -108,6 +108,17 @@ Trackball は左右 overlay に保存されます。一度に大きく変える�
 
 ## Build & Flash
 
+Firmware Mode の `Build & Flash` は、編集から書き込みまでを1本で進めるだけでなく、途中から再開する用途にも使えます。
+
+| 状況 | 使う操作 | できること |
+| --- | --- | --- |
+| KobitoKey Studio で編集して、build から書き込みまで進める | `GitHub から読み込み` → 編集 → `Diff 確認済み` → `Commit & Build` → `Artifact 取得` | repository に変更を残し、対象 commit の artifact を取得して書き込む |
+| すでに GitHub Actions artifact まで作成済み | GitHub に接続し、repository / branch / run を確認して `Artifact 取得` | 画面上の commit / run に紐づく artifact を再取得して書き込む |
+| GitHub 以外で取得した artifact を使う | `Artifact フォルダから再開` または `フォルダを選択` | 展開済み artifact フォルダ内の UF2 を読み込み、Flash だけ進める |
+| UF2 ファイルだけ手元にある | UF2 を1つのフォルダにまとめて `Artifact フォルダから再開` | フォルダ内の left / reset / right UF2 を分類して書き込む |
+
+どの入口でも、ブラウザ版の書き込みは `reset UF2 → firmware UF2` の順です。Direct Mode / ZMK Studio の保存設定が残っている場合でも、reset UF2 を先に入れることで firmware keymap が反映されやすくなります。
+
 ### Commit と build
 
 1. `Diff 確認済み` を押します。
@@ -116,6 +127,8 @@ Trackball は左右 overlay に保存されます。一度に大きく変える�
 4. build が成功したら `Artifact 取得` を押します。
 
 `Commit & Build` は Studio が扱う keymap / overlay の3ファイルだけを1 commit にまとめ、同じ branch の `build.yml` を起動します。commit はできたが workflow 起動だけ失敗した場合は、同じ画面の `Build 起動` で再試行できます。
+
+編集をすべて Studio から行う場合は、このルートを使います。`Artifact 取得` は表示中 commit と一致する成功 run を確認してから artifact を読むため、古い build の UF2 を間違って使いにくくなっています。
 
 ### Artifact を確認する
 
@@ -129,7 +142,25 @@ Trackball は左右 overlay に保存されます。一度に大きく変える�
 
 artifact に `manifest.json` または `firmware-manifest.json` がある場合、Studio は manifest の `left` / `right` / `reset` または `outputs[].side` / `outputs[].file` を優先します。manifest がない場合は UF2 ファイル名から推定します。left / reset / right が揃わない場合、書き込みボタンは有効になりません。
 
-GitHub 以外で取得した artifact や、以前ダウンロードした artifact フォルダから再開する場合は `Artifact フォルダから再開` または `フォルダを選択` を使います。
+### Artifact から再開する
+
+GitHub 以外で取得した artifact や、以前ダウンロードした artifact から書き込む場合は `Artifact フォルダから再開` または Flash パネル内の `フォルダを選択` を使います。
+
+1. GitHub Actions などから artifact zip を取得している場合は、先に展開します。
+2. 展開したフォルダ、または left / reset / right UF2 をまとめたフォルダを選びます。
+3. Studio がフォルダ内を読み込み、left / reset / right を分類します。
+4. Flash パネルの表示が `left OK / reset OK / right OK` になったことを確認します。
+5. [UF2 を書き込む](#uf2-を書き込む) の手順で左右にコピーします。
+
+artifact フォルダから再開する場合、GitHub token、repository、branch、commit、run の再接続は不要です。Flash だけをやり直したいとき、別のPCで取得した artifact を書き込みたいとき、GitHub Actions 画面から手動ダウンロードした artifact を使うときに便利です。
+
+注意点:
+
+- ブラウザ版は zip ファイルを直接選ぶのではなく、展開済みフォルダを選びます。
+- フォルダ内のサブフォルダも読めます。
+- フォルダ再開では UF2 ファイル名から分類します。`left`、`right`、`reset` または `settingsreset` が分かる名前にしてください。
+- left / reset / right のどれかが欠けると、書き込みボタンは有効になりません。
+- manifest にしか side 情報がない artifact は、GitHub run から `Artifact 取得` するルートを使うほうが確実です。
 
 ### UF2 を書き込む
 

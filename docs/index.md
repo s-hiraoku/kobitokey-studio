@@ -18,7 +18,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 | 目的 | 選ぶモード | 反映方法 |
 | --- | --- | --- |
-| すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右 UF2 を書き込み |
+| すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右それぞれ reset UF2、firmware UF2 の順に書き込み |
 | キーを少しだけ素早く変えたい | Direct Mode | USB 推奨。Bluetooth は見つかる場合のみ → 実機へ書き込み |
 | Combo を変更したい | Firmware Mode | `KobitoKey.keymap` を編集 → build + flash |
 | トラックボールを変更したい | Firmware Mode | 左右 overlay を編集 → build + flash。Direct Mode では参照のみ |
