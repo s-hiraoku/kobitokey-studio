@@ -2389,7 +2389,8 @@ function App() {
 
       setBuildStatus(`${phaseLabel} UF2 を ${handle.name} にコピーしています`);
       const writeResult = await writeBrowserUf2ToDirectoryHandle(handle, target);
-      const writeSuffix = writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : "";
+      const retrySuffix = writeResult.attempts > 1 ? `（${writeResult.attempts} 回目で成功）` : "";
+      const writeSuffix = `${retrySuffix}${writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : ""}`;
       if (!isFirmwarePhase) {
         setBrowserFirmwareSideResetDone(side, true);
         setBuildStatus(
@@ -7024,32 +7025,52 @@ async function writeProjectToDirectoryHandle(
 
 type BrowserUf2WriteResult = {
   ambiguousEject: boolean;
+  attempts: number;
 };
+
+const BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3;
 
 async function writeBrowserUf2ToDirectoryHandle(handle: FileSystemDirectoryHandle, file: GitHubArtifactUf2): Promise<BrowserUf2WriteResult> {
   await ensureWritablePermission(handle);
   const filename = file.name.split("/").pop() ?? file.name;
-  const fileHandle = await handle.getFileHandle(filename, { create: true });
-  const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
-  try {
-    await writable.write(arrayBufferFromBytes(file.bytes));
-  } catch (error) {
-    await closeWritableQuietly(writable);
-    if (isLikelyBootloaderEjectError(error)) {
-      return { ambiguousEject: true };
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS; attempt += 1) {
+    let writable: FileSystemWritableFileStream | null = null;
+    try {
+      const fileHandle = await handle.getFileHandle(filename, { create: true });
+      writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
+      await writable.write(arrayBufferFromBytes(file.bytes));
+      try {
+        await writable.close();
+        return { ambiguousEject: false, attempts: attempt };
+      } catch (error) {
+        if (isLikelyBootloaderEjectError(error)) {
+          return { ambiguousEject: true, attempts: attempt };
+        }
+        throw error;
+      }
+    } catch (error) {
+      if (writable) {
+        await closeWritableQuietly(writable);
+      }
+      if (!isLikelyBootloaderEjectError(error) || attempt === BROWSER_UF2_WRITE_MAX_ATTEMPTS) {
+        throw uf2WriteRetryError(error, attempt);
+      }
+      lastError = error;
+      await delay(350);
     }
-    throw error;
   }
 
-  try {
-    await writable.close();
-    return { ambiguousEject: false };
-  } catch (error) {
-    if (isLikelyBootloaderEjectError(error)) {
-      return { ambiguousEject: true };
-    }
-    throw error;
-  }
+  throw uf2WriteRetryError(lastError, BROWSER_UF2_WRITE_MAX_ATTEMPTS);
+}
+
+function uf2WriteRetryError(error: unknown, attempts: number): Error {
+  return new Error(`UF2 copy failed after ${attempts} attempts: ${formatError(error)}`);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function closeWritableQuietly(writable: FileSystemWritableFileStream) {

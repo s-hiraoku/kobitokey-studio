@@ -1008,9 +1008,11 @@ const checks = [
     pass: () =>
       allIncludes(files.main, [
         "writeBrowserUf2ToDirectoryHandle",
+        "BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3",
+        "attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS",
+        "UF2 copy failed after",
         "assertUf2BootloaderDirectory(handle)",
         "isLikelyBootloaderEjectError",
-        "return { ambiguousEject: true }",
         "FlashConfirmationDialog",
         "firmwareArtifactProvenanceLabel",
         "manifestArtifactName",
