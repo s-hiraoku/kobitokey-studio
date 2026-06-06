@@ -278,11 +278,13 @@ describe("browser firmware GitHub release flow", () => {
         JSON.stringify({
           outputs: [
             { side: "left", file: "KobitoKey_left.uf2" },
+            { side: "reset", file: "settings_reset.uf2" },
             { side: "right", file: "KobitoKey_right.uf2" },
           ],
         }),
       ),
       "firmware/KobitoKey_left.uf2": new Uint8Array([1]),
+      "firmware/settings_reset.uf2": new Uint8Array([3]),
       "firmware/KobitoKey_right.uf2": new Uint8Array([2]),
     });
     const requests: Array<{ body?: unknown; method: string; url: string }> = [];
@@ -405,6 +407,7 @@ describe("browser firmware GitHub release flow", () => {
       manifestPath: "firmware/manifest.json",
       targets: {
         left: "firmware/KobitoKey_left.uf2",
+        reset: "firmware/settings_reset.uf2",
         right: "firmware/KobitoKey_right.uf2",
         unknown: [],
       },
@@ -412,6 +415,7 @@ describe("browser firmware GitHub release flow", () => {
     expect(artifacts.files).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ artifactId: 42, artifactName: "firmware", name: "firmware/KobitoKey_left.uf2" }),
+        expect.objectContaining({ artifactId: 42, artifactName: "firmware", name: "firmware/settings_reset.uf2" }),
         expect.objectContaining({ artifactId: 42, artifactName: "firmware", name: "firmware/KobitoKey_right.uf2" }),
       ]),
     );
@@ -482,6 +486,7 @@ describe("GitHub artifact helpers", () => {
       manifestPath: "firmware/manifest.json",
       targets: {
         left: "firmware/KobitoKey_B.uf2",
+        reset: null,
         right: "firmware/KobitoKey_A.uf2",
         unknown: [],
       },
@@ -503,6 +508,7 @@ describe("GitHub artifact helpers", () => {
       manifestPath: "firmware/manifest.json",
       targets: {
         left: null,
+        reset: null,
         right: null,
         unknown: ["firmware/KobitoKey.uf2"],
       },
@@ -523,6 +529,7 @@ describe("GitHub artifact helpers", () => {
       manifestPath: "firmware/manifest.json",
       targets: {
         left: "firmware/KobitoKey_right.uf2",
+        reset: null,
         right: null,
         unknown: [],
       },
@@ -532,6 +539,7 @@ describe("GitHub artifact helpers", () => {
   it("downloads active artifacts and classifies left/right UF2 files", async () => {
     const zip = zipSync({
       "KobitoKey_left.uf2": new Uint8Array([1]),
+      "settings_reset.uf2": new Uint8Array([3]),
       "KobitoKey_right.uf2": new Uint8Array([2]),
       "firmware-manifest.json": new TextEncoder().encode(
         JSON.stringify({
@@ -566,15 +574,17 @@ describe("GitHub artifact helpers", () => {
 
     expect(result.targets).toEqual({
       left: "KobitoKey_right.uf2",
+      reset: "settings_reset.uf2",
       right: "KobitoKey_left.uf2",
       unknown: [],
     });
     expect(result.manifestPath).toBe("firmware-manifest.json");
     expect(result.manifestArtifactId).toBe(10);
     expect(result.manifestArtifactName).toBe("firmware");
-    expect(result.files.map((file) => file.name)).toEqual(["KobitoKey_left.uf2", "KobitoKey_right.uf2"]);
+    expect(result.files.map((file) => file.name)).toEqual(["KobitoKey_left.uf2", "settings_reset.uf2", "KobitoKey_right.uf2"]);
     expect(result.files.map((file) => `${file.artifactName}:${file.artifactId}:${file.name}`)).toEqual([
       "firmware:10:KobitoKey_left.uf2",
+      "firmware:10:settings_reset.uf2",
       "firmware:10:KobitoKey_right.uf2",
     ]);
   });
@@ -616,6 +626,7 @@ describe("GitHub artifact helpers", () => {
     expect(result.manifestArtifactName).toBeUndefined();
     expect(result.targets).toEqual({
       left: null,
+      reset: null,
       right: null,
       unknown: ["KobitoKey_A.uf2", "KobitoKey_B.uf2"],
     });
@@ -624,6 +635,7 @@ describe("GitHub artifact helpers", () => {
   it("verifies the run commit, branch, and success state before downloading artifacts", async () => {
     const zip = zipSync({
       "KobitoKey_left.uf2": new Uint8Array([1]),
+      "settings_reset.uf2": new Uint8Array([3]),
       "KobitoKey_right.uf2": new Uint8Array([2]),
     });
     const fetches: string[] = [];
@@ -658,6 +670,7 @@ describe("GitHub artifact helpers", () => {
     ).resolves.toMatchObject({
       targets: {
         left: "KobitoKey_left.uf2",
+        reset: "settings_reset.uf2",
         right: "KobitoKey_right.uf2",
       },
     });

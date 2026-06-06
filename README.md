@@ -48,7 +48,7 @@ For end-user steps, start with the published docs:
 - Preview file-level diffs before saving
 - Trigger GitHub Actions builds through the browser GitHub API or the Tauri backend
 - Download build artifacts and guide UF2 copying to bootloader volumes
-- Browser Firmware Mode can read firmware files from GitHub, create one commit for the managed files, dispatch `build.yml`, find the matching run, download artifacts, classify left/right UF2 files, and write UF2 files to verified UF2 bootloader folders through the File System Access API when available. It also exposes side-fixed UF2 download buttons for manual bootloader copy fallback
+- Browser Firmware Mode can read firmware files from GitHub, create one commit for the managed files, dispatch `build.yml`, find the matching run, download artifacts, classify left/reset/right UF2 files, and write reset then firmware UF2 files to verified UF2 bootloader folders through the File System Access API when available
 
 Direct Mode supports key action writes in both browser and desktop builds.
 Combo and Trackball are reference-only in Direct Mode because the current

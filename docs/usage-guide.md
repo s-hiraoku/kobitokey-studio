@@ -404,14 +404,16 @@ Firmware repository URL を設定している場合、KobitoKey Studio は対象
 KobitoKey の firmware は左右別々に書き込みます。
 
 1. 左側を USB で接続し、bootloader mode に入れます。
-2. ブラウザ版では `Left を書き込み` を押し、確認ダイアログで接続中の half が Left 側であることにチェックしてから、表示されたフォルダ選択で bootloader volume を選びます。Tauri 版では `Left` を選び、`UF2 / Volume 更新`、`Left UF2 を bootloader にコピー` の順に押します。
-3. 右側へ USB を差し替えます。
-4. 右側を bootloader mode に入れます。
-5. ブラウザ版では `Right を書き込み` を押し、確認ダイアログで接続中の half が Right 側であることにチェックしてから、bootloader volume を選びます。Tauri 版では `Right UF2 を bootloader にコピー` を押します。
+2. ブラウザ版では `Left reset を直接コピー` を押し、`INFO_UF2.TXT` がある Left 側の bootloader volume を選びます。Tauri 版では `Left` を選び、`UF2 / Volume 更新`、`Left UF2 を bootloader にコピー` の順に押します。
+3. 左側をもう一度 bootloader mode に入れ、`Left firmware を直接コピー` で Left 側の firmware UF2 を書き込みます。
+4. 右側へ USB を差し替えて bootloader mode に入れます。
+5. `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。Tauri 版では `Right UF2 を bootloader にコピー` を押します。
 
-ブラウザで folder picker が使える場合、Studio はコピー直前に side と UF2 ファイル名を確認し、接続中の keyboard half が正しい side であることをチェックしない限り続行できません。folder picker が使えない場合や直接コピーがうまくいかない場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。Studio は同じ確認を通してから該当 side の UF2 を download します。download した UF2 を bootloader volume に手動コピーした後、同じ side の書き込みボタンをもう一度押すと確認を表示し、その side を完了として記録して次の side へ進みます。
+ブラウザ版は Finder での手動コピーを通常ルートにしません。Chrome のフォルダ選択で `INFO_UF2.TXT` がある bootloader volume を選び、artifact 内の reset UF2 を先に直接コピーしてから、同じ side の firmware UF2 を直接コピーします。reset UF2 を書くと bootloader volume が消える場合があるため、同じ側をもう一度 bootloader mode に入れてから firmware UF2 を書き込んでください。
 
 左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合や、left / right が別パスでも同じ UF2 ファイル名になる場合は、書き込みボタンが有効になりません。書き込み前には表示中の UF2 名に加えて `artifact <name> #<id>` が想定した GitHub Actions artifact と一致していることも確認してください。
+
+Direct Mode / ZMK Studio で保存した runtime keymap は ZMK の永続設定に残り、通常 firmware を flash しても `.keymap` の変更より優先されることがあります。そのためブラウザ版の Firmware mode では、artifact に含まれる settings reset UF2 を先に書き込んでから通常の Left / Right UF2 を書き込みます。
 
 ### 4.4 書き込み前の安全確認
 

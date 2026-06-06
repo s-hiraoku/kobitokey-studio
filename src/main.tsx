@@ -203,7 +203,7 @@ type BrowserFirmwareOperation =
   | "import-artifact"
   | "flash";
 type BrowserFirmwareArtifactSource = "github" | "folder" | null;
-type FlashConfirmationKind = "write" | "download" | "manual-complete";
+type FlashConfirmationKind = "write";
 type FlashConfirmationRequest = {
   id: number;
   side: FlashSide;
@@ -2295,7 +2295,9 @@ function App() {
       setBrowserFirmwareArtifactSource("github");
       setBrowserFirmwareBuildStatus("success");
       setBuildStatus(
-        `artifact を取得しました: left ${artifacts.targets.left ? "OK" : "未検出"} / right ${
+        `artifact を取得しました: left ${artifacts.targets.left ? "OK" : "未検出"} / reset ${
+          artifacts.targets.reset ? "OK" : "未検出"
+        } / right ${
           artifacts.targets.right ? "OK" : "未検出"
         }${artifacts.manifestPath ? " / manifest OK" : ""}`,
       );
@@ -2327,7 +2329,9 @@ function App() {
       setBrowserFirmwareRightFlashed(false);
       setFlashSide("left");
       setBuildStatus(
-        `artifact フォルダから UF2 を読み込みました: left ${artifacts.targets.left ? "OK" : "未検出"} / right ${
+        `artifact フォルダから UF2 を読み込みました: left ${artifacts.targets.left ? "OK" : "未検出"} / reset ${
+          artifacts.targets.reset ? "OK" : "未検出"
+        } / right ${
           artifacts.targets.right ? "OK" : "未検出"
         }`,
       );
@@ -2347,95 +2351,55 @@ function App() {
       setBuildStatus(browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側を書き込む条件が揃っていません`);
       return;
     }
-    if (!beginBrowserFirmwareOperation("flash")) return;
-
-    try {
-      if (browserFirmwareDownloadedSide === side) {
-        const targetName = browserFirmwareArtifacts?.targets[side] ?? `${sideLabel(side)} UF2`;
-        if (!(await confirmBrowserFirmwareManualFlashComplete(side, targetName))) {
-          setBuildStatus(`${sideLabel(side)} UF2 の完了記録をキャンセルしました`);
-          return;
-        }
-        markBrowserFirmwareSideFlashed(side);
-        setBrowserFirmwareDownloadedSide(null);
-        setBuildStatus(browserFirmwareFlashCompleteMessage(side, "手動コピー完了として記録しました"));
-        return;
-      }
-
-      const target = browserFirmwareUf2Target(side);
-      if (!target) {
-        setBuildStatus(`${sideLabel(side)} UF2 が見つかりません`);
-        return;
-      }
-
-      if (typeof window.showDirectoryPicker === "function") {
-        if (!(await confirmBrowserFirmwareFlashWrite(side, target.name))) {
-          setBuildStatus(`${sideLabel(side)} UF2 書き込みをキャンセルしました`);
-          return;
-        }
-        setBuildStatus(`${sideLabel(side)} UF2 のコピー先フォルダを確認しています`);
-        const handle = await window.showDirectoryPicker({ mode: "readwrite" });
-        setBuildStatus(`${sideLabel(side)} UF2 を ${handle.name} にコピーしています`);
-        const writeResult = await writeUf2ToDirectoryHandle(handle, target);
-        markBrowserFirmwareSideFlashed(side);
-        setBuildStatus(
-          browserFirmwareFlashCompleteMessage(
-            side,
-            writeResult.closeWarning
-              ? `${handle.name} にコピーしました。bootloader が再起動してドライブが消えた可能性があります`
-              : `${handle.name} にコピーしました`,
-          ),
-        );
-        return;
-      }
-
-      if (!(await confirmBrowserFirmwareFlashDownload(side, target.name))) {
-        setBuildStatus(`${sideLabel(side)} UF2 ダウンロードをキャンセルしました`);
-        return;
-      }
-      downloadBytes(target.name.split("/").pop() ?? target.name, target.bytes);
-      setBrowserFirmwareDownloadedSide(side);
-      setBuildStatus(
-        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じ side の書き込みボタンで完了として記録してください`,
-      );
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setBuildStatus(`${sideLabel(side)} UF2 書き込み失敗: ${formatError(error)}`);
-    } finally {
-      endBrowserFirmwareOperation("flash");
-    }
-  }
-
-  async function downloadBrowserFirmwareUf2(side: FlashSide) {
-    if (!canFlashFirmwareSide(browserFirmwareReadiness, side)) {
-      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側の UF2 を取得する条件が揃っていません`);
+    if (typeof window.showDirectoryPicker !== "function") {
+      setBuildStatus("このブラウザではフォルダ選択による直接コピーが使えません。デスクトップ版を使ってください");
       return;
     }
     if (!beginBrowserFirmwareOperation("flash")) return;
 
     try {
-      const target = browserFirmwareUf2Target(side);
+      const isFirmwarePhase = browserFirmwareDownloadedSide === side;
+      const target = isFirmwarePhase ? browserFirmwareUf2Target(side) : browserFirmwareUf2Target("reset");
       if (!target) {
-        setBuildStatus(`${sideLabel(side)} UF2 が見つかりません`);
+        setBuildStatus(isFirmwarePhase ? `${sideLabel(side)} UF2 が見つかりません` : "reset UF2 が artifact に見つかりません");
         return;
       }
-      if (!(await confirmBrowserFirmwareFlashDownload(side, target.name))) {
-        setBuildStatus(`${sideLabel(side)} UF2 ダウンロードをキャンセルしました`);
+
+      const phaseLabel = isFirmwarePhase ? `${sideLabel(side)} firmware` : "reset";
+      setBuildStatus(`${sideLabel(side)} 側の bootloader ドライブを選択してください: ${phaseLabel} UF2`);
+      const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+      await assertUf2BootloaderDirectory(handle);
+      if (!(await requestFlashConfirmation({ kind: "write", side, uf2Name: target.name, volumeName: handle.name }))) {
+        setBuildStatus(`${phaseLabel} UF2 の直接コピーをキャンセルしました`);
         return;
       }
-      downloadBytes(target.name.split("/").pop() ?? target.name, target.bytes);
-      setBrowserFirmwareDownloadedSide(side);
-      setBuildStatus(
-        `${sideLabel(side)} UF2 をダウンロードしました。bootloader volume に手動コピーしてから、同じ side の書き込みボタンで完了として記録してください`,
-      );
+
+      setBuildStatus(`${phaseLabel} UF2 を ${handle.name} にコピーしています`);
+      const writeResult = await writeBrowserUf2ToDirectoryHandle(handle, target);
+      const writeSuffix = writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : "";
+      if (!isFirmwarePhase) {
+        setBrowserFirmwareDownloadedSide(side);
+        setBuildStatus(
+          `reset UF2 を ${handle.name} に直接コピーしました${writeSuffix}。もう一度 ${sideLabel(side)} 側を bootloader に入れて、同じボタンで firmware UF2 をコピーしてください`,
+        );
+        return;
+      }
+
+      markBrowserFirmwareSideFlashed(side);
+      setBrowserFirmwareDownloadedSide(null);
+      setBuildStatus(browserFirmwareFlashCompleteMessage(side, `${handle.name} に直接コピーしました${writeSuffix}`));
     } catch (error) {
-      setBuildStatus(`${sideLabel(side)} UF2 ダウンロード失敗: ${formatError(error)}`);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setBuildStatus(`${sideLabel(side)} UF2 の直接コピーをキャンセルしました`);
+        return;
+      }
+      setBuildStatus(`${sideLabel(side)} UF2 の直接コピー失敗: ${formatError(error)}`);
     } finally {
       endBrowserFirmwareOperation("flash");
     }
   }
 
-  function browserFirmwareUf2Target(side: FlashSide) {
+  function browserFirmwareUf2Target(side: FlashSide | "reset") {
     const targetName = browserFirmwareArtifacts?.targets[side];
     return targetName ? browserFirmwareArtifacts?.files.find((file) => file.name === targetName) ?? null : null;
   }
@@ -2443,15 +2407,20 @@ function App() {
   function markBrowserFirmwareSideFlashed(side: FlashSide) {
     if (side === "left") {
       setBrowserFirmwareLeftFlashed(true);
-      setFlashSide("right");
+      if (!browserFirmwareRightFlashed) {
+        setFlashSide("right");
+      }
     } else {
       setBrowserFirmwareRightFlashed(true);
+      if (!browserFirmwareLeftFlashed) {
+        setFlashSide("left");
+      }
     }
   }
 
   function browserFirmwareFlashCompleteMessage(side: FlashSide, result: string) {
     return side === "left"
-      ? `Left UF2: ${result}。次は USB を右側へ差し替え、右側を bootloader にして Right を書き込みます。`
+      ? `Left UF2: ${result}。次は USB を右側へ差し替え、右側を bootloader にして reset UF2 から直接コピーします。`
       : `Right UF2: ${result}。左右の書き込みが完了しました。`;
   }
 
@@ -2472,18 +2441,6 @@ function App() {
     flashConfirmationResolverRef.current?.(confirmed);
     flashConfirmationResolverRef.current = null;
     setFlashConfirmation(null);
-  }
-
-  function confirmBrowserFirmwareFlashWrite(side: FlashSide, uf2Name: string): Promise<boolean> {
-    return requestFlashConfirmation({ kind: "write", side, uf2Name });
-  }
-
-  function confirmBrowserFirmwareFlashDownload(side: FlashSide, uf2Name: string): Promise<boolean> {
-    return requestFlashConfirmation({ kind: "download", side, uf2Name });
-  }
-
-  function confirmBrowserFirmwareManualFlashComplete(side: FlashSide, uf2Name: string): Promise<boolean> {
-    return requestFlashConfirmation({ kind: "manual-complete", side, uf2Name });
   }
 
   async function readFlashTargets() {
@@ -2905,7 +2862,6 @@ function App() {
                   onCopyUf2={copyBrowserFirmwareUf2}
                   onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
                   onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
-                  onDownloadUf2={downloadBrowserFirmwareUf2}
                   onImportArtifactFolder={importBrowserFirmwareArtifactFolder}
                   onLoadProject={loadBrowserFirmwareProject}
                   onRefreshRun={refreshBrowserFirmwareBuildRun}
@@ -3057,8 +3013,6 @@ function FlashConfirmationDialog({
   const side = sideLabel(request.side);
   const titleId = `flash-confirm-title-${request.id}`;
   const descriptionId = `flash-confirm-description-${request.id}`;
-  const isManualCompletion = request.kind === "manual-complete";
-  const isDownload = request.kind === "download";
 
   return (
     <dialog
@@ -3078,11 +3032,7 @@ function FlashConfirmationDialog({
         <p className="eyebrow">UF2 Flash Confirmation</p>
         <h2 id={titleId}>{side} 側の書き込み確認</h2>
         <p id={descriptionId}>
-          {isManualCompletion
-            ? `${request.uf2Name} を ${side} 側の bootloader volume に手動コピー済みなら、完了として記録します。`
-            : isDownload
-              ? `${request.uf2Name} をダウンロードします。ダウンロード後、${side} 側の bootloader volume に手動コピーしてください。`
-              : `${request.uf2Name} を ${side} 側の bootloader volume にコピーします。次に開くフォルダ選択では、${side} 側を bootloader にした時に出る USB ドライブを選んでください。reset file は不要です。`}
+          {request.uf2Name} を {request.volumeName ?? `${side} 側の bootloader volume`} にコピーします。接続中の half とコピー先が正しいことを確認してください。
         </p>
         {request.volumeName ? (
           <dl className="flash-confirm-targets">
@@ -3110,7 +3060,7 @@ function FlashConfirmationDialog({
             キャンセル
           </button>
           <button type="button" className="primary" disabled={!keyboardHalfChecked} onClick={() => onResolve(true)}>
-            {isManualCompletion ? "完了として記録" : isDownload ? "確認してダウンロード" : "フォルダを選んで書き込み"}
+            コピーを開始
           </button>
         </div>
       </div>
@@ -4972,7 +4922,6 @@ function BrowserFirmwareReleaseWorkbench({
   onCopyUf2,
   onDiffReviewed,
   onDownloadArtifacts,
-  onDownloadUf2,
   onImportArtifactFolder,
   onLoadProject,
   onRefreshRun,
@@ -5007,7 +4956,6 @@ function BrowserFirmwareReleaseWorkbench({
   onCopyUf2: (side: FlashSide) => void;
   onDiffReviewed: () => void;
   onDownloadArtifacts: () => void;
-  onDownloadUf2: (side: FlashSide) => void;
   onImportArtifactFolder: () => void;
   onLoadProject: () => void;
   onRefreshRun: () => void;
@@ -5217,38 +5165,28 @@ function BrowserFirmwareReleaseWorkbench({
                 onClick={() => onCopyUf2(side)}
               >
                 <span className="button-label">
-                  {downloadedSide === side ? `${sideLabel(side)} コピー完了を記録` : `${sideLabel(side)} を書き込み`}
+                  {downloadedSide === side ? `${sideLabel(side)} firmware を直接コピー` : `${sideLabel(side)} reset を直接コピー`}
                 </span>
               </button>
             ))}
           </div>
-          <div className="flash-folder-guidance" aria-label="Bootloader フォルダの選び方">
-            <strong>フォルダ選択で選ぶもの</strong>
+          <div className="flash-folder-guidance" aria-label="Bootloader コピー先の見分け方">
+            <strong>コピー先の見分け方</strong>
             <span>
-              {sideLabel(flashSide)} 側を bootloader に入れると Finder に出る USB ドライブを選びます。
-              <code>INFO_UF2.TXT</code> が入っているドライブです。reset file は不要で、UF2 をコピーすると書き込みが始まります。
+              {sideLabel(flashSide)} 側を bootloader に入れると出る <code>INFO_UF2.TXT</code> 入りの USB ドライブを選びます。
+              先に reset UF2、次に firmware UF2 を Chrome から直接コピーします。
             </span>
           </div>
-          <details className="flash-fallback-details">
-            <summary>直接書き込みできない場合だけ UF2 をダウンロード</summary>
-            <p>通常は上の Left / Right 書き込みを使います。ブラウザが bootloader ドライブへ直接コピーできない時だけ、UF2 を保存して手動コピーします。</p>
-            <div className="flash-download-actions" role="group" aria-label="UF2 download fallback">
-              {(["left", "right"] as FlashSide[]).map((side) => (
-                <button
-                  type="button"
-                  key={side}
-                  disabled={isBusy || (side === "left" ? !readiness.canFlashLeft : !readiness.canFlashRight)}
-                  onClick={() => onDownloadUf2(side)}
-                >
-                  <Download size={14} />
-                  <span className="button-label">{sideLabel(side)} UF2 をダウンロード</span>
-                </button>
-              ))}
-            </div>
+          <details className="flash-settings-reset-note" open>
+            <summary>reset UF2 を先に書き込みます</summary>
+            <p>
+              artifact 内の reset UF2 で Direct Mode / ZMK Studio の保存設定を消してから、同じ側の firmware UF2 を書き込みます。
+              reset 後はもう一度 bootloader に入れて同じボタンを押してください。
+            </p>
           </details>
           <small>
             {artifacts
-              ? `${firmwareArtifactSideSummary(artifacts, "left")} / ${firmwareArtifactSideSummary(artifacts, "right")}${
+              ? `${firmwareArtifactSideSummary(artifacts, "left")} / ${firmwareArtifactResetSummary(artifacts)} / ${firmwareArtifactSideSummary(artifacts, "right")}${
                   artifacts.manifestPath
                     ? ` / manifest ${artifacts.manifestPath}${firmwareManifestArtifactLabel(artifacts) ? ` (${firmwareManifestArtifactLabel(artifacts)})` : ""}`
                     : ""
@@ -5267,6 +5205,15 @@ function firmwareArtifactSideSummary(artifacts: GitHubFirmwareArtifacts, side: F
   }
   const provenance = firmwareArtifactProvenanceLabel(artifacts, side);
   return `${side} OK${provenance ? ` (${provenance})` : ""}`;
+}
+
+function firmwareArtifactResetSummary(artifacts: GitHubFirmwareArtifacts): string {
+  if (!artifacts.targets.reset) {
+    return "reset 未検出";
+  }
+  const file = artifacts.files.find((candidate) => candidate.name === artifacts.targets.reset);
+  const provenance = formatGitHubArtifactProvenance(file?.artifactName, file?.artifactId);
+  return `reset OK${provenance ? ` (${provenance})` : ""}`;
 }
 
 function firmwareArtifactProvenanceLabel(artifacts: GitHubFirmwareArtifacts, side: FlashSide): string {
@@ -5334,31 +5281,35 @@ function FlashSequenceGuide({
   downloadedSide: FlashSide | null;
   readiness: FirmwareReleaseReadiness;
 }) {
-  const leftState = readiness.canFlashRight || readiness.complete ? "done" : readiness.canFlashLeft ? "current" : "pending";
-  const rightState = readiness.complete ? "done" : readiness.canFlashRight ? "current" : "pending";
-  const artifactReady = Boolean(artifacts?.targets.left && artifacts.targets.right);
+  const leftState = readiness.leftFlashed || readiness.complete ? "done" : readiness.canFlashLeft ? "current" : "pending";
+  const rightState = readiness.rightFlashed || readiness.complete ? "done" : readiness.canFlashRight ? "current" : "pending";
+  const artifactReady = Boolean(artifacts?.targets.left && artifacts.targets.reset && artifacts.targets.right);
 
   return (
     <div className="flash-sequence-guide" aria-label="左右の書き込み順">
       <div className="flash-sequence-intro">
-        <strong>{artifactReady ? "UF2 は取得済みです" : "まず左の手順で Artifact 取得まで進めます"}</strong>
+        <strong>{artifactReady ? "reset / firmware UF2 は取得済みです" : "まず左の手順で Artifact 取得まで進めます"}</strong>
         <span>
-          左右は別々に焼きます。最初に Left、完了後に USB を右側へ差し替えて Right を書き込みます。
+          各側で reset UF2 を先に直接コピーし、もう一度 bootloader に入れて firmware UF2 を直接コピーします。
         </span>
       </div>
       <ol>
         <FlashSequenceItem
           detail={
             downloadedSide === "left"
-              ? "Left UF2 はダウンロード済みです。bootloader volume へ手動コピーしてから完了として記録します。"
-              : "左側を USB bootloader にして、Left を書き込みます。"
+              ? "Left reset は完了です。左側をもう一度 bootloader にして firmware UF2 を直接コピーします。"
+              : "左側を USB bootloader にして、reset UF2 を直接コピーします。"
           }
-          label="Left を書き込み"
+          label="Left reset → firmware"
           state={leftState}
         />
         <FlashSequenceItem
-          detail={readiness.canFlashRight ? "右側を USB bootloader にして、Right を書き込みます。" : "Left 完了後に有効になります。"}
-          label="Right を書き込み"
+          detail={
+            downloadedSide === "right"
+              ? "Right reset は完了です。右側をもう一度 bootloader にして firmware UF2 を直接コピーします。"
+              : "右側を USB bootloader にして、reset UF2 を直接コピーします。"
+          }
+          label="Right reset → firmware"
           state={rightState}
         />
       </ol>
@@ -5373,8 +5324,8 @@ function FlashCompletionStatus({
   activeSide: FlashSide;
   readiness: FirmwareReleaseReadiness;
 }) {
-  const leftDone = readiness.canFlashRight || readiness.complete;
-  const rightDone = readiness.complete;
+  const leftDone = readiness.leftFlashed || readiness.complete;
+  const rightDone = readiness.rightFlashed || readiness.complete;
   const leftState = leftDone ? "done" : readiness.canFlashLeft ? "current" : "pending";
   const rightState = rightDone ? "done" : readiness.canFlashRight ? "current" : "pending";
   const nextInstruction = flashNextInstruction(readiness, activeSide);
@@ -5406,11 +5357,17 @@ function flashNextInstruction(readiness: FirmwareReleaseReadiness, activeSide: F
   if (readiness.complete) {
     return "左右の書き込みが完了しています。";
   }
-  if (readiness.canFlashRight) {
-    return "Left は完了です。USB を右側へ差し替え、右側を bootloader にして Right を書き込みます。";
+  if (readiness.leftFlashed && readiness.canFlashRight) {
+    return "Left は完了です。USB を右側へ差し替え、右側を bootloader にして reset UF2 から直接コピーします。";
+  }
+  if (readiness.rightFlashed && readiness.canFlashLeft) {
+    return "Right は完了です。USB を左側へ差し替え、左側を bootloader にして reset UF2 から直接コピーします。";
+  }
+  if (readiness.canFlashLeft && readiness.canFlashRight) {
+    return `${sideLabel(activeSide)} 側を bootloader にして、reset UF2 から直接コピーします。左右どちらからでも書き込めます。`;
   }
   if (readiness.canFlashLeft) {
-    return `${sideLabel(activeSide)} 側を bootloader にして、Finder に出る UF2 ドライブを選びます。`;
+    return `${sideLabel(activeSide)} 側を bootloader にして、reset UF2 から直接コピーします。`;
   }
   return "Artifact 取得が完了すると、Left から順番に書き込めます。";
 }
@@ -5429,6 +5386,9 @@ function FlashSequenceItem({ detail, label, state }: { detail: string; label: st
 }
 
 function releaseFlowSteps(readiness: FirmwareReleaseReadiness): ReleaseFlowStep[] {
+  const flashLeftState = readiness.leftFlashed || readiness.complete ? "done" : readiness.canFlashLeft ? "current" : "pending";
+  const flashRightState = readiness.rightFlashed || readiness.complete ? "done" : readiness.canFlashRight ? "current" : "pending";
+
   return [
     {
       label: "GitHub 接続と読み込み",
@@ -5456,14 +5416,14 @@ function releaseFlowSteps(readiness: FirmwareReleaseReadiness): ReleaseFlowStep[
       state: releaseFlowGroupState(readiness, ["download-artifact"], "download-artifact", readiness.canFlashLeft || readiness.canFlashRight || readiness.complete),
     },
     {
-      label: "Left を書き込み",
-      detail: "左側を bootloader にして Left UF2 をコピーします。",
-      state: releaseFlowGroupState(readiness, ["flash-left"], "flash-left", readiness.canFlashRight || readiness.complete),
+      label: "Left reset → firmware",
+      detail: "左側を bootloader にして reset UF2、再度 bootloader にして Left firmware UF2 を直接コピーします。",
+      state: flashLeftState,
     },
     {
-      label: "Right を書き込み",
-      detail: "右側へ USB を差し替えて Right UF2 をコピーします。",
-      state: releaseFlowGroupState(readiness, ["flash-right"], "flash-right", readiness.complete),
+      label: "Right reset → firmware",
+      detail: "右側へ USB を差し替え、reset UF2、再度 bootloader、Right firmware UF2 の順で直接コピーします。",
+      state: flashRightState,
     },
   ];
 }
@@ -5481,8 +5441,10 @@ function releaseFlowGroupState(
 
 function releaseFlowSummary(readiness: FirmwareReleaseReadiness): string {
   if (readiness.complete) return "左右の書き込みが完了しています。";
-  if (readiness.canFlashRight) return "Left は完了済みです。右側へ USB を差し替えて Right を書き込みます。";
-  if (readiness.canFlashLeft) return "Artifact 取得済みです。左側から書き込みを開始します。";
+  if (readiness.leftFlashed && readiness.canFlashRight) return "Left は完了済みです。右側で reset UF2 から直接コピーします。";
+  if (readiness.rightFlashed && readiness.canFlashLeft) return "Right は完了済みです。左側で reset UF2 から直接コピーします。";
+  if (readiness.canFlashLeft && readiness.canFlashRight) return "Artifact 取得済みです。左右どちらからでも reset UF2 から直接コピーできます。";
+  if (readiness.canFlashLeft) return "Artifact 取得済みです。左側の reset UF2 から直接コピーします。";
   return "左から順に進めると、最後に左右 UF2 の書き込みまで到達できます。";
 }
 
@@ -5548,11 +5510,11 @@ function releaseNextActionDescription(readiness: FirmwareReleaseReadiness): stri
     case "build":
       return "GitHub Actions の build run を起動または確認します。";
     case "download-artifact":
-      return "成功した build artifact から左右の UF2 を取得します。";
+      return "成功した build artifact から left / reset / right UF2 を取得します。";
     case "flash-left":
-      return "左側を bootloader にして left UF2 を書き込みます。";
+      return "左側を bootloader にして reset UF2、次に left firmware UF2 を直接コピーします。";
     case "flash-right":
-      return "右側を bootloader にして right UF2 を書き込みます。";
+      return "右側を bootloader にして reset UF2、次に right firmware UF2 を直接コピーします。";
     case "done":
       return "左右の UF2 書き込みが完了しています。";
   }
@@ -5566,8 +5528,8 @@ function BrowserReleaseGateList({ readiness }: { readiness: FirmwareReleaseReadi
     { label: "Files", step: "load-files", done: currentIndex > releaseStepIndex("load-files") },
     { label: "Diff", step: "review-diff", done: readiness.canCommit || readiness.canBuild || currentIndex > releaseStepIndex("review-diff") },
     { label: "Build", step: "build", done: readiness.canDownloadArtifact || readiness.canFlashLeft || readiness.canFlashRight || readiness.complete },
-    { label: "Left", step: "flash-left", done: readiness.canFlashRight || readiness.complete },
-    { label: "Right", step: "flash-right", done: readiness.complete },
+    { label: "Left", step: "flash-left", done: readiness.leftFlashed || readiness.complete },
+    { label: "Right", step: "flash-right", done: readiness.rightFlashed || readiness.complete },
   ] satisfies Array<{ label: string; step: FirmwareReleaseStep; done: boolean }>;
 
   return (
@@ -7047,33 +7009,28 @@ async function writeProjectToDirectoryHandle(
   }
 }
 
-type Uf2DirectoryWriteResult = {
-  closeWarning: string | null;
+type BrowserUf2WriteResult = {
+  ambiguousEject: boolean;
 };
 
-async function writeUf2ToDirectoryHandle(handle: FileSystemDirectoryHandle, file: GitHubArtifactUf2): Promise<Uf2DirectoryWriteResult> {
+async function writeBrowserUf2ToDirectoryHandle(handle: FileSystemDirectoryHandle, file: GitHubArtifactUf2): Promise<BrowserUf2WriteResult> {
   await ensureWritablePermission(handle);
-  await assertUf2BootloaderDirectory(handle);
   const filename = file.name.split("/").pop() ?? file.name;
   const fileHandle = await handle.getFileHandle(filename, { create: true });
   const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
   try {
     await writable.write(arrayBufferFromBytes(file.bytes));
   } catch (error) {
-    if (isLikelyUf2BootloaderEjectError(error)) {
-      await closeWritableQuietly(writable);
-      return { closeWarning: formatError(error) };
-    }
     await closeWritableQuietly(writable);
     throw error;
   }
 
   try {
     await writable.close();
-    return { closeWarning: null };
+    return { ambiguousEject: false };
   } catch (error) {
-    if (isLikelyUf2BootloaderEjectError(error)) {
-      return { closeWarning: formatError(error) };
+    if (isLikelyBootloaderEjectError(error)) {
+      return { ambiguousEject: true };
     }
     throw error;
   }
@@ -7087,7 +7044,7 @@ async function closeWritableQuietly(writable: FileSystemWritableFileStream) {
   }
 }
 
-function isLikelyUf2BootloaderEjectError(error: unknown): boolean {
+function isLikelyBootloaderEjectError(error: unknown): boolean {
   if (error instanceof DOMException) {
     return ["AbortError", "InvalidStateError", "NetworkError", "NotFoundError", "UnknownError"].includes(error.name);
   }

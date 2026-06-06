@@ -4263,6 +4263,60 @@ select:focus-visible {
   padding: var(--sp-2) var(--sp-3);
   background: rgba(255, 255, 255, 0.44);
 }
+.flash-direct-copy-details,
+.flash-desktop-note {
+  border: 1px solid rgba(47, 96, 122, 0.2);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  background: rgba(235, 245, 248, 0.58);
+}
+.flash-direct-copy-details summary,
+.flash-desktop-note strong {
+  color: var(--pine);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.flash-direct-copy-details summary {
+  cursor: pointer;
+}
+.flash-direct-copy-details p,
+.flash-desktop-note span {
+  margin: var(--sp-2) 0;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.flash-desktop-note {
+  display: grid;
+  gap: var(--sp-1);
+}
+.flash-desktop-note span {
+  margin: 0;
+}
+.flash-direct-copy-details:not([open]) p,
+.flash-direct-copy-details:not([open]) .flash-download-actions {
+  display: none;
+}
+.flash-settings-reset-note {
+  border: 1px solid rgba(182, 125, 18, 0.28);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--amber-warn-bg);
+}
+.flash-settings-reset-note summary {
+  cursor: pointer;
+  color: #5d4613;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.flash-settings-reset-note p {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
 .flash-fallback-details summary {
   cursor: pointer;
   color: var(--ink-muted);

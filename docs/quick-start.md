@@ -94,10 +94,11 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 3. `Commit & Build` を押します。
 4. build 成功後、`Artifact 取得` を押します。
 5. Studio が manifest または UF2 ファイル名から left / right を分類したことを確認します。
-6. 左側を bootloader mode に入れて `Left を書き込み` を押し、表示された bootloader volume に保存します。
-7. `Right` 側も同じように進めます。
+6. 左側を bootloader mode に入れて `Left reset を直接コピー` を押し、`INFO_UF2.TXT` がある bootloader volume を選びます。
+7. reset 後に左側をもう一度 bootloader mode に入れ、同じボタンで `Left firmware を直接コピー` を実行します。
+8. `Right` 側も `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。
 
-ブラウザで bootloader folder を直接選べない場合や、手動コピーのほうが確実な場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。download した UF2 を bootloader volume に手動コピーしてから同じ side の書き込みボタンをもう一度押すと、完了として記録して次の side へ進みます。
+ブラウザ版は Finder での手動コピーを通常ルートにしません。Chrome のフォルダ選択で `INFO_UF2.TXT` がある bootloader volume を選び、artifact 内の reset UF2 を先に直接コピーしてから、同じ side の firmware UF2 を直接コピーします。
 
 ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。
 

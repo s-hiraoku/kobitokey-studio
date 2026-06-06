@@ -444,11 +444,13 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
       JSON.stringify({
         outputs: [
           { side: "left", file: "KobitoKey_left.uf2" },
+          { side: "reset", file: "settings_reset.uf2" },
           { side: "right", file: "KobitoKey_right.uf2" },
         ],
       }),
     ),
     "firmware/KobitoKey_left.uf2": new Uint8Array([1, 2, 3]),
+    "firmware/settings_reset.uf2": new Uint8Array([7, 8, 9]),
     "firmware/KobitoKey_right.uf2": new Uint8Array([4, 5, 6]),
   });
 
@@ -482,22 +484,16 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
     const headerText = document.querySelector(".browser-release-workbench .flash-wizard-header span")?.textContent?.trim() ?? "";
     const summaryText = document.querySelector(".browser-release-workbench .flash-wizard small")?.textContent?.trim() ?? "";
     const leftButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
-      button.textContent?.includes("Left を書き込み"),
+      button.textContent?.includes("Left reset を直接コピー"),
     );
     const rightButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
-      button.textContent?.includes("Right を書き込み"),
+      button.textContent?.includes("Right reset を直接コピー"),
     );
-    const rightDownloadButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-download-actions button")).find((button) =>
-      button.textContent?.includes("Right UF2 をダウンロード"),
-    );
-    const fallbackDetails = document.querySelector(".browser-release-workbench .flash-fallback-details");
     return {
       headerText,
-      fallbackCollapsed: fallbackDetails instanceof HTMLDetailsElement ? !fallbackDetails.open : null,
       folderGuidanceText: document.querySelector(".browser-release-workbench .flash-folder-guidance")?.textContent?.trim() ?? "",
       leftDisabled: leftButton?.disabled ?? null,
       rightDisabled: rightButton?.disabled ?? null,
-      rightDownloadDisabled: rightDownloadButton?.disabled ?? null,
       summaryText,
     };
   });
@@ -509,6 +505,7 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   }
   for (const expected of [
     `left OK (artifact ${artifactName} #${artifactId})`,
+    `reset OK (artifact ${artifactName} #${artifactId})`,
     `right OK (artifact ${artifactName} #${artifactId})`,
     `manifest firmware/manifest.json (artifact ${artifactName} #${artifactId})`,
   ]) {
@@ -519,64 +516,15 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   if (state.leftDisabled !== false) {
     failures.push(`${label}: left flash should be enabled after artifact provenance is shown`);
   }
-  if (state.fallbackCollapsed !== true) {
-    failures.push(`${label}: UF2 download fallback should be collapsed by default`);
-  }
   if (
     !state.folderGuidanceText.includes("INFO_UF2.TXT") ||
-    !state.folderGuidanceText.includes("USB ドライブ") ||
-    !state.folderGuidanceText.includes("reset file は不要")
+    !state.folderGuidanceText.includes("reset UF2") ||
+    !state.folderGuidanceText.includes("firmware UF2")
   ) {
-    failures.push(`${label}: flash panel should explain which bootloader folder to select`);
+    failures.push(`${label}: flash panel should explain reset then firmware direct copy`);
   }
-  if (state.rightDisabled !== true || state.rightDownloadDisabled !== true) {
-    failures.push(`${label}: right flash should stay disabled until left is completed`);
-  }
-
-  await page.locator(".browser-release-workbench .flash-fallback-details").evaluate((details) => {
-    details.setAttribute("open", "");
-  });
-  const downloadPromise = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
-  await page
-    .locator(".browser-release-workbench .flash-download-actions")
-    .getByRole("button", { name: "Left UF2 をダウンロード" })
-    .click();
-  await confirmFlashDialog(page, "確認してダウンロード");
-  const download = await downloadPromise;
-  if (!download) {
-    failures.push(`${label}: left UF2 download fallback should trigger a browser download`);
-  } else if (download.suggestedFilename() !== "KobitoKey_left.uf2") {
-    failures.push(`${label}: left UF2 download filename should be KobitoKey_left.uf2, got "${download.suggestedFilename()}"`);
-  }
-
-  await page.getByRole("button", { name: "Left コピー完了を記録" }).click();
-  await confirmFlashDialog(page, "完了として記録");
-  await page.waitForFunction(() =>
-    document.querySelector(".browser-release-workbench .build-status[role='status']")?.textContent?.includes("Left UF2 の手動コピー完了として記録しました"),
-  );
-
-  const rightState = await page.evaluate(() => {
-    const headerText = document.querySelector(".browser-release-workbench .flash-wizard-header span")?.textContent?.trim() ?? "";
-    const leftButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
-      button.textContent?.includes("Left を書き込み"),
-    );
-    const rightButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-side-toggle button")).find((button) =>
-      button.textContent?.includes("Right を書き込み"),
-    );
-    return {
-      headerText,
-      leftDisabled: leftButton?.disabled ?? null,
-      rightDisabled: rightButton?.disabled ?? null,
-    };
-  });
-
-  for (const expected of ["firmware/KobitoKey_right.uf2", `artifact ${artifactName} #${artifactId}`]) {
-    if (!rightState.headerText.includes(expected)) {
-      failures.push(`${label}: right flash target header should include "${expected}", got "${rightState.headerText}"`);
-    }
-  }
-  if (rightState.leftDisabled !== true || rightState.rightDisabled !== false) {
-    failures.push(`${label}: right flash should be enabled only after left is completed`);
+  if (state.rightDisabled !== false) {
+    failures.push(`${label}: right flash should be enabled so users can write either side first`);
   }
 
   await page.unroute("**/*");
@@ -1190,23 +1138,25 @@ async function inspectFirmwareUi(page, label) {
     if (!workbench?.querySelector(".release-flow-guide")) {
       failures.push(`${viewportLabel}: Build & Flash should expose a release flow guide from GitHub to Right flash`);
     }
-    if (!workbench?.textContent?.includes("Flash までの順番") || !workbench?.textContent?.includes("Right を書き込み")) {
+    if (!workbench?.textContent?.includes("Flash までの順番") || !workbench?.textContent?.includes("Right reset → firmware")) {
       failures.push(`${viewportLabel}: Build & Flash release flow should make the path to flashing both sides explicit`);
     }
     if (!workbench?.querySelector(".flash-sequence-guide")) {
       failures.push(`${viewportLabel}: Flash panel should expose the left then right sequence guide`);
     }
-    const fallbackDetails = workbench?.querySelector(".flash-fallback-details");
-    if (!(fallbackDetails instanceof HTMLDetailsElement) || fallbackDetails.open) {
-      failures.push(`${viewportLabel}: UF2 download fallback should be collapsed outside the normal flash flow`);
-    }
     const folderGuidance = workbench?.querySelector(".flash-folder-guidance")?.textContent ?? "";
     if (
       !folderGuidance.includes("INFO_UF2.TXT") ||
-      !folderGuidance.includes("USB ドライブ") ||
-      !folderGuidance.includes("reset file は不要")
+      !folderGuidance.includes("reset UF2") ||
+      !folderGuidance.includes("firmware UF2")
     ) {
-      failures.push(`${viewportLabel}: Flash panel should explain that the bootloader USB drive is the folder to select`);
+      failures.push(`${viewportLabel}: Flash panel should explain reset then firmware direct copy`);
+    }
+    if (
+      !workbench?.textContent?.includes("reset UF2 を先に書き込みます") ||
+      !workbench.textContent.includes("artifact 内の reset UF2")
+    ) {
+      failures.push(`${viewportLabel}: Flash panel should explain reset UF2 is written before firmware`);
     }
     if (!workbench?.querySelector(".flash-completion-status") || !workbench?.textContent?.includes("書き込み待ち")) {
       failures.push(`${viewportLabel}: Flash panel should show left/right flash completion state`);
@@ -1263,9 +1213,9 @@ async function inspectFirmwareUi(page, label) {
       "Artifact 取得",
       "Artifact フォルダから再開",
       "フォルダを選択",
-      "Left を書き込み",
-      "Right を書き込み",
-      "直接書き込みできない場合だけ UF2 をダウンロード",
+      "Left reset を直接コピー",
+      "Right reset を直接コピー",
+      "reset UF2 を先に書き込みます",
     ];
     for (const text of requiredLabels) {
       const found = Array.from(document.querySelectorAll(".browser-release-workbench button")).some((button) =>
