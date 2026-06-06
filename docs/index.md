@@ -18,7 +18,7 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 
 | 目的 | 選ぶモード | 反映方法 |
 | --- | --- | --- |
-| すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右 UF2 を書き込み |
+| すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右それぞれ reset UF2、firmware UF2 の順に書き込み |
 | キーを少しだけ素早く変えたい | Direct Mode | USB 推奨。Bluetooth は見つかる場合のみ → 実機へ書き込み |
 | Combo を変更したい | Firmware Mode | `KobitoKey.keymap` を編集 → build + flash |
 | トラックボールを変更したい | Firmware Mode | 左右 overlay を編集 → build + flash。Direct Mode では参照のみ |
@@ -52,7 +52,9 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 4. keymap、Combo、Trackball を変更する
 5. `Diff` を確認する
 6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
-7. 左右 UF2 を順番に bootloader へ書き込む
+7. 左右それぞれで reset UF2、firmware UF2 の順に bootloader へ書き込む
+
+ブラウザ版はローカル clone 不要です。公式 repository に書き込み権限がない場合は、GitHub 上で `KobitoKey_QWERTY` を fork し、その fork を `Firmware repository` に指定してください。
 
 ### キーを 1 個だけ試す
 
@@ -89,12 +91,12 @@ Tauri デスクトップ版は一部ユーザー向けのローカル作業用�
 ### ファイル編集で確実に反映する流れ
 
 1. `Firmware` を選ぶ
-2. `KobitoKey_QWERTY` フォルダを読み込む
+2. ブラウザ版では GitHub repository、Tauri 版では `KobitoKey_QWERTY` フォルダを読み込む
 3. キー、Combo、トラックボール設定を編集する
 4. `Diff` で変更内容を確認する
 5. `保存` する
 6. GitHub Actions でビルドする
-7. 左右の UF2 をそれぞれ bootloader にコピーする
+7. 左右それぞれで reset UF2、firmware UF2 の順に bootloader にコピーする
 
 ### 実機へすぐ反映する流れ
 

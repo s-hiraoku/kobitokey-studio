@@ -42,7 +42,7 @@ const STANDARD_BEHAVIOR_BINDINGS = new Set([
 const CUSTOM_BEHAVIOR_IDS: Record<string, string> = {
   "&zoom_hold": "22",
 };
-const CUSTOM_LAYER_TAP_BEHAVIORS = new Set(["&lt_left_thumb", "&lt_right_thumb"]);
+const CUSTOM_LAYER_TAP_BEHAVIORS = new Set(["&lt_l", "&lt_left_thumb", "&lt_r", "&lt_right_thumb"]);
 export type StudioKeymap = {
   deviceName: string;
   serialNumber: string;

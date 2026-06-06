@@ -27,9 +27,11 @@ describe("classifyUf2Artifacts", () => {
       classifyUf2Artifacts([
         "/tmp/artifacts/KobitoKey_left.uf2",
         "/tmp/artifacts/KobitoKey_right.uf2",
+        "/tmp/artifacts/settings_reset.uf2",
       ]),
     ).toEqual({
       left: "/tmp/artifacts/KobitoKey_left.uf2",
+      reset: "/tmp/artifacts/settings_reset.uf2",
       right: "/tmp/artifacts/KobitoKey_right.uf2",
       unknown: [],
     });
@@ -45,6 +47,7 @@ describe("classifyUf2Artifacts", () => {
       ]),
     ).toEqual({
       left: "KobitoKey_left.uf2",
+      reset: null,
       right: null,
       unknown: ["KobitoKey.uf2", "KobitoKey_l.uf2"],
     });
@@ -229,7 +232,35 @@ describe("deriveFirmwareReleaseReadiness", () => {
     });
   });
 
-  it("forces left flash before right flash and reports completion after both sides", () => {
+  it("allows flashing from externally loaded artifact folders without GitHub state", () => {
+    const readiness = deriveFirmwareReleaseReadiness({
+      ...baseState,
+      artifactFiles: ["firmware/KobitoKey_left.uf2", "firmware/settings_reset.uf2", "firmware/KobitoKey_right.uf2"],
+      externalArtifactsReady: true,
+    });
+
+    expect(readiness).toMatchObject({
+      step: "flash-left",
+      canFlashLeft: true,
+      canFlashRight: true,
+    });
+    expect(canFlashFirmwareSide(readiness, "left")).toBe(true);
+
+    expect(
+      deriveFirmwareReleaseReadiness({
+        ...baseState,
+        artifactFiles: ["firmware/KobitoKey_left.uf2", "firmware/settings_reset.uf2", "firmware/KobitoKey_right.uf2"],
+        externalArtifactsReady: true,
+        leftFlashed: true,
+      }),
+    ).toMatchObject({
+      step: "flash-right",
+      canFlashLeft: false,
+      canFlashRight: true,
+    });
+  });
+
+  it("allows either side to flash first and reports completion after both sides", () => {
     const readyToFlash = {
       ...baseState,
       authenticated: true,
@@ -241,28 +272,44 @@ describe("deriveFirmwareReleaseReadiness", () => {
       commitSha: "abc123",
       buildRunId: "987",
       buildStatus: "success" as const,
-      artifactFiles: ["KobitoKey_left.uf2", "KobitoKey_right.uf2"],
+      artifactFiles: ["KobitoKey_left.uf2", "settings_reset.uf2", "KobitoKey_right.uf2"],
     };
 
     expect(deriveFirmwareReleaseReadiness(readyToFlash)).toMatchObject({
       step: "flash-left",
       canFlashLeft: true,
-      canFlashRight: false,
+      canFlashRight: true,
+      leftFlashed: false,
+      rightFlashed: false,
     });
     expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness(readyToFlash), "left")).toBe(true);
-    expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness(readyToFlash), "right")).toBe(false);
+    expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness(readyToFlash), "right")).toBe(true);
 
     expect(deriveFirmwareReleaseReadiness({ ...readyToFlash, leftFlashed: true })).toMatchObject({
       step: "flash-right",
       canFlashLeft: false,
       canFlashRight: true,
+      leftFlashed: true,
+      rightFlashed: false,
     });
     expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness({ ...readyToFlash, leftFlashed: true }), "left")).toBe(false);
     expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness({ ...readyToFlash, leftFlashed: true }), "right")).toBe(true);
 
+    expect(deriveFirmwareReleaseReadiness({ ...readyToFlash, rightFlashed: true })).toMatchObject({
+      step: "flash-left",
+      canFlashLeft: true,
+      canFlashRight: false,
+      leftFlashed: false,
+      rightFlashed: true,
+    });
+    expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness({ ...readyToFlash, rightFlashed: true }), "left")).toBe(true);
+    expect(canFlashFirmwareSide(deriveFirmwareReleaseReadiness({ ...readyToFlash, rightFlashed: true }), "right")).toBe(false);
+
     expect(deriveFirmwareReleaseReadiness({ ...readyToFlash, leftFlashed: true, rightFlashed: true })).toMatchObject({
       step: "done",
       complete: true,
+      leftFlashed: true,
+      rightFlashed: true,
     });
   });
 
@@ -281,6 +328,7 @@ describe("deriveFirmwareReleaseReadiness", () => {
       artifactFiles: ["KobitoKey_left.uf2", "KobitoKey_right.uf2"],
       artifactTargets: {
         left: null,
+        reset: null,
         right: null,
         unknown: ["KobitoKey_left.uf2", "KobitoKey_right.uf2"],
       },
@@ -308,6 +356,7 @@ describe("deriveFirmwareReleaseReadiness", () => {
       buildStatus: "success",
       artifactTargets: {
         left: "left/KobitoKey.uf2",
+        reset: "settings_reset.uf2",
         right: "right/KobitoKey.uf2",
         unknown: [],
       },

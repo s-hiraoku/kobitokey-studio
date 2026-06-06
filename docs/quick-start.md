@@ -18,7 +18,7 @@ permalink: /quick-start/
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | ✅ GitHub 連携対応 |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | ✅ 一部ユーザー向け |
 
-ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 の分類まで進めます。
+ブラウザ版の Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token を使って firmware repository を読み込み、commit、GitHub Actions build、artifact 取得、left / reset / right UF2 の分類まで進めます。
 Tauri デスクトップ版は一部ユーザー向けのローカル作業用です。公開版の手順はブラウザ版を基準にしてください。
 
 スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
@@ -66,10 +66,10 @@ npm run tauri dev
 4. 左側で layer を選びます。
 5. 中央のキーボード図で変更したい key を選びます。
 6. 右側の動作エディタで新しいキー動作を選びます。
-7. `選択キーの編集を保存` を押します。
+7. `選択キーに反映` を押します。
 8. `Diff` で変更内容を確認します。
 9. `Diff 確認済み` を押してから `Commit & Build` を押します。変更を破棄する場合は `編集をリセット` を押します。
-10. build 成功後に artifact を取得し、left / right UF2 を順番に書き込みます。
+10. build 成功後に artifact を取得し、左右それぞれで reset UF2、firmware UF2 の順に書き込みます。
 
 Firmware Mode では layer 一覧の上にあるボタンで layer を追加・複製できます。削除は layer 番号参照のずれを避けるため、最後の layer だけ対応しています。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
 
@@ -89,19 +89,24 @@ Firmware Mode では layer 一覧の上にあるボタンで layer を追加・�
 
 ここでいう build は、KobitoKey Studio 自体の build ではなく、Firmware repository の GitHub Actions build です。KobitoKey Studio の画面では、ローカルフォルダとは別に Firmware repository URL を指定できます。
 
+Studio で編集する場合は `GitHub から読み込み`、編集、`Commit & Build`、`Artifact 取得` の順に進めます。すでに artifact まで作成済みなら、GitHub に再接続して `Artifact 取得` だけやり直せます。artifact zip や UF2 を手元に持っている場合は、zip を展開するか UF2 を1つのフォルダにまとめて、`Artifact フォルダから再開` または `フォルダを選択` から Flash だけ再開できます。
+
 1. KobitoKey Studio の `Build & Flash` ボタンを押します。
 2. GitHub OAuth device flow または token で接続します。device flow の新規タブが開かない場合は、画面上の `GitHub 認証を開く` リンクから認証を開きます。
 3. `Commit & Build` を押します。
 4. build 成功後、`Artifact 取得` を押します。
-5. Studio が manifest または UF2 ファイル名から left / right を分類したことを確認します。
-6. 左側を bootloader mode に入れて `Left を書き込み` を押し、表示された bootloader volume に保存します。
-7. `Right` 側も同じように進めます。
+5. Studio が manifest または UF2 ファイル名から left / reset / right を分類したことを確認します。
+6. 左側を bootloader mode に入れて `Left reset を直接コピー` を押し、`INFO_UF2.TXT` がある bootloader volume を選びます。
+7. reset 後に左側をもう一度 bootloader mode に入れ、同じボタンで `Left firmware を直接コピー` を実行します。
+8. `Right` 側も `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。
 
-ブラウザで bootloader folder を直接選べない場合や、手動コピーのほうが確実な場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。download した UF2 を bootloader volume に手動コピーしてから同じ side の書き込みボタンをもう一度押すと、完了として記録して次の side へ進みます。
+ブラウザ版は Finder での手動コピーを通常ルートにしません。Chrome のフォルダ選択で `INFO_UF2.TXT` がある bootloader volume を選び、artifact 内の reset UF2 を先に直接コピーしてから、同じ side の firmware UF2 を直接コピーします。
+
+`Artifact フォルダから再開` は zip ファイルそのものではなく、展開済みフォルダを選びます。フォルダ再開では UF2 ファイル名から left / reset / right を分類するため、名前で判別できる artifact を使ってください。
 
 ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。
 
-artifact に `manifest.json` または `firmware-manifest.json` がある場合、Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` が含まれる前提です。分類できない場合、ブラウザ版は左右の書き込みボタンを有効化しません。Tauri 版は手動の UF2 / Bootloader 選択で確認しながらコピーできます。
+GitHub から `Artifact 取得` する場合、artifact に `manifest.json` または `firmware-manifest.json` があれば Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` / `reset` が含まれる前提です。分類できない場合や reset UF2 がない場合、ブラウザ版は書き込みボタンを有効化しません。Tauri 版は手動の UF2 / Bootloader 選択で確認しながらコピーできます。
 
 ## 4. Direct Mode でキーをすぐ書き込む
 

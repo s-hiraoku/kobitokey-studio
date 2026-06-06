@@ -19,7 +19,7 @@ permalink: /usage-guide/
 | ブラウザ版 (`npm run dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ GitHub 連携対応 |
 | デスクトップ版 (`npm run tauri dev`) | ✅ 利用可 | Combo / Trackball は参照のみ | ✅ 一部ユーザー向け |
 
-- ブラウザ版 Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token をメモリ上で使い、repository 読み込み、commit、GitHub Actions build、artifact 取得、左右 UF2 分類まで進めます。
+- ブラウザ版 Firmware Mode は GitHub 連携で利用できます。GitHub OAuth device flow または GitHub token をメモリ上で使い、repository 読み込み、commit、GitHub Actions build、artifact 取得、left / reset / right UF2 分類まで進めます。
 - OAuth device flow と artifact download は release gate で CORS / scope / rate limit を確認します。
 - デスクトップ版 Firmware Mode は、ローカル clone、`gh` CLI、bootloader volume 検出を使う従来フローです。
 
@@ -54,7 +54,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | 確認すること | Firmware Mode | Direct Mode |
 | --- | --- | --- |
 | KobitoKey Studio を起動できる | 必須 | 必須 |
-| `KobitoKey_QWERTY` の GitHub repository またはローカル clone がある | 必須 | 任意 |
+| `KobitoKey_QWERTY` の GitHub repository がある | 必須。ブラウザ版では書き込み権限のある repository を指定します | 任意 |
 | `config/KobitoKey.keymap` が読める | 必須 | 任意 |
 | 左右 overlay ファイルが読める | Trackball 編集に必須 | 任意 |
 | GitHub 認証済み | Firmware Mode の build に必須。ブラウザ版は OAuth/token、Tauri 版は `gh auth login` | 不要 |
@@ -62,7 +62,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | USB data 通信できるケーブルがある | UF2 書き込みに必須 | USB Direct に必須 |
 | Chrome または Edge を使っている | ブラウザ版では推奨 | ブラウザ Direct では必須 |
 
-ブラウザ版の Firmware Mode では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを一部ユーザー向けに利用できます。
+ブラウザ版の Firmware Mode では、ローカル clone は不要です。GitHub 上の repository を読み込み、編集後に同じ repository へ commit し、GitHub Actions build、artifact download、left / reset / right UF2 の順番ガイドまで一つの画面で進められます。公式 repository に書き込み権限がない場合は、GitHub 上で `KobitoKey_QWERTY` を fork し、その fork の URL を `Firmware repository` に指定してください。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを一部ユーザー向けに利用できます。
 
 ## 画面の見方
 
@@ -113,7 +113,7 @@ KobitoKey Studio には大きく分けて 2 つのモードがあります。
 4. 必要なら Combo やトラックボールも変更する
 5. `Diff` で変更内容を確認する
 6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
-7. left / right の UF2 をそれぞれ bootloader にコピーする
+7. 左右それぞれで reset UF2、firmware UF2 の順に bootloader にコピーする
 
 ### Direct Mode の基本フロー
 
@@ -168,7 +168,7 @@ Tauri デスクトップ版では、ローカルファイルの読み書き、`g
 
 ### GitHub 認証の準備
 
-ブラウザ版 Firmware Mode は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。
+ブラウザ版 Firmware Mode は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。公式 repository に直接書き込めないユーザーは、GitHub 上で fork を作り、その fork に対する権限を token/OAuth に付けます。
 
 Tauri 版 Firmware Mode の GitHub Actions build 操作は、Tauri backend から `gh` CLI を呼び出します。初回は次で認証してください。
 
@@ -239,13 +239,13 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 3. Tauri 版では `読み込み` を押します。
 4. (任意)Tauri 版でビルドまで進める場合は `Build & Flash` ボタンを押し、`Firmware repository URL` に GitHub の repository URL を指定します。
 
-ブラウザ版の初回は GitHub repository URL と branch を指定してください。Tauri 版のプロジェクトフォルダ初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
+ブラウザ版の初回は GitHub repository URL と branch を指定してください。ローカル clone の用意は不要です。公式 repository へ書き込めない場合は、GitHub 上の fork URL を指定します。Tauri 版のプロジェクトフォルダ初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
 
 読み込みに成功すると、左側に layer 一覧、中央に KobitoKey の物理レイアウト、右側に選択中キーの編集 panel が表示されます。
 
 読み込み後に最初に見る場所は、左側の layer 一覧です。layer を切り替えると中央の key 表示が変わります。中央の key をクリックすると、右側の inspector がその key の編集画面になります。
 
-ブラウザ版では GitHub repository URL を keymap / overlay の読み書き、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。Tauri 版ではローカルフォルダを keymap / overlay の読み書きに使い、Firmware repository URL を Actions 操作に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
+ブラウザ版では GitHub repository URL を keymap / overlay の読み書き、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。公式 repository に書き込み権限がない場合は、GitHub 上の fork URL を指定してください。Tauri 版ではローカルフォルダを keymap / overlay の読み書きに使い、Firmware repository URL を Actions 操作に使います。
 repository は `owner/repo`、`https://github.com/owner/repo`、または `git@github.com:owner/repo.git` の形で入力してください。`tree/main` や `blob/...` 付きの URL、query/hash 付きの URL は対象 repository が曖昧になるため読み込み前に拒否します。branch は `feature/firmware-mode` のように `/` を含む名前でも使えます。
 
 Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer を追加し、copy で選択中 layer を末尾に複製できます。trash は layer 番号参照のずれを避けるため、最後の layer を選んでいるときだけ有効になります。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
@@ -256,10 +256,10 @@ Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer �
 2. 中央のキーボード図で変更したい key をクリックします。
 3. 右側の動作エディタで動作タイプを選びます。
 4. on-screen picker から keycode、layer、modifier、mouse button、Bluetooth action などを選びます。
-5. `選択キーの編集を保存` を押します。
+5. `選択キーに反映` を押します。
 6. 中央の表示と右側の preview が変わったことを確認します。
 
-Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `保存` を押してください。
+Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `Firmwareファイルを保存` または `Firmwareファイルをダウンロード` を押してください。
 
 変更後は、対象 key の表示と右側の preview が意図した動作になっているか確認します。複雑な ZMK 構文は label が短縮表示されることがありますが、tooltip や inspector では元の ZMK 構文を確認できます。
 
@@ -391,27 +391,44 @@ Firmware repository URL を設定している場合、KobitoKey Studio は対象
 1. GitHub Actions の build が成功したことを確認します。
 2. `Artifact 取得` を押します。
 3. ブラウザ版では、表示中 commit と一致する成功 run であることを GitHub API で再確認してから artifact zip を取得し、画面内で展開します。Tauri 版では、最新の成功 run から artifact を取得し、`KobitoKey_QWERTY/.kobitokey-studio/artifacts/` に保存します。
-4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / right を分類します。manifest がない場合はファイル名から推定します。Flash パネルには left / right UF2 と manifest の GitHub artifact 名 / id も表示されます。公開判定の証跡では、画面に表示された artifact 名 / id が GitHub Actions の build artifact と一致し、manifest が指す UF2 が同じ GitHub artifact 内にあることも確認します。
+4. 取得後、Studio は UF2 を再スキャンし、manifest があればそれを優先して left / reset / right を分類します。manifest がない場合はファイル名から推定します。Flash パネルには left / reset / right UF2 と manifest の GitHub artifact 名 / id も表示されます。公開判定の証跡では、画面に表示された artifact 名 / id が GitHub Actions の build artifact と一致し、manifest が指す UF2 が同じ GitHub artifact 内にあることも確認します。
 
-左右それぞれの UF2 が生成されていることを確認してください。ファイル名で left / right を取り違えないようにします。
+left / reset / right の UF2 が生成されていることを確認してください。ファイル名で left / right を取り違えないようにします。
 
 ブラウザ版では、artifact が存在しない、すべて期限切れ、または zip の中に UF2 が含まれない場合は、artifact 取得を失敗として止めます。`Artifact 取得` を押した時点で前回取得した UF2 と左右の書き込み完了状態は破棄されるため、失敗後に古い UF2 を誤って書き込むことはできません。その場合は `Build 起動` で新しい run を作り、GitHub Actions の artifact upload 設定と build 出力を確認してください。
 
 ブラウザ版は token や artifact bytes を local storage に保存しません。保存するのは repository、branch、commit、run id などの再開用 metadata だけで、壊れた URL や一致しない commit/run link は復元時に破棄します。画面を閉じた後に再開する場合は、GitHub に再接続してから `Artifact 取得` を押すと、保存済み run id から再取得できます。Tauri 版で古い UF2 と混ざる場合は `.kobitokey-studio/artifacts/` の中身を一度整理してから再取得すると、選択ミスを減らせます。
+
+### 4.2.1 Firmware Mode の再開ルート
+
+ブラウザ版 Firmware Mode は、どこまで進んでいるかに合わせて途中から再開できます。
+
+| 今の状態 | 操作 | 補足 |
+| --- | --- | --- |
+| Studio でこれから編集する | `GitHub から読み込み` → 編集 → `Diff 確認済み` → `Commit & Build` → `Artifact 取得` | 変更を repository に commit し、対象 commit の build artifact を使います |
+| 編集と build は完了している | GitHub に接続し、repository / branch / run を確認して `Artifact 取得` | 画面に保存された run metadata があれば、再接続後に artifact を再取得できます |
+| artifact zip を GitHub Actions などから手元に保存済み | zip を展開し、`Artifact フォルダから再開` | GitHub token や commit/run の再接続なしで Flash パネルへ進めます |
+| UF2 ファイルだけ持っている | left / reset / right UF2 を1つのフォルダにまとめ、`Artifact フォルダから再開` | ファイル名から分類できる必要があります |
+
+`Artifact フォルダから再開` は Flash だけをやり直したいときに便利です。GitHub から artifact を再取得しなくても、展開済み artifact フォルダを選べば left / reset / right の UF2 を読み込んで書き込みボタンを有効化できます。
+
+フォルダ再開で選ぶ場所は、`.zip` ファイルではなく展開済みフォルダです。フォルダ内のサブフォルダも再帰的に読みます。現在のフォルダ再開は UF2 ファイル名で分類するため、`left`、`right`、`reset` または `settingsreset` が分かる名前にしてください。manifest にしか side 情報がない artifact は、GitHub run から `Artifact 取得` するルートを使うほうが確実です。
 
 ### 4.3 左右の UF2 を bootloader にコピーする
 
 KobitoKey の firmware は左右別々に書き込みます。
 
 1. 左側を USB で接続し、bootloader mode に入れます。
-2. ブラウザ版では `Left を書き込み` を押し、確認ダイアログで接続中の half が Left 側であることにチェックしてから、表示されたフォルダ選択で bootloader volume を選びます。Tauri 版では `Left` を選び、`UF2 / Volume 更新`、`Left UF2 を bootloader にコピー` の順に押します。
-3. 右側へ USB を差し替えます。
-4. 右側を bootloader mode に入れます。
-5. ブラウザ版では `Right を書き込み` を押し、確認ダイアログで接続中の half が Right 側であることにチェックしてから、bootloader volume を選びます。Tauri 版では `Right UF2 を bootloader にコピー` を押します。
+2. ブラウザ版では `Left reset を直接コピー` を押し、`INFO_UF2.TXT` がある Left 側の bootloader volume を選びます。Tauri 版では `Left` を選び、`UF2 / Volume 更新`、`Left UF2 を bootloader にコピー` の順に押します。
+3. 左側をもう一度 bootloader mode に入れ、`Left firmware を直接コピー` で Left 側の firmware UF2 を書き込みます。
+4. 右側へ USB を差し替えて bootloader mode に入れます。
+5. `Right reset を直接コピー`、もう一度 bootloader mode、`Right firmware を直接コピー` の順に進めます。Tauri 版では `Right UF2 を bootloader にコピー` を押します。
 
-ブラウザで folder picker が使える場合、Studio はコピー直前に side と UF2 ファイル名を確認し、接続中の keyboard half が正しい side であることをチェックしない限り続行できません。folder picker が使えない場合や直接コピーがうまくいかない場合は、`Left UF2 をダウンロード` / `Right UF2 をダウンロード` を使います。Studio は同じ確認を通してから該当 side の UF2 を download します。download した UF2 を bootloader volume に手動コピーした後、同じ side の書き込みボタンをもう一度押すと確認を表示し、その side を完了として記録して次の side へ進みます。
+ブラウザ版は Finder での手動コピーを通常ルートにしません。Chrome のフォルダ選択で `INFO_UF2.TXT` がある bootloader volume を選び、artifact 内の reset UF2 を先に直接コピーしてから、同じ side の firmware UF2 を直接コピーします。reset UF2 を書くと bootloader volume が消える場合があるため、同じ側をもう一度 bootloader mode に入れてから firmware UF2 を書き込んでください。
 
-左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` が含まれる前提で推定します。分類できない場合や、left / right が別パスでも同じ UF2 ファイル名になる場合は、書き込みボタンが有効になりません。書き込み前には表示中の UF2 名に加えて `artifact <name> #<id>` が想定した GitHub Actions artifact と一致していることも確認してください。
+左右両方の bootloader volume が同時に表示される場合は、ケーブルを差し替えずに順番に書き込めます。artifact に `manifest.json` または `firmware-manifest.json` が含まれている場合、Studio は manifest の `left` / `right` / `reset` / `outputs[].side` / `outputs[].file` を使います。manifest がない場合は、ファイル名に `left` / `right` / `reset` が含まれる前提で推定します。分類できない場合、left / right が別パスでも同じ UF2 ファイル名になる場合、または reset UF2 がない場合は、書き込みボタンが有効になりません。書き込み前には表示中の UF2 名に加えて `artifact <name> #<id>` が想定した GitHub Actions artifact と一致していることも確認してください。
+
+Direct Mode / ZMK Studio で保存した runtime keymap は ZMK の永続設定に残り、通常 firmware を flash しても `.keymap` の変更より優先されることがあります。そのためブラウザ版の Firmware mode では、artifact に含まれる settings reset UF2 を先に書き込んでから通常の Left / Right UF2 を書き込みます。
 
 ### 4.4 書き込み前の安全確認
 
@@ -573,7 +590,7 @@ Trackball は Direct Mode では参照のみです。変更する場合は Firmw
 
 ### GitHub Actions build から書き込みまで行いたい
 
-ブラウザ版では Firmware Mode の `Build & Flash` ボタンから GitHub に接続し、repository を読み込んで変更後に `Commit & Build` を押します。build 成功後に artifact を取得し、left / right UF2 を順番に bootloader volume へ保存します。
+ブラウザ版では Firmware Mode の `Build & Flash` ボタンから GitHub に接続し、repository を読み込んで変更後に `Commit & Build` を押します。build 成功後に artifact を取得し、左右それぞれで reset UF2、firmware UF2 の順に bootloader volume へ保存します。
 
 Tauri 版では Firmware Mode で設定を保存し、`KobitoKey_QWERTY` 側で commit / push します。その後、KobitoKey Studio の `Build & Flash` ボタンから build を起動し、artifact を download して、左右 UF2 を順番に bootloader volume へコピーします。
 

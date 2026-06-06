@@ -477,12 +477,11 @@ const checks = [
         "Artifact 取得",
         "Browser firmware release checks",
         "UF2 → Bootloader",
-        "onDownloadUf2",
-        '${sideLabel(side)} UF2 をダウンロード',
         "FirmwareWorkbenchActions",
         "Build & Flash ボタンから GitHub repository を読み込みます",
         "firmware 編集を読み込み時点に戻しました",
-        '${sideLabel(side)} を書き込み',
+        '${sideLabel(side)} reset を直接コピー',
+        '${sideLabel(side)} firmware を直接コピー',
         'return side === "left" ? "Left" : "Right"',
         '<span className="button-label">',
         'htmlFor="browser-firmware-repository"',
@@ -498,7 +497,11 @@ const checks = [
         'aria-live="polite"',
         'aria-atomic="true"',
         "disabled={isBusy || !readiness.canCommit}",
-        "disabled={isBusy || !readiness.canDownloadArtifact}",
+        "disabled={isBusy || !canDownloadArtifacts}",
+        "onImportArtifactFolder",
+        "Artifact フォルダから再開",
+        "browserFirmwareArtifactFolderHandleRef",
+        'startIn: browserFirmwareArtifactFolderHandleRef.current ?? "downloads"',
         "GitHub commit 失敗",
         "endBrowserFirmwareOperation(\"commit-build\")",
       ]),
@@ -524,6 +527,8 @@ const checks = [
         "GitHub Commit & Build",
         "inspectFirmwareActionButtons",
         "Build & Flash should be a firmware action button",
+        "Build & Flash action should read 編集に戻る while it closes the build panel",
+        "Build & Flash panel should show exactly one 編集に戻る button",
         "reset edits should be paired with the Build & Flash action",
         "reset edits should be enabled after firmware edits",
         "Build & Flash should not appear as an edit tab",
@@ -533,7 +538,7 @@ const checks = [
         "reset edits should announce that firmware edits were restored",
         "inspectBuildFlashBackAction",
         "Build & Flash panel should hide edit tabs",
-        "Build & Flash panel should expose a back-to-edit button",
+        "Build & Flash action should expose a single back-to-edit button",
         "elementFromPoint",
         "back-to-edit button should not be covered by another element",
         "back-to-edit button should restore edit tabs",
@@ -545,11 +550,27 @@ const checks = [
         "document.documentElement.scrollWidth > documentWidth + 1",
         "right pane should contain exactly one firmware key inspector",
         "right pane contains duplicated workbench controls",
+        ".release-flow-guide",
+        "Flash までの順番",
+        "Build & Flash should expose a release flow guide from GitHub to Right flash",
+        "Build & Flash release flow should make the path to flashing both sides explicit",
+        ".flash-sequence-guide",
+        "Flash panel should expose the left then right sequence guide",
+        ".flash-folder-guidance",
+        "INFO_UF2.TXT",
+        "reset UF2",
+        "firmware UF2",
+        "artifact 内の reset UF2",
+        "Artifact フォルダから再開",
+        ".release-next-action",
+        "キー / Combo / Trackball を編集",
         "Build & Flash status should use role=status",
         "Build & Flash status should be announced as an atomic polite live region",
-        "Left UF2 をダウンロード",
-        "Right UF2 をダウンロード",
-        ".flash-download-actions button",
+        "Build & Flash status should expose a visual status tone",
+        "Build & Flash release checks should not mark the whole list as error",
+        "Build & Flash release checks should show the current row",
+        "Left reset を直接コピー",
+        "Right reset を直接コピー",
         "inspectLayerStructureActions",
         "add layer should create one new layer",
         "add layer should fill keys with &trans bindings",
@@ -594,10 +615,7 @@ const checks = [
         "artifact summary should include",
         "flash target header should include",
         "left flash should be enabled after artifact provenance is shown",
-        "right flash should stay disabled until left is completed",
-        "left UF2 download fallback should trigger a browser download",
-        "right flash target header should include",
-        "right flash should be enabled only after left is completed",
+        "right flash should be enabled so users can write either side first",
         "confirmFlashDialog",
         "artifact ${artifactName} #${artifactId}",
         "firmware/manifest.json",
@@ -635,7 +653,11 @@ const checks = [
     name: "firmware edit action labels use consistent user-facing terminology",
     pass: () =>
       allIncludes(files.main, [
-        'actionLabel="選択キーの編集を保存"',
+        'actionLabel="選択キーに反映"',
+        "canApplyBinding={hasPendingFirmwareKeyDraft}",
+        "Firmwareファイルを保存",
+        "Firmwareファイルをダウンロード",
+        '<span className="button-label">{projectSaveLabel}</span>',
         'actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}',
         'saveLabel = "Combo の編集を保存"',
         'actionLabel="Combo 動作を編集"',
@@ -645,7 +667,11 @@ const checks = [
         "Combo 差分を Firmware に取り込む",
       ]) &&
       allIncludes(files.uiSmoke, [
-        'getByRole("button", { name: "選択キーの編集を保存" })',
+        'getByRole("button", { name: "選択キーに反映" })',
+        "selected key apply action should live in the right key inspector",
+        "selected key apply should not be grouped with firmware project actions",
+        "project save/export should be grouped with firmware actions",
+        "project save/export should not be stranded in the layer heading",
         'getByRole("button", { name: "Combo の編集を保存" })',
         'getByRole("button", { name: "トラックボール編集を保存" })',
       ]) &&
@@ -715,6 +741,7 @@ const checks = [
     name: "Direct/Firmware combo comparison preserves layer scope",
     pass: () =>
       allIncludes(files.directKeymap, [
+        'const CUSTOM_LAYER_TAP_BEHAVIORS = new Set(["&lt_l", "&lt_left_thumb", "&lt_r", "&lt_right_thumb"])',
         "comboLayersToMask(combo.layers)",
         "layerMaskToLayers(combo)",
         "sameComparableLayers(left.layers, right.layers)",
@@ -722,8 +749,11 @@ const checks = [
         "layers: directCombo.layers",
       ]) &&
       allIncludes(files.directKeymapTest, [
+        'it("does not diff custom layer-tap aliases returned with Studio behavior names"',
         'it("diffs Direct combo layer masks against firmware combo layer scopes"',
         'it("applies Direct combo layer scope changes back to firmware source"',
+        "&lt_l 1 SPACE",
+        "&lt_left_thumb 1 458796",
         "layers = <1>;",
         "layers = <2>;",
       ]),
@@ -925,7 +955,7 @@ const checks = [
     name: "release gate requires diff review before commit and a verified run before flash",
     pass: () =>
       allIncludes(files.releaseFlow, [
-        "state.hasLocalChanges &&",
+        "state.hasLocalChanges",
         "state.diffReviewed",
         "hasVerifiedSuccessfulRun",
         "canFlashFirmwareSide",
@@ -934,20 +964,22 @@ const checks = [
         "allows commit only after files are changed and diff is reviewed",
         "closes both flash gates when files change after a partial flash",
         "requires a verified successful run before either side can be flashed",
-        "forces left flash before right flash",
+        "allows either side to flash first",
         "blocks flash when left and right artifact basenames are the same",
       ]),
   },
   {
-    name: "flash execution path rechecks left/right gate before writing or marking manual completion",
+    name: "flash execution path rechecks left/right gate and writes reset before firmware",
     pass: () =>
       allIncludes(files.main, [
         "canFlashFirmwareSide(browserFirmwareReadiness, side)",
         "markBrowserFirmwareSideFlashed(side)",
         "setBrowserFirmwareDownloadedSide(side)",
-        "UF2 ダウンロードをキャンセルしました",
-        "confirmBrowserFirmwareFlashDownload",
-        "同じ side の書き込みボタンで完了として記録してください",
+        "browserFirmwareUf2Target(\"reset\")",
+        "reset UF2 を",
+        "もう一度",
+        "firmware UF2",
+        "assertUf2BootloaderDirectory(handle)",
         "requestFlashConfirmation",
         "keyboardHalfChecked",
       ]),
@@ -971,25 +1003,28 @@ const checks = [
       ]),
   },
   {
-    name: "browser flash writes only to verified UF2 bootloader folders",
+    name: "browser flash uses direct copy and reset UF2 before firmware",
     pass: () =>
       allIncludes(files.main, [
+        "writeBrowserUf2ToDirectoryHandle",
         "assertUf2BootloaderDirectory(handle)",
-        "writeUf2ToDirectoryHandle",
-        "confirmBrowserFirmwareFlashWrite",
-        "confirmBrowserFirmwareFlashDownload",
-        "confirmBrowserFirmwareManualFlashComplete",
+        "isLikelyBootloaderEjectError",
         "FlashConfirmationDialog",
         "firmwareArtifactProvenanceLabel",
         "manifestArtifactName",
+        "setBrowserFirmwareDownloadedSide(side)",
+        "readLocalFirmwareArtifactsFromDirectoryHandle",
+        "externalArtifactsReady",
         "接続中の keyboard half",
-        "bootloader volume にコピーします",
-        "確認してダウンロード",
-        "手動コピー済みなら",
+        "reset を直接コピー",
+        "firmware を直接コピー",
+        "reset UF2 を先に書き込みます",
+        "コピーを開始",
       ]) &&
       !files.main.includes("window.confirm") &&
-      allIncludes(files.bootloader, ["INFO_UF2.TXT", "CURRENT.UF2"]) &&
-      allIncludes(files.bootloaderTest, ["accepts UF2 bootloader directories with INFO_UF2.TXT", "rejects directories without UF2 bootloader markers"]),
+      !files.main.includes("confirmBrowserFirmwareFlashWrite") &&
+      !files.main.includes("confirmBrowserFirmwareFlashDownload") &&
+      !files.main.includes("onDownloadUf2"),
   },
   {
     name: "browser session persistence excludes token and UF2 bytes",
@@ -1005,11 +1040,15 @@ const checks = [
       ]) &&
       allIncludes(files.sessionTest, [
         "excludes token or artifact bytes",
+        "persists repository and branch preferences before a build exists",
         "not.toContain(\"secret\")",
         "not.toContain(\"uf2Bytes\")",
         "drops unsafe persisted GitHub URLs and invalid commit metadata",
         "keeps safe GitHub resume links only when they match the stored commit and run",
         "https://github.com/other/repo/commit/abc123",
+      ]) &&
+      allIncludes(files.main, [
+        "このブラウザに保存します",
       ]),
   },
   {
@@ -1057,6 +1096,7 @@ const checks = [
         "ISO UTC の flash 完了時刻",
       ]) &&
       allIncludes(files.docsUsageGuide, ["GitHub artifact 名 / id", "artifact <name> #<id>"]) &&
+      allIncludes(files.docsUsageGuide, ["settings reset UF2", "runtime keymap", "reset UF2 を先に直接コピー"]) &&
       allIncludes(files.docsDeployment, [
         "PR / feature branch の Workers preview",
         "preview preflight の成功は production 公開の証跡にしない",

@@ -17,6 +17,7 @@ export type FlashSide = "left" | "right";
 
 export type ClassifiedUf2Artifacts = {
   left: string | null;
+  reset: string | null;
   right: string | null;
   unknown: string[];
 };
@@ -32,6 +33,7 @@ export type FirmwareReleaseState = {
   buildRunId: string | null;
   buildStatus: FirmwareBuildStatus;
   artifactFiles: string[];
+  externalArtifactsReady?: boolean;
   artifactTargets?: ClassifiedUf2Artifacts;
   leftFlashed: boolean;
   rightFlashed: boolean;
@@ -46,15 +48,19 @@ export type FirmwareReleaseReadiness = {
   canDownloadArtifact: boolean;
   canFlashLeft: boolean;
   canFlashRight: boolean;
+  leftFlashed: boolean;
+  rightFlashed: boolean;
   complete: boolean;
 };
 
 export function classifyUf2Artifacts(files: string[]): ClassifiedUf2Artifacts {
-  const result: ClassifiedUf2Artifacts = { left: null, right: null, unknown: [] };
+  const result: ClassifiedUf2Artifacts = { left: null, reset: null, right: null, unknown: [] };
 
   for (const file of files.filter((value) => value.toLowerCase().endsWith(".uf2"))) {
     const side = inferUf2Side(file);
-    if (side === "left" && result.left === null) {
+    if (isResetUf2File(file) && result.reset === null) {
+      result.reset = file;
+    } else if (side === "left" && result.left === null) {
       result.left = file;
     } else if (side === "right" && result.right === null) {
       result.right = file;
@@ -73,6 +79,8 @@ export function deriveFirmwareReleaseReadiness(state: FirmwareReleaseState): Fir
   const hasCommittedChanges = Boolean(state.commitSha);
   const committedRevisionIsCurrent = hasCommittedChanges && !state.hasLocalChanges;
   const hasVerifiedSuccessfulRun = committedRevisionIsCurrent && Boolean(state.buildRunId) && buildSucceeded;
+  const canUseExternalArtifacts = Boolean(state.externalArtifactsReady);
+  const hasFlashableArtifacts = (hasVerifiedSuccessfulRun || canUseExternalArtifacts) && hasCompleteArtifacts;
   const canCommit =
     state.authenticated &&
     state.repositorySelected &&
@@ -88,9 +96,36 @@ export function deriveFirmwareReleaseReadiness(state: FirmwareReleaseState): Fir
     state.branchSelected &&
     Boolean(state.buildRunId) &&
     buildSucceeded;
-  const canFlashLeft = hasVerifiedSuccessfulRun && hasCompleteArtifacts && !state.leftFlashed;
-  const canFlashRight =
-    hasVerifiedSuccessfulRun && hasCompleteArtifacts && state.leftFlashed && !state.rightFlashed;
+  const canFlashLeft = hasFlashableArtifacts && !state.leftFlashed;
+  const canFlashRight = hasFlashableArtifacts && !state.rightFlashed;
+
+  if (canUseExternalArtifacts && hasCompleteArtifacts) {
+    if (!state.leftFlashed) {
+      return readiness("flash-left", "左側を書き込む", [], state, {
+        canCommit,
+        canBuild,
+        canDownloadArtifact,
+        canFlashLeft,
+        canFlashRight,
+      });
+    }
+    if (!state.rightFlashed) {
+      return readiness("flash-right", "右側を書き込む", [], state, {
+        canCommit,
+        canBuild,
+        canDownloadArtifact,
+        canFlashLeft,
+        canFlashRight,
+      });
+    }
+    return readiness("done", "完了", [], state, {
+      canCommit,
+      canBuild,
+      canDownloadArtifact,
+      canFlashLeft,
+      canFlashRight,
+    });
+  }
 
   if (!state.authenticated) {
     return readiness("connect-github", "GitHub で接続", ["GitHub 連携が必要です"], state, {
@@ -183,7 +218,7 @@ export function deriveFirmwareReleaseReadiness(state: FirmwareReleaseState): Fir
     });
   }
   if (!hasCompleteArtifacts) {
-    return readiness("download-artifact", "Artifact を取得", ["left / right UF2 が揃っていません"], state, {
+    return readiness("download-artifact", "Artifact を取得", ["left / right / reset UF2 が揃っていません"], state, {
       canCommit,
       canBuild,
       canDownloadArtifact,
@@ -224,10 +259,11 @@ export function canFlashFirmwareSide(readiness: FirmwareReleaseReadiness, side: 
 }
 
 function hasDistinctCompleteArtifacts(artifacts: ClassifiedUf2Artifacts): boolean {
-  if (!artifacts.left || !artifacts.right || artifacts.left === artifacts.right) {
+  if (!artifacts.left || !artifacts.reset || !artifacts.right) {
     return false;
   }
-  return artifactBasename(artifacts.left) !== artifactBasename(artifacts.right);
+  const basenames = [artifacts.left, artifacts.reset, artifacts.right].map(artifactBasename);
+  return new Set(basenames).size === basenames.length;
 }
 
 function artifactBasename(path: string): string {
@@ -246,6 +282,8 @@ function readiness(
     nextAction,
     blockers,
     ...gates,
+    leftFlashed: state.leftFlashed,
+    rightFlashed: state.rightFlashed,
     complete: state.leftFlashed && state.rightFlashed && step === "done",
   };
 }
@@ -263,6 +301,15 @@ function inferUf2Side(file: string): FlashSide | null {
     return null;
   }
   return hasLeft ? "left" : "right";
+}
+
+function isResetUf2File(file: string): boolean {
+  const filename = basename(file).toLowerCase();
+  const tokens = filename
+    .replace(/\.uf2$/, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  return tokens.includes("reset") || tokens.includes("settingsreset");
 }
 
 function basename(path: string): string {
