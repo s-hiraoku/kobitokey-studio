@@ -54,6 +54,8 @@ KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボー
 6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
 7. 左右 UF2 を順番に bootloader へ書き込む
 
+ブラウザ版はローカル clone 不要です。公式 repository に書き込み権限がない場合は、GitHub 上で `KobitoKey_QWERTY` を fork し、その fork を `Firmware repository` に指定してください。
+
 ### キーを 1 個だけ試す
 
 1. ZMK Studio 対応 firmware が入った KobitoKey を用意する

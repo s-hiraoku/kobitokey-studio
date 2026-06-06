@@ -295,7 +295,14 @@ async function setSelectedKeyRawBinding(page, binding) {
     details.setAttribute("open", "");
   });
   await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
-  await page.getByRole("button", { name: "選択キーの編集を保存" }).click();
+  await page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" }).click();
+}
+
+async function draftSelectedKeyRawBinding(page, binding) {
+  await page.locator(".firmware-key-inspector .advanced-binding").evaluate((details) => {
+    details.setAttribute("open", "");
+  });
+  await page.locator('.firmware-key-inspector input[name="zmkBinding"]').fill(binding);
 }
 
 async function inspectKeyBindingEditActions(page, label) {
@@ -312,7 +319,15 @@ async function inspectKeyBindingEditActions(page, label) {
   }
 
   await page.locator('.choice-grid button[title="B"]').click();
-  await page.getByRole("button", { name: "選択キーの編集を保存" }).click();
+  const writeButton = page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" });
+  if ((await writeButton.count()) !== 1) {
+    failures.push(`${label}: selected key apply action should live in the right key inspector`);
+    return failures;
+  }
+  if (await writeButton.isDisabled()) {
+    failures.push(`${label}: selected key apply action should enable after editing a key`);
+  }
+  await writeButton.click();
 
   const afterApply = await readKeyBindingState(page);
   if (afterApply.selectedBinding !== "&kp B") {
@@ -326,6 +341,34 @@ async function inspectKeyBindingEditActions(page, label) {
   }
   if (afterApply.writeTargetText !== "Tap B") {
     failures.push(`${label}: key inspector write target should reflect Tap B`);
+  }
+
+  await draftSelectedKeyRawBinding(page, "&kp C");
+  await page.getByRole("button", { name: "Build & Flash" }).click();
+  await page.getByText("GitHub Commit & Build").waitFor();
+
+  const actions = page.locator(".firmware-workbench-actions");
+  const buildNavigationButtons = await actions.getByRole("button", { name: "Build & Flash", exact: true }).count();
+  if (buildNavigationButtons !== 0) {
+    failures.push(`${label}: Build & Flash action should be relabeled while the build panel is open`);
+  }
+
+  const actionBackButtons = await actions.getByRole("button", { name: "編集に戻る", exact: true }).count();
+  if (actionBackButtons !== 1) {
+    failures.push(`${label}: Build & Flash action should read 編集に戻る while it closes the build panel`);
+  }
+  const allBackButtons = await page.getByRole("button", { name: "編集に戻る", exact: true }).count();
+  if (allBackButtons !== 1) {
+    failures.push(`${label}: Build & Flash panel should show exactly one 編集に戻る button, got ${allBackButtons}`);
+  }
+
+  await actions.getByRole("button", { name: "編集に戻る", exact: true }).click();
+  const afterBuildTransition = await readKeyBindingState(page);
+  if (afterBuildTransition.selectedBinding !== "&kp C") {
+    failures.push(`${label}: pending key draft should be saved before opening Build & Flash`);
+  }
+  if (afterBuildTransition.selectedLabel !== "C") {
+    failures.push(`${label}: pending key draft should update the rendered key label after returning from Build & Flash`);
   }
 
   return failures;
@@ -420,7 +463,7 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   await page.getByRole("button", { name: "GitHub から読み込み" }).click();
   await waitForBuildStatusText(page, "firmware files を読み込みました");
 
-  await page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" }).click();
+  await page.locator(".firmware-workbench-actions").getByRole("button", { name: "編集に戻る", exact: true }).click();
   await page.locator(".layer-list button").first().click();
   await page.locator(".physical-key").first().click();
   await setSelectedKeyRawBinding(page, "&kp C");
@@ -447,8 +490,11 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
     const rightDownloadButton = Array.from(document.querySelectorAll(".browser-release-workbench .flash-download-actions button")).find((button) =>
       button.textContent?.includes("Right UF2 をダウンロード"),
     );
+    const fallbackDetails = document.querySelector(".browser-release-workbench .flash-fallback-details");
     return {
       headerText,
+      fallbackCollapsed: fallbackDetails instanceof HTMLDetailsElement ? !fallbackDetails.open : null,
+      folderGuidanceText: document.querySelector(".browser-release-workbench .flash-folder-guidance")?.textContent?.trim() ?? "",
       leftDisabled: leftButton?.disabled ?? null,
       rightDisabled: rightButton?.disabled ?? null,
       rightDownloadDisabled: rightDownloadButton?.disabled ?? null,
@@ -473,10 +519,23 @@ async function inspectArtifactProvenanceAfterDownload(page, label) {
   if (state.leftDisabled !== false) {
     failures.push(`${label}: left flash should be enabled after artifact provenance is shown`);
   }
+  if (state.fallbackCollapsed !== true) {
+    failures.push(`${label}: UF2 download fallback should be collapsed by default`);
+  }
+  if (
+    !state.folderGuidanceText.includes("INFO_UF2.TXT") ||
+    !state.folderGuidanceText.includes("USB ドライブ") ||
+    !state.folderGuidanceText.includes("reset file は不要")
+  ) {
+    failures.push(`${label}: flash panel should explain which bootloader folder to select`);
+  }
   if (state.rightDisabled !== true || state.rightDownloadDisabled !== true) {
     failures.push(`${label}: right flash should stay disabled until left is completed`);
   }
 
+  await page.locator(".browser-release-workbench .flash-fallback-details").evaluate((details) => {
+    details.setAttribute("open", "");
+  });
   const downloadPromise = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
   await page
     .locator(".browser-release-workbench .flash-download-actions")
@@ -675,9 +734,11 @@ async function readReleaseWizardState(page) {
       Array.from(document.querySelectorAll(".browser-release-workbench button")).find((button) =>
         button.textContent?.includes(text),
       );
-    const nextText = Array.from(document.querySelectorAll(".browser-release-meta span")).find((node) =>
-      node.textContent?.startsWith("次:"),
-    )?.textContent;
+    const nextText =
+      document.querySelector(".browser-release-meta .release-next-action strong")?.textContent ??
+      Array.from(document.querySelectorAll(".browser-release-meta span")).find((node) =>
+        node.textContent?.startsWith("次:"),
+      )?.textContent;
     return {
       commitDisabled: buttonByText("Commit & Build")?.disabled ?? null,
       clearTokenDisabled: buttonByText("token を消去")?.disabled ?? null,
@@ -718,6 +779,9 @@ async function inspectComboEditActions(page, label) {
   if (afterCreate.selectedComboKeys !== "1 + 2") {
     failures.push(`${label}: added combo should default to the selected key pair, got "${afterCreate.selectedComboKeys}"`);
   }
+  if (afterCreate.selectedComboFormKeys !== "1 + 2") {
+    failures.push(`${label}: added combo editor should show the selected key pair, got "${afterCreate.selectedComboFormKeys}"`);
+  }
   if (afterCreate.selectedComboBinding !== "ESC") {
     failures.push(`${label}: added combo should default to ESC, got "${afterCreate.selectedComboBinding}"`);
   }
@@ -733,6 +797,22 @@ async function inspectComboEditActions(page, label) {
   }
   if (afterCreate.diffCount < initial.diffCount) {
     failures.push(`${label}: adding a combo should not lose existing diffs`);
+  }
+  await page.locator(".combo-key-grid button").nth(4).click();
+  const afterKeyEdit = await readComboState(page);
+  if (afterKeyEdit.selectedComboFormKeys !== "1 + 2 + 5") {
+    failures.push(`${label}: combo key picker should keep the added combo keys while editing, got "${afterKeyEdit.selectedComboFormKeys}"`);
+  }
+  await comboEditor.getByRole("button", { name: "Combo の編集を保存" }).click();
+  const afterSave = await readComboState(page);
+  if (afterSave.comboCount !== initial.comboCount + 1) {
+    failures.push(`${label}: saving an added combo should keep it in the combo list`);
+  }
+  if (afterSave.selectedComboKeys !== "1 + 2 + 5") {
+    failures.push(`${label}: saving an added combo should update its displayed keys, got "${afterSave.selectedComboKeys}"`);
+  }
+  if (afterSave.selectedComboFormKeys !== "1 + 2 + 5") {
+    failures.push(`${label}: saving an added combo should keep the editor keys, got "${afterSave.selectedComboFormKeys}"`);
   }
   if (await deleteButton.isDisabled()) {
     failures.push(`${label}: combo list delete button should be enabled for the selected combo`);
@@ -755,15 +835,35 @@ async function inspectFirmwareActionButtons(page, label) {
   const failures = [];
   const actions = page.locator(".firmware-workbench-actions");
   const buildButton = actions.getByRole("button", { name: "Build & Flash" });
+  const writeButton = page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" });
+  const strayWriteButton = actions.getByRole("button", { name: "選択キーに反映" });
+  const exportButton = actions.getByRole("button", { name: "Firmwareファイルをダウンロード" });
   const resetButton = actions.getByRole("button", { name: "編集をリセット" });
 
   if ((await buildButton.count()) !== 1) {
     failures.push(`${label}: Build & Flash should be a firmware action button`);
     return failures;
   }
+  if ((await writeButton.count()) !== 1) {
+    failures.push(`${label}: selected key apply should be available in the right key inspector`);
+    return failures;
+  }
+  if ((await strayWriteButton.count()) !== 0) {
+    failures.push(`${label}: selected key apply should not be grouped with firmware project actions`);
+  }
+  if ((await exportButton.count()) !== 1) {
+    failures.push(`${label}: project save/export should be grouped with firmware actions`);
+    return failures;
+  }
+  if ((await page.locator(".panel-heading").getByRole("button", { name: "Firmwareファイルをダウンロード" }).count()) !== 0) {
+    failures.push(`${label}: project save/export should not be stranded in the layer heading`);
+  }
   if ((await resetButton.count()) !== 1) {
     failures.push(`${label}: reset edits should be paired with the Build & Flash action`);
     return failures;
+  }
+  if ((await actions.locator(".firmware-danger-actions").getByRole("button", { name: "編集をリセット" }).count()) !== 1) {
+    failures.push(`${label}: reset edits should be separated from primary firmware actions`);
   }
   if (await resetButton.isDisabled()) {
     failures.push(`${label}: reset edits should be enabled after firmware edits`);
@@ -838,14 +938,14 @@ async function inspectBuildFlashBackAction(page, label) {
     failures.push(`${label}: Build & Flash panel should hide edit tabs`);
   }
 
-  const backButton = page.locator(".browser-release-workbench").getByRole("button", { name: "編集に戻る" });
+  const backButton = page.locator(".firmware-workbench-actions").getByRole("button", { name: "編集に戻る", exact: true });
   if ((await backButton.count()) !== 1) {
-    failures.push(`${label}: Build & Flash panel should expose a back-to-edit button`);
+    failures.push(`${label}: Build & Flash action should expose a single back-to-edit button`);
     return failures;
   }
 
   const clickTarget = await page.evaluate(() => {
-    const buttons = Array.from(document.querySelectorAll(".browser-release-workbench button"));
+    const buttons = Array.from(document.querySelectorAll(".firmware-workbench-actions button"));
     const button = buttons.find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "編集に戻る");
     if (!button) {
       return { found: false, hitMatches: false, hitText: "", rect: null };
@@ -989,6 +1089,7 @@ async function readComboState(page) {
       diffCount: readDiffCount(),
       editingCount: document.querySelectorAll(".combo-list .combo-row.selected").length,
       selectedComboBinding: selectedRow?.querySelector(".binding-chip strong")?.textContent?.trim() ?? null,
+      selectedComboFormKeys: document.querySelector(".combo-key-picker .binding-preview strong")?.textContent?.trim() ?? null,
       selectedComboKeys: selectedSummary?.querySelector("strong")?.textContent?.trim() ?? null,
       selectedComboLayerScope: selectedScope?.querySelector("strong")?.textContent?.trim() ?? null,
     };
@@ -1078,6 +1179,45 @@ async function inspectFirmwareUi(page, label) {
     if (releaseStatus?.getAttribute("aria-live") !== "polite" || releaseStatus?.getAttribute("aria-atomic") !== "true") {
       failures.push(`${viewportLabel}: Build & Flash status should be announced as an atomic polite live region`);
     }
+    if (!releaseStatus?.classList.contains("warning") && !releaseStatus?.classList.contains("success")) {
+      failures.push(`${viewportLabel}: Build & Flash status should expose a visual status tone`);
+    }
+    if (!workbench?.querySelector(".release-next-action")) {
+      failures.push(
+        `${viewportLabel}: Build & Flash next action should use .release-next-action and explain キー / Combo / Trackball を編集 when no changes`,
+      );
+    }
+    if (!workbench?.querySelector(".release-flow-guide")) {
+      failures.push(`${viewportLabel}: Build & Flash should expose a release flow guide from GitHub to Right flash`);
+    }
+    if (!workbench?.textContent?.includes("Flash までの順番") || !workbench?.textContent?.includes("Right を書き込み")) {
+      failures.push(`${viewportLabel}: Build & Flash release flow should make the path to flashing both sides explicit`);
+    }
+    if (!workbench?.querySelector(".flash-sequence-guide")) {
+      failures.push(`${viewportLabel}: Flash panel should expose the left then right sequence guide`);
+    }
+    const fallbackDetails = workbench?.querySelector(".flash-fallback-details");
+    if (!(fallbackDetails instanceof HTMLDetailsElement) || fallbackDetails.open) {
+      failures.push(`${viewportLabel}: UF2 download fallback should be collapsed outside the normal flash flow`);
+    }
+    const folderGuidance = workbench?.querySelector(".flash-folder-guidance")?.textContent ?? "";
+    if (
+      !folderGuidance.includes("INFO_UF2.TXT") ||
+      !folderGuidance.includes("USB ドライブ") ||
+      !folderGuidance.includes("reset file は不要")
+    ) {
+      failures.push(`${viewportLabel}: Flash panel should explain that the bootloader USB drive is the folder to select`);
+    }
+    if (!workbench?.querySelector(".flash-completion-status") || !workbench?.textContent?.includes("書き込み待ち")) {
+      failures.push(`${viewportLabel}: Flash panel should show left/right flash completion state`);
+    }
+    const releaseChecks = workbench?.querySelector(".build-check-list");
+    if (releaseChecks?.classList.contains("error")) {
+      failures.push(`${viewportLabel}: Build & Flash release checks should not mark the whole list as error`);
+    }
+    if (!releaseChecks?.querySelector(".build-check-item.done") || !releaseChecks?.querySelector(".build-check-item.current")) {
+      failures.push(`${viewportLabel}: Build & Flash release checks should show done and current rows separately`);
+    }
 
     const inspector = document.querySelector("aside.inspector");
     if (!inspector) {
@@ -1121,10 +1261,11 @@ async function inspectFirmwareUi(page, label) {
       "Build 起動",
       "最新 run",
       "Artifact 取得",
+      "Artifact フォルダから再開",
+      "フォルダを選択",
       "Left を書き込み",
       "Right を書き込み",
-      "Left UF2 をダウンロード",
-      "Right UF2 をダウンロード",
+      "直接書き込みできない場合だけ UF2 をダウンロード",
     ];
     for (const text of requiredLabels) {
       const found = Array.from(document.querySelectorAll(".browser-release-workbench button")).some((button) =>
@@ -1136,7 +1277,7 @@ async function inspectFirmwareUi(page, label) {
     }
 
     const buttons = Array.from(
-      document.querySelectorAll(".browser-release-workbench .build-actions button, .browser-release-workbench .flash-side-toggle button, .browser-release-workbench .flash-download-actions button"),
+      document.querySelectorAll(".browser-release-workbench .build-actions button, .browser-release-workbench .flash-side-toggle button"),
     );
     for (const button of buttons) {
       const rect = button.getBoundingClientRect();

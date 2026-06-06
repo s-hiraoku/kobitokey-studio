@@ -32,6 +32,7 @@ export type FirmwareReleaseState = {
   buildRunId: string | null;
   buildStatus: FirmwareBuildStatus;
   artifactFiles: string[];
+  externalArtifactsReady?: boolean;
   artifactTargets?: ClassifiedUf2Artifacts;
   leftFlashed: boolean;
   rightFlashed: boolean;
@@ -73,6 +74,8 @@ export function deriveFirmwareReleaseReadiness(state: FirmwareReleaseState): Fir
   const hasCommittedChanges = Boolean(state.commitSha);
   const committedRevisionIsCurrent = hasCommittedChanges && !state.hasLocalChanges;
   const hasVerifiedSuccessfulRun = committedRevisionIsCurrent && Boolean(state.buildRunId) && buildSucceeded;
+  const canUseExternalArtifacts = Boolean(state.externalArtifactsReady);
+  const hasFlashableArtifacts = (hasVerifiedSuccessfulRun || canUseExternalArtifacts) && hasCompleteArtifacts;
   const canCommit =
     state.authenticated &&
     state.repositorySelected &&
@@ -88,9 +91,37 @@ export function deriveFirmwareReleaseReadiness(state: FirmwareReleaseState): Fir
     state.branchSelected &&
     Boolean(state.buildRunId) &&
     buildSucceeded;
-  const canFlashLeft = hasVerifiedSuccessfulRun && hasCompleteArtifacts && !state.leftFlashed;
+  const canFlashLeft = hasFlashableArtifacts && !state.leftFlashed;
   const canFlashRight =
-    hasVerifiedSuccessfulRun && hasCompleteArtifacts && state.leftFlashed && !state.rightFlashed;
+    hasFlashableArtifacts && state.leftFlashed && !state.rightFlashed;
+
+  if (canUseExternalArtifacts && hasCompleteArtifacts) {
+    if (!state.leftFlashed) {
+      return readiness("flash-left", "左側を書き込む", [], state, {
+        canCommit,
+        canBuild,
+        canDownloadArtifact,
+        canFlashLeft,
+        canFlashRight,
+      });
+    }
+    if (!state.rightFlashed) {
+      return readiness("flash-right", "右側を書き込む", [], state, {
+        canCommit,
+        canBuild,
+        canDownloadArtifact,
+        canFlashLeft,
+        canFlashRight,
+      });
+    }
+    return readiness("done", "完了", [], state, {
+      canCommit,
+      canBuild,
+      canDownloadArtifact,
+      canFlashLeft,
+      canFlashRight,
+    });
+  }
 
   if (!state.authenticated) {
     return readiness("connect-github", "GitHub で接続", ["GitHub 連携が必要です"], state, {

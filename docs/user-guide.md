@@ -24,7 +24,7 @@ KobitoKey Studio は PC の Chrome / Edge で使う設定ツールです。ま�
 Firmware Mode は keymap、Combo、Trackball、build、UF2 書き込みまでをファイルとして扱うモードです。迷ったら Firmware Mode を使ってください。
 
 1. [Build & Flash](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build) で GitHub に接続します。
-2. `Firmware repository` と `Branch` を確認し、`GitHub から読み込み` を押します。
+2. `Firmware repository` と `Branch` を確認し、`GitHub から読み込み` を押します。ローカル clone は不要です。公式 repository に書き込み権限がない場合は、自分の GitHub fork を指定してください。
 3. key、Combo、Trackball を編集します。
 4. [Diff](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff) で変更内容を確認します。
 5. 変更を破棄する場合は `編集をリセット` を押します。

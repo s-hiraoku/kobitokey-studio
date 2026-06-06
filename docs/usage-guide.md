@@ -54,7 +54,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | 確認すること | Firmware Mode | Direct Mode |
 | --- | --- | --- |
 | KobitoKey Studio を起動できる | 必須 | 必須 |
-| `KobitoKey_QWERTY` の GitHub repository またはローカル clone がある | 必須 | 任意 |
+| `KobitoKey_QWERTY` の GitHub repository がある | 必須。ブラウザ版では書き込み権限のある repository を指定します | 任意 |
 | `config/KobitoKey.keymap` が読める | 必須 | 任意 |
 | 左右 overlay ファイルが読める | Trackball 編集に必須 | 任意 |
 | GitHub 認証済み | Firmware Mode の build に必須。ブラウザ版は OAuth/token、Tauri 版は `gh auth login` | 不要 |
@@ -62,7 +62,7 @@ Firmware Mode は `KobitoKey_QWERTY` の設定ファイルを編集し、ファ�
 | USB data 通信できるケーブルがある | UF2 書き込みに必須 | USB Direct に必須 |
 | Chrome または Edge を使っている | ブラウザ版では推奨 | ブラウザ Direct では必須 |
 
-ブラウザ版の Firmware Mode では、GitHub repository の読み込み、commit、GitHub Actions 操作、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを一部ユーザー向けに利用できます。
+ブラウザ版の Firmware Mode では、ローカル clone は不要です。GitHub 上の repository を読み込み、編集後に同じ repository へ commit し、GitHub Actions build、artifact download、左右 UF2 の順番ガイドまで一つの画面で進められます。公式 repository に書き込み権限がない場合は、GitHub 上で `KobitoKey_QWERTY` を fork し、その fork の URL を `Firmware repository` に指定してください。Tauri デスクトップ版では、ローカルファイル保存、`gh` CLI、bootloader volume 検出を使う従来フローを一部ユーザー向けに利用できます。
 
 ## 画面の見方
 
@@ -168,7 +168,7 @@ Tauri デスクトップ版では、ローカルファイルの読み書き、`g
 
 ### GitHub 認証の準備
 
-ブラウザ版 Firmware Mode は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。
+ブラウザ版 Firmware Mode は、GitHub OAuth device flow または GitHub token を使います。OAuth を使う公開環境では `VITE_GITHUB_OAUTH_CLIENT_ID` を設定してください。OAuth flow は managed firmware files の読み書きと Actions build 起動のために `repo` scope を要求します。fine-grained token を手入力する場合は、対象 firmware repository だけに Contents write と Actions write を付け、作業後は `token を消去` を押すか画面を閉じて破棄してください。公式 repository に直接書き込めないユーザーは、GitHub 上で fork を作り、その fork に対する権限を token/OAuth に付けます。
 
 Tauri 版 Firmware Mode の GitHub Actions build 操作は、Tauri backend から `gh` CLI を呼び出します。初回は次で認証してください。
 
@@ -239,13 +239,13 @@ Firmware Mode は「ファイルを更新してから firmware に焼き込む�
 3. Tauri 版では `読み込み` を押します。
 4. (任意)Tauri 版でビルドまで進める場合は `Build & Flash` ボタンを押し、`Firmware repository URL` に GitHub の repository URL を指定します。
 
-ブラウザ版の初回は GitHub repository URL と branch を指定してください。Tauri 版のプロジェクトフォルダ初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
+ブラウザ版の初回は GitHub repository URL と branch を指定してください。ローカル clone の用意は不要です。公式 repository へ書き込めない場合は、GitHub 上の fork URL を指定します。Tauri 版のプロジェクトフォルダ初期値は空です。初回は `参照…` で `KobitoKey_QWERTY` をクローンしているローカルフォルダを選んでください。
 
 読み込みに成功すると、左側に layer 一覧、中央に KobitoKey の物理レイアウト、右側に選択中キーの編集 panel が表示されます。
 
 読み込み後に最初に見る場所は、左側の layer 一覧です。layer を切り替えると中央の key 表示が変わります。中央の key をクリックすると、右側の inspector がその key の編集画面になります。
 
-ブラウザ版では GitHub repository URL を keymap / overlay の読み書き、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。Tauri 版ではローカルフォルダを keymap / overlay の読み書きに使い、Firmware repository URL を Actions 操作に使います。通常は同じ repository を指しますが、fork の Actions を使いたい場合は fork 側の URL を指定できます。
+ブラウザ版では GitHub repository URL を keymap / overlay の読み書き、GitHub Actions の build 起動、最新 run 確認、artifact 取得に使います。公式 repository に書き込み権限がない場合は、GitHub 上の fork URL を指定してください。Tauri 版ではローカルフォルダを keymap / overlay の読み書きに使い、Firmware repository URL を Actions 操作に使います。
 repository は `owner/repo`、`https://github.com/owner/repo`、または `git@github.com:owner/repo.git` の形で入力してください。`tree/main` や `blob/...` 付きの URL、query/hash 付きの URL は対象 repository が曖昧になるため読み込み前に拒否します。branch は `feature/firmware-mode` のように `/` を含む名前でも使えます。
 
 Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer を追加し、copy で選択中 layer を末尾に複製できます。trash は layer 番号参照のずれを避けるため、最後の layer を選んでいるときだけ有効になります。キー動作や Combo の動作 / `layers` 指定から参照されている layer は削除できません。Direct Mode では実機の layer 構造変更は行いません。
@@ -256,10 +256,10 @@ Firmware Mode では layer 一覧の上にある `+` で末尾に空の layer �
 2. 中央のキーボード図で変更したい key をクリックします。
 3. 右側の動作エディタで動作タイプを選びます。
 4. on-screen picker から keycode、layer、modifier、mouse button、Bluetooth action などを選びます。
-5. `選択キーの編集を保存` を押します。
+5. `選択キーに反映` を押します。
 6. 中央の表示と右側の preview が変わったことを確認します。
 
-Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `保存` を押してください。
+Firmware Mode の編集は、押した時点ではまだローカルファイルへ保存されません。画面上の変更を確認してから `Firmwareファイルを保存` または `Firmwareファイルをダウンロード` を押してください。
 
 変更後は、対象 key の表示と右側の preview が意図した動作になっているか確認します。複雑な ZMK 構文は label が短縮表示されることがありますが、tooltip や inspector では元の ZMK 構文を確認できます。
 

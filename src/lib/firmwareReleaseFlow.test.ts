@@ -229,6 +229,34 @@ describe("deriveFirmwareReleaseReadiness", () => {
     });
   });
 
+  it("allows flashing from externally loaded artifact folders without GitHub state", () => {
+    const readiness = deriveFirmwareReleaseReadiness({
+      ...baseState,
+      artifactFiles: ["firmware/KobitoKey_left.uf2", "firmware/KobitoKey_right.uf2"],
+      externalArtifactsReady: true,
+    });
+
+    expect(readiness).toMatchObject({
+      step: "flash-left",
+      canFlashLeft: true,
+      canFlashRight: false,
+    });
+    expect(canFlashFirmwareSide(readiness, "left")).toBe(true);
+
+    expect(
+      deriveFirmwareReleaseReadiness({
+        ...baseState,
+        artifactFiles: ["firmware/KobitoKey_left.uf2", "firmware/KobitoKey_right.uf2"],
+        externalArtifactsReady: true,
+        leftFlashed: true,
+      }),
+    ).toMatchObject({
+      step: "flash-right",
+      canFlashLeft: false,
+      canFlashRight: true,
+    });
+  });
+
   it("forces left flash before right flash and reports completion after both sides", () => {
     const readyToFlash = {
       ...baseState,

@@ -343,8 +343,11 @@ gh auth login
 The app ships with fixture copies of the current KobitoKey files in
 `public/fixtures/`, so the UI can run before a local `KobitoKey_QWERTY` folder
 or GitHub repository is selected. In browser Firmware Mode, use the
-`Build & Flash` tab to load a GitHub repository. In Tauri Firmware Mode, choose
-your local firmware clone with the `参照…` button.
+`Build & Flash` tab to load a GitHub repository; a local firmware clone is not
+required. If the user cannot write to the official firmware repository, they
+should fork `KobitoKey_QWERTY` on GitHub and use that fork as the Firmware
+repository. In Tauri Firmware Mode, choose your local firmware clone with the
+`参照…` button.
 
 ## Deployment Notes
 
