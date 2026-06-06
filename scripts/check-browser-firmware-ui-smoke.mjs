@@ -297,7 +297,12 @@ async function setSelectedKeyRawBinding(page, binding) {
     details.setAttribute("open", "");
   });
   const rawBindingInput = page.locator('.firmware-key-inspector input[name="zmkBinding"]');
-  await rawBindingInput.fill(binding);
+  await rawBindingInput.evaluate((input, nextBinding) => {
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    valueSetter?.call(input, nextBinding);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, binding);
   const currentRawBinding = (await rawBindingInput.inputValue()).trim();
   if (currentRawBinding !== binding) {
     throw new Error(`raw binding input did not update to ${binding}, got ${currentRawBinding || "-"}`);
