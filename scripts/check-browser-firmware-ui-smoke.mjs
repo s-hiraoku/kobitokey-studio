@@ -318,7 +318,7 @@ async function inspectKeyBindingEditActions(page, label) {
     failures.push(`${label}: expected no keymap diff before editing, got "${initial.diffTabText}"`);
   }
 
-  await page.locator('.choice-grid button[title="B"]').click();
+  await clickCurrentElement(page, '.choice-grid button[title="B"]');
   const writeButton = page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" });
   if ((await writeButton.count()) !== 1) {
     failures.push(`${label}: selected key apply action should live in the right key inspector`);
@@ -372,6 +372,23 @@ async function inspectKeyBindingEditActions(page, label) {
   }
 
   return failures;
+}
+
+async function clickCurrentElement(page, selector) {
+  await page.waitForSelector(selector, { state: "visible" });
+  await page.waitForFunction((targetSelector) => !document.querySelector(targetSelector)?.disabled, selector);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const clicked = await page.evaluate((targetSelector) => {
+      const target = document.querySelector(targetSelector);
+      if (!(target instanceof HTMLButtonElement) || target.disabled) return false;
+      target.click();
+      return true;
+    }, selector);
+    if (clicked) return;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Unable to click ${selector}`);
 }
 
 async function inspectReleaseWizardPreconditions(page, label) {
