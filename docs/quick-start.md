@@ -106,7 +106,7 @@ Studio で編集する場合は `GitHub から読み込み`、編集、`Commit &
 
 ブラウザ版の `Commit & Build` は、Studio が扱う keymap / overlay だけを GitHub に commit してから GitHub Actions を起動します。
 
-artifact に `manifest.json` または `firmware-manifest.json` がある場合、Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` が含まれる前提です。分類できない場合、ブラウザ版は左右の書き込みボタンを有効化しません。Tauri 版は手動の UF2 / Bootloader 選択で確認しながらコピーできます。
+GitHub から `Artifact 取得` する場合、artifact に `manifest.json` または `firmware-manifest.json` があれば Studio は manifest を優先します。manifest がない場合、UF2 の自動分類はファイル名に `left` / `right` / `reset` が含まれる前提です。分類できない場合や reset UF2 がない場合、ブラウザ版は書き込みボタンを有効化しません。Tauri 版は手動の UF2 / Bootloader 選択で確認しながらコピーできます。
 
 ## 4. Direct Mode でキーをすぐ書き込む
 
