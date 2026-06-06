@@ -343,6 +343,7 @@ function App() {
   const browserFirmwareOperationRef = React.useRef<BrowserFirmwareOperation>("idle");
   const browserFirmwareRepoBranchInitializedRef = React.useRef(false);
   const browserFirmwareArtifactFolderHandleRef = React.useRef<FileSystemDirectoryHandle | null>(null);
+  const browserFirmwareResetDoneRef = React.useRef<Record<FlashSide, boolean>>({ left: false, right: false });
   const flashConfirmationResolverRef = React.useRef<((confirmed: boolean) => void) | null>(null);
   const [savedKeymap, setSavedKeymap] = React.useState("");
   const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
@@ -380,7 +381,7 @@ function App() {
   const [browserFirmwareFilesLoadedFromGitHub, setBrowserFirmwareFilesLoadedFromGitHub] = React.useState(false);
   const [browserFirmwareArtifacts, setBrowserFirmwareArtifacts] = React.useState<GitHubFirmwareArtifacts | null>(null);
   const [browserFirmwareArtifactSource, setBrowserFirmwareArtifactSource] = React.useState<BrowserFirmwareArtifactSource>(null);
-  const [browserFirmwareDownloadedSide, setBrowserFirmwareDownloadedSide] = React.useState<FlashSide | null>(null);
+  const [browserFirmwareResetDone, setBrowserFirmwareResetDone] = React.useState<Record<FlashSide, boolean>>({ left: false, right: false });
   const [browserFirmwareLeftFlashed, setBrowserFirmwareLeftFlashed] = React.useState(storedBrowserFirmwareSession?.leftFlashed ?? false);
   const [browserFirmwareRightFlashed, setBrowserFirmwareRightFlashed] = React.useState(storedBrowserFirmwareSession?.rightFlashed ?? false);
   const [browserFirmwareOperation, setBrowserFirmwareOperation] = React.useState<BrowserFirmwareOperation>("idle");
@@ -583,7 +584,7 @@ function App() {
     setBrowserFirmwareBuildStatus("idle");
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
-    setBrowserFirmwareDownloadedSide(null);
+    clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
   }, [browserFirmwareBranch, firmwareRepoUrl]);
@@ -608,6 +609,18 @@ function App() {
       flashConfirmationResolverRef.current = null;
     };
   }, []);
+
+  function setBrowserFirmwareSideResetDone(side: FlashSide, done: boolean) {
+    const next = { ...browserFirmwareResetDoneRef.current, [side]: done };
+    browserFirmwareResetDoneRef.current = next;
+    setBrowserFirmwareResetDone(next);
+  }
+
+  function clearBrowserFirmwareResetDone() {
+    const next = { left: false, right: false };
+    browserFirmwareResetDoneRef.current = next;
+    setBrowserFirmwareResetDone(next);
+  }
 
   React.useEffect(() => {
     if (isDesktopRuntime) {
@@ -900,7 +913,7 @@ function App() {
     setBrowserFirmwareBuildStatus("idle");
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
-    setBrowserFirmwareDownloadedSide(null);
+    clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
     setBuildStatus("編集を読み込み時点に戻しました");
@@ -2130,7 +2143,7 @@ function App() {
       setBrowserFirmwareBuildStatus("idle");
       setBrowserFirmwareArtifacts(null);
       setBrowserFirmwareArtifactSource(null);
-      setBrowserFirmwareDownloadedSide(null);
+      clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
       setBuildStatus(`GitHub から firmware files を読み込みました: ${formatGitHubRepositoryRef(ref)}`);
@@ -2173,7 +2186,7 @@ function App() {
       setBrowserFirmwareBuildStatus("queued");
       setBrowserFirmwareArtifacts(null);
       setBrowserFirmwareArtifactSource(null);
-      setBrowserFirmwareDownloadedSide(null);
+      clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
       setSavedKeymap(files.keymap);
@@ -2228,7 +2241,7 @@ function App() {
     setBrowserFirmwareBuildStatus("queued");
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
-    setBrowserFirmwareDownloadedSide(null);
+    clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
     await dispatchGitHubFirmwareBuild(ref, browserFirmwareBranchRef, { token: browserGithubToken });
@@ -2276,7 +2289,7 @@ function App() {
     // Drop previously verified UF2 bytes before revalidating the run/artifact.
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
-    setBrowserFirmwareDownloadedSide(null);
+    clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
 
@@ -2324,7 +2337,7 @@ function App() {
       const artifacts = await readLocalFirmwareArtifactsFromDirectoryHandle(handle);
       setBrowserFirmwareArtifacts(artifacts);
       setBrowserFirmwareArtifactSource("folder");
-      setBrowserFirmwareDownloadedSide(null);
+      clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
       setFlashSide("left");
@@ -2358,7 +2371,7 @@ function App() {
     if (!beginBrowserFirmwareOperation("flash")) return;
 
     try {
-      const isFirmwarePhase = browserFirmwareDownloadedSide === side;
+      const isFirmwarePhase = browserFirmwareResetDoneRef.current[side];
       const target = isFirmwarePhase ? browserFirmwareUf2Target(side) : browserFirmwareUf2Target("reset");
       if (!target) {
         setBuildStatus(isFirmwarePhase ? `${sideLabel(side)} UF2 が見つかりません` : "reset UF2 が artifact に見つかりません");
@@ -2378,7 +2391,7 @@ function App() {
       const writeResult = await writeBrowserUf2ToDirectoryHandle(handle, target);
       const writeSuffix = writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : "";
       if (!isFirmwarePhase) {
-        setBrowserFirmwareDownloadedSide(side);
+        setBrowserFirmwareSideResetDone(side, true);
         setBuildStatus(
           `reset UF2 を ${handle.name} に直接コピーしました${writeSuffix}。もう一度 ${sideLabel(side)} 側を bootloader に入れて、同じボタンで firmware UF2 をコピーしてください`,
         );
@@ -2386,7 +2399,7 @@ function App() {
       }
 
       markBrowserFirmwareSideFlashed(side);
-      setBrowserFirmwareDownloadedSide(null);
+      setBrowserFirmwareSideResetDone(side, false);
       setBuildStatus(browserFirmwareFlashCompleteMessage(side, `${handle.name} に直接コピーしました${writeSuffix}`));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -2844,10 +2857,10 @@ function App() {
                   canDownloadArtifacts={canAttemptBrowserFirmwareArtifactDownload}
                   commitSha={browserFirmwareCommitSha}
                   commitUrl={browserFirmwareCommitUrl}
-                  downloadedSide={browserFirmwareDownloadedSide}
                   flashSide={flashSide}
                   githubOAuthAvailable={Boolean(githubOAuthClientId())}
                   onBack={closeFirmwareBuildFlash}
+                  resetDone={browserFirmwareResetDone}
                   readiness={browserFirmwareReadiness}
                   repoRef={browserFirmwareRepoRef}
                   repoUrl={firmwareRepoUrl}
@@ -4910,7 +4923,6 @@ function BrowserFirmwareReleaseWorkbench({
   canDownloadArtifacts,
   commitSha,
   commitUrl,
-  downloadedSide,
   flashSide,
   githubOAuthAvailable,
   onBack,
@@ -4929,6 +4941,7 @@ function BrowserFirmwareReleaseWorkbench({
   onTokenChange,
   onTriggerBuild,
   readiness,
+  resetDone,
   repoRef,
   repoUrl,
   runId,
@@ -4944,7 +4957,6 @@ function BrowserFirmwareReleaseWorkbench({
   canDownloadArtifacts: boolean;
   commitSha: string | null;
   commitUrl: string;
-  downloadedSide: FlashSide | null;
   flashSide: FlashSide;
   githubOAuthAvailable: boolean;
   onBack: () => void;
@@ -4963,6 +4975,7 @@ function BrowserFirmwareReleaseWorkbench({
   onTokenChange: (value: string) => void;
   onTriggerBuild: () => void;
   readiness: FirmwareReleaseReadiness;
+  resetDone: Record<FlashSide, boolean>;
   repoRef: GitHubRepositoryRef | null;
   repoUrl: string;
   runId: number | null;
@@ -5145,7 +5158,7 @@ function BrowserFirmwareReleaseWorkbench({
             <span className="button-label">フォルダを選択</span>
           </button>
         </div>
-        <FlashSequenceGuide artifacts={artifacts} downloadedSide={downloadedSide} readiness={readiness} />
+        <FlashSequenceGuide artifacts={artifacts} readiness={readiness} resetDone={resetDone} />
         <div className="flash-wizard">
           <div className="flash-wizard-header">
             <strong>{sideLabel(flashSide)} 側を書き込み</strong>
@@ -5165,7 +5178,7 @@ function BrowserFirmwareReleaseWorkbench({
                 onClick={() => onCopyUf2(side)}
               >
                 <span className="button-label">
-                  {downloadedSide === side ? `${sideLabel(side)} firmware を直接コピー` : `${sideLabel(side)} reset を直接コピー`}
+                  {resetDone[side] ? `${sideLabel(side)} firmware を直接コピー` : `${sideLabel(side)} reset を直接コピー`}
                 </span>
               </button>
             ))}
@@ -5274,12 +5287,12 @@ function BrowserFirmwareFlowGuide({ readiness }: { readiness: FirmwareReleaseRea
 
 function FlashSequenceGuide({
   artifacts,
-  downloadedSide,
   readiness,
+  resetDone,
 }: {
   artifacts: GitHubFirmwareArtifacts | null;
-  downloadedSide: FlashSide | null;
   readiness: FirmwareReleaseReadiness;
+  resetDone: Record<FlashSide, boolean>;
 }) {
   const leftState = readiness.leftFlashed || readiness.complete ? "done" : readiness.canFlashLeft ? "current" : "pending";
   const rightState = readiness.rightFlashed || readiness.complete ? "done" : readiness.canFlashRight ? "current" : "pending";
@@ -5296,7 +5309,7 @@ function FlashSequenceGuide({
       <ol>
         <FlashSequenceItem
           detail={
-            downloadedSide === "left"
+            resetDone.left
               ? "Left reset は完了です。左側をもう一度 bootloader にして firmware UF2 を直接コピーします。"
               : "左側を USB bootloader にして、reset UF2 を直接コピーします。"
           }
@@ -5305,7 +5318,7 @@ function FlashSequenceGuide({
         />
         <FlashSequenceItem
           detail={
-            downloadedSide === "right"
+            resetDone.right
               ? "Right reset は完了です。右側をもう一度 bootloader にして firmware UF2 を直接コピーします。"
               : "右側を USB bootloader にして、reset UF2 を直接コピーします。"
           }
