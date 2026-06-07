@@ -46,6 +46,8 @@ const files = {
   directKeymapTest: read("src/lib/directKeymap.test.ts"),
   releasePlan: read("docs/browser-firmware-release-plan.md"),
   docsConfig: read("docs/_config.yml"),
+  docsDefaultLayout: read("docs/_layouts/default.html"),
+  docsGuideCss: read("docs/assets/css/guide.css"),
   docsIndex: read("docs/index.md"),
   docsUserGuide: read("docs/user-guide.md"),
   docsFirmwareMode: read("docs/firmware-mode.md"),
@@ -428,6 +430,8 @@ const checks = [
     name: "GitHub Pages user guide links to app entry points by setting area",
     pass: () =>
       allIncludes(files.docsConfig, ["/firmware-mode/", "/direct-mode/", "/faq/", "/deployment/"]) &&
+      allIncludes(files.docsDefaultLayout, ['href="{{ \'/assets/css/guide.css\' | relative_url }}"']) &&
+      allIncludes(files.docsGuideCss, ["@layer reset, base, layout, components, utilities", ".site-header", ".mode-card"]) &&
       allIncludes(files.docsIndex, ["/firmware-mode/", "/direct-mode/", "やりたいこと別・早見表"]) &&
       allIncludes(files.docsUserGuide, [
         "permalink: /user-guide/",
