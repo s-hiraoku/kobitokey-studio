@@ -435,11 +435,11 @@ input[type="url"] {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--pine-bright) 22%,
-    var(--pine-bright) 78%,
+    var(--honey) 22%,
+    var(--honey) 78%,
     transparent 100%
   );
-  opacity: 0.45;
+  opacity: 0.7;
 }
 
 .topbar h1,
@@ -745,6 +745,11 @@ select:focus-visible {
   border-radius: 50%;
   background: var(--pine-bright);
   box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18);
+  animation: chip-pulse 2.2s var(--ease-in-out) infinite;
+}
+@keyframes chip-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18); }
+  50%      { box-shadow: 0 0 0 4px rgba(63, 104, 131, 0.06); }
 }
 .connected-chip svg { flex: 0 0 auto; color: var(--pine-deep); }
 .connected-chip strong {
@@ -999,6 +1004,26 @@ select:focus-visible {
   color: #5a4209;
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Inline "open Firmware Mode" affordance inside the pine reference notice */
+.reference-notice-action {
+  justify-self: start;
+  margin-top: 2px;
+  min-height: 30px;
+  border: 1px solid var(--pine-line);
+  border-radius: var(--r-sm);
+  padding: 0 var(--sp-3);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--pine-deep);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.reference-notice-action:hover {
+  background: #fff;
+  border-color: var(--pine-bright);
 }
 
 .runtime-diagnostics {
@@ -2109,21 +2134,6 @@ select:focus-visible {
   font-weight: 700;
 }
 
-.diff-panel pre {
-  height: 196px;
-  margin: var(--sp-3) 0 0;
-  border: 1px solid var(--pine-deep);
-  border-radius: var(--r-lg);
-  padding: var(--sp-4);
-  overflow: auto;
-  background: linear-gradient(180deg, #1f2c36 0%, #16212a 100%);
-  color: #d4dde6;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
-  line-height: 1.65;
-  box-shadow: inset 0 2px 12px -4px rgba(0, 0, 0, 0.4);
-}
-
 /* ----------------------------------------------------------------
    Structured diff viewer (replaces <pre>)
    ---------------------------------------------------------------- */
@@ -2607,7 +2617,6 @@ select:focus-visible {
   padding: 0;
   background: transparent;
 }
-.workbench-grid .diff-panel pre { margin-top: var(--sp-3); }
 
 /* ----------------------------------------------------------------
    Inspector — right rail
@@ -2615,18 +2624,34 @@ select:focus-visible {
 .inspector {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--sp-5);
   min-height: 0;
-  padding: 24px 22px 28px;
+  padding: var(--sp-6) var(--sp-5) var(--sp-7);
   border-left: 1px solid var(--hairline);
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
   overflow: auto;
 }
-.inspector section {
-  border-bottom: 1px dashed var(--hairline);
-  padding-bottom: var(--sp-6);
+/* The inspector shell sections (.firmware-inspector / .direct-inspector) stay
+   transparent layout wrappers. Only the meaningful content sections inside them
+   become light cards, so each region (key editor, combos, trackball) reads as a
+   distinct group instead of blurring together with dashed dividers. */
+.firmware-inspector,
+.direct-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 0;
 }
-.inspector section:last-child { border-bottom: 0; padding-bottom: 0; }
+.firmware-key-inspector > section,
+.combo-panel,
+.combo-reference-panel,
+.trackball-parameters {
+  padding: var(--sp-4);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
 
 .inspector h2 {
   font-family: "Fraunces", Georgia, serif;
@@ -2989,12 +3014,23 @@ select:focus-visible {
 .binding-editor label,
 .trackball-editor label { margin-top: 0; }
 
-.firmware-key-inspector .binding-editor > .wide-action {
+/* The apply button anchors to the bottom of the scrolling inspector so it stays
+   reachable without scrolling past the (often long) key palette. Used by both the
+   Firmware key inspector and the Direct "Key Config" tab. */
+.firmware-key-inspector .binding-editor > .wide-action,
+.direct-key-editor .binding-editor > .wide-action {
+  position: sticky;
+  bottom: calc(-1 * var(--sp-7));
+  z-index: 2;
   min-height: 42px;
-  margin-top: var(--sp-2);
-  box-shadow: 0 0 0 3px rgba(42, 75, 82, 0.08);
+  margin-top: var(--sp-3);
+  /* A soft backing fades the scrolled palette out behind the pinned button. */
+  box-shadow:
+    0 0 0 3px rgba(42, 75, 82, 0.08),
+    0 -10px 14px -8px var(--paper-2);
 }
-.firmware-key-inspector .binding-editor > .wide-action:disabled {
+.firmware-key-inspector .binding-editor > .wide-action:disabled,
+.direct-key-editor .binding-editor > .wide-action:disabled {
   box-shadow: none;
   opacity: 0.62;
 }
@@ -3588,7 +3624,8 @@ select:focus-visible {
   margin-top: 6px;
 }
 
-.browser-release-workbench > .release-flow-guide {
+.browser-release-workbench > .release-flow-guide,
+.build-workbench > .release-flow-guide {
   grid-column: 1 / -1;
 }
 .release-flow-guide {
@@ -4473,10 +4510,10 @@ select:focus-visible {
   display: flex;
   align-items: center;
   min-height: 30px;
-  border-top: 1px solid var(--pine-deep);
+  border-top: 1px solid var(--hairline);
   padding: 6px var(--sp-5);
-  background: linear-gradient(180deg, #243528 0%, #16221b 100%);
-  color: #d9d1b8;
+  background: linear-gradient(180deg, var(--card) 0%, var(--paper-2) 100%);
+  color: var(--ink-muted);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
   letter-spacing: 0.02em;
@@ -4484,7 +4521,7 @@ select:focus-visible {
 .statusbar::before {
   content: "▸";
   margin-right: var(--sp-2);
-  color: var(--on-pine);
+  color: var(--pine-bright);
   font-size: 10.5px;
 }
 
@@ -4496,8 +4533,7 @@ select:focus-visible {
 .combo-list::-webkit-scrollbar,
 .keyboard-viewport::-webkit-scrollbar,
 .workbench-panel::-webkit-scrollbar,
-.keyboard-panel > .direct-summary::-webkit-scrollbar,
-.diff-panel pre::-webkit-scrollbar {
+.keyboard-panel > .direct-summary::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
@@ -4524,11 +4560,6 @@ select:focus-visible {
 .choice-grid::-webkit-scrollbar-thumb:hover,
 .combo-list::-webkit-scrollbar-thumb:hover,
 .workbench-panel::-webkit-scrollbar-thumb:hover { background-color: var(--ink-soft); }
-.diff-panel pre::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
-.diff-panel pre::-webkit-scrollbar-thumb {
-  border-radius: var(--r-full);
-  background-color: #4a5b4d;
-}
 
 /* ----------------------------------------------------------------
    Page-load reveal

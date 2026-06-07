@@ -3593,13 +3593,47 @@ function DirectSummaryPanel({
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
   portPath: string;
 }) {
+  const [syncTab, setSyncTab] = React.useState<"summary" | "key" | "combo">("summary");
+
+  if (!keymap) {
+    return (
+      <section className="direct-summary">
+        <div className="panel-heading compact">
+          <h3>Direct モード</h3>
+          <span>未接続</span>
+        </div>
+        <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
+      </section>
+    );
+  }
+
+  const syncTabs: Array<{ id: typeof syncTab; label: string; count?: number }> = [
+    { id: "summary", label: "概要" },
+    { id: "key", label: "Key 差分", count: firmwareDiffs.length },
+    { id: "combo", label: "Combo 差分", count: firmwareComboDiffs.length },
+  ];
+
   return (
     <section className="direct-summary">
-      <div className="panel-heading compact">
-        <h3>Direct モード</h3>
-        <span>{keymap ? `${keymap.layers.length} レイヤー` : "未接続"}</span>
+      {/* Segmented "Sync" region: Summary / Key diff / Combo diff share one panel
+          so only the active region renders instead of stacking all three. */}
+      <div className="workbench-tablist direct-sync-tablist" role="tablist" aria-label="Direct sync">
+        {syncTabs.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            role="tab"
+            aria-selected={tab.id === syncTab}
+            className={tab.id === syncTab ? "active" : ""}
+            onClick={() => setSyncTab(tab.id)}
+          >
+            <span>{tab.label}</span>
+            {typeof tab.count === "number" ? <em>{tab.count}</em> : null}
+          </button>
+        ))}
       </div>
-      {keymap ? (
+
+      {syncTab === "summary" ? (
         <dl>
           <div>
             <dt>デバイス</dt>
@@ -3626,11 +3660,11 @@ function DirectSummaryPanel({
             <dd>{firmwareComboDiffs.length === 0 ? "差分なし" : `${firmwareComboDiffs.length} combos`}</dd>
           </div>
         </dl>
-      ) : (
-        <p>上部の Direct で device を検出して読み込むと、実機の keymap がここに表示されます。</p>
-      )}
-      {keymap ? <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} /> : null}
-      {keymap ? (
+      ) : null}
+      {syncTab === "key" ? (
+        <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} />
+      ) : null}
+      {syncTab === "combo" ? (
         <DirectFirmwareComboDiffPanel diffs={firmwareComboDiffs} onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs} />
       ) : null}
     </section>
@@ -4440,6 +4474,7 @@ function DirectInspectorTabs({
           maxCombos={maxCombos}
           onCreate={onCreateCombo}
           onDelete={onDeleteCombo}
+          onFirmwareMode={onFirmwareMode}
           onPreview={onPreviewCombo}
           onRefresh={onRefreshCombos}
           onSave={onSaveCombo}
@@ -4471,11 +4506,19 @@ function DirectTrackballPanel({
 }) {
   return (
     <div className="direct-settings-panel direct-trackball-panel">
-      <div className="direct-settings-heading">
-        <div>
-          <strong>Trackball Reference</strong>
-          <p>Direct Mode では Trackball 設定を実機へ書き込まず、firmware overlay の値を参照表示します。</p>
-        </div>
+      {/* Consolidated reference notice replaces the former heading blurb +
+          combo-write-warning + trailing duplicate button. */}
+      <div className="runtime-notice direct-reference-notice">
+        <strong>Trackball は参照のみです</strong>
+        <span>
+          firmware overlay の値を参照表示しています。現在の firmware では Trackball を runtime 保存できないため、変更は
+          {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で左右 overlay を編集し、build + flash で反映します。
+        </span>
+        {canOpenFirmwareMode ? (
+          <button type="button" className="reference-notice-action" onClick={onFirmwareMode}>
+            Firmware Mode で編集 →
+          </button>
+        ) : null}
       </div>
 
       <div className="trackball-reference-summary" aria-label="Trackball Direct Mode status">
@@ -4493,25 +4536,9 @@ function DirectTrackballPanel({
         </div>
       </div>
 
-      <div className="combo-write-warning">
-        <strong>Trackball は Direct Mode 未対応です</strong>
-        <span>現在の KobitoKey firmware は Trackball 設定を Studio RPC で runtime 保存できないため、この画面では参照のみ行います。</span>
-        <small>
-          {canOpenFirmwareMode
-            ? "変更する場合は Firmware Mode で左右 overlay を編集し、firmware を build + flash してください。"
-            : "変更する場合はデスクトップ版の Firmware Mode で左右 overlay を編集し、firmware を build + flash してください。"}
-        </small>
-      </div>
-
       <div className="trackball-reference-mode">
         <TrackballPanel settings={firmwareSettings} />
       </div>
-
-      {canOpenFirmwareMode ? (
-        <button type="button" className="wide-action" onClick={onFirmwareMode}>
-          Firmware Mode で Trackball を編集
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -4526,6 +4553,7 @@ function DirectComboPanel({
   maxCombos,
   onCreate,
   onDelete,
+  onFirmwareMode,
   onPreview,
   onRefresh,
   onSave,
@@ -4542,6 +4570,7 @@ function DirectComboPanel({
   maxCombos: number;
   onCreate: () => void;
   onDelete: (combo: KeymapCombo) => void;
+  onFirmwareMode?: () => void;
   onPreview: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
   onRefresh: () => void;
   onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
@@ -4549,43 +4578,21 @@ function DirectComboPanel({
   selectedCombo?: KeymapCombo;
   selectedCombos: KeymapCombo[];
 }) {
-  const connected = connectionState === "connected";
-  const firmwareFallback = comboSource === "firmware";
-  const comboWritable = false;
+  const firmwareModeName = canOpenFirmwareMode ? "Firmware Mode" : "デスクトップ版の Firmware Mode";
   return (
     <div className="direct-combo-panel">
-      <div className="direct-settings-panel">
-        <div className="direct-settings-heading">
-          <div>
-            <strong>Combo Reference</strong>
-            <p>
-              Direct Mode では firmware keymap の Combo を参照表示します。Combo の変更は
-              {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で編集し、build + flash で反映します。
-            </p>
-          </div>
-        </div>
-        <div className="direct-combo-meter">
-          <span>{combos.length} combos</span>
-          <span>Firmware keymap</span>
-        </div>
-        {!connected ? (
-          <div className="combo-write-warning">
-            <strong>Combo は参照のみです</strong>
-            <span>
-              Direct Mode では Combo を実機へ書き込めません。
-              {canOpenFirmwareMode ? "Firmware Mode" : "デスクトップ版の Firmware Mode"} で編集してください。
-            </span>
-          </div>
-        ) : null}
-        {connected ? (
-          <div className="combo-write-warning">
-            <strong>Combo は参照のみです</strong>
-            <span>現在の実機 firmware では Direct Combo RPC が使えないため、Direct Mode での Combo 読み書きは見送っています。</span>
-            <small>
-              Combo を変更する場合は
-              {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で keymap を編集し、firmware を build + flash してください。
-            </small>
-          </div>
+      {/* One consolidated, on-theme "reference only" notice replaces the former
+          duplicated combo-write-warning blocks (connected / disconnected). */}
+      <div className="runtime-notice direct-reference-notice">
+        <strong>Combo は参照のみです</strong>
+        <span>
+          firmware keymap の Combo を参照表示しています（{combos.length} combos）。変更は
+          {` ${firmwareModeName}`} で編集し、build + flash で反映します。
+        </span>
+        {onFirmwareMode && canOpenFirmwareMode ? (
+          <button type="button" className="reference-notice-action" onClick={onFirmwareMode}>
+            Firmware Mode で編集 →
+          </button>
         ) : null}
       </div>
       <ComboPanel
@@ -4594,7 +4601,7 @@ function DirectComboPanel({
         selectedCombos={selectedCombos}
         onSelect={onSelect}
       />
-      <ComboReferencePanel combo={selectedCombo} />
+      {selectedCombo ? <ComboReferencePanel combo={selectedCombo} /> : null}
     </div>
   );
 }
@@ -4685,12 +4692,13 @@ function ScaleSlider({
 function DirectTimingPanel() {
   return (
     <div className="direct-settings-panel timing-panel">
-      <div className="direct-settings-heading">
-        <div>
-          <strong>Timing Reference</strong>
-          <p>Direct Mode では tapping term などの timing 設定を実機へ書き込めません。</p>
-        </div>
-        <span className="coming-soon-badge">未対応</span>
+      {/* Consolidated reference notice replaces the former heading blurb + warning. */}
+      <div className="runtime-notice direct-reference-notice">
+        <strong>Timing は Direct Mode 未対応です</strong>
+        <span>
+          現在の KobitoKey firmware は tapping term や hold-tap timing を runtime 保存できません。変更する場合は
+          firmware 設定ファイルを編集し、build + flash で反映します。
+        </span>
       </div>
 
       <div className="trackball-reference-summary" aria-label="Timing Direct Mode status">
@@ -4706,12 +4714,6 @@ function DirectTimingPanel() {
           <span>反映方法</span>
           <strong>build + flash</strong>
         </div>
-      </div>
-
-      <div className="combo-write-warning">
-        <strong>Timing は Direct Mode 未対応です</strong>
-        <span>現在の KobitoKey firmware は tapping term や hold-tap timing を Studio RPC で runtime 保存できません。</span>
-        <small>変更する場合は firmware 設定ファイルを編集し、firmware を build + flash してください。</small>
       </div>
     </div>
   );
@@ -5255,6 +5257,46 @@ type ReleaseFlowStep = {
   state: ReleaseGateState;
 };
 
+/* A static, stateless "where am I" stepper for the overall edit → save → build →
+   flash flow. Reuses the release-flow-steps visual so the desktop Build & Flash
+   screen and the browser release path share one numbered-step affordance. The
+   `current` step is highlighted; everything before it is marked done. */
+function FirmwareFlowStepper({ current }: { current: "build" | "flash" }) {
+  const steps: Array<{ label: string; detail: string }> = [
+    { label: "編集", detail: "keymap / overlay を編集" },
+    { label: "保存", detail: "Diff を確認して保存" },
+    { label: "Build", detail: "GitHub Actions で UF2 を生成" },
+    { label: "Flash", detail: "UF2 を bootloader にコピー" },
+  ];
+  const currentIndex = current === "build" ? 2 : 3;
+  return (
+    <section className="release-flow-guide firmware-flow-stepper" aria-label="Build & Flash までの流れ">
+      <div className="release-flow-heading">
+        <div>
+          <p className="eyebrow">Build &amp; Flash</p>
+          <h2>編集から Flash までの順番</h2>
+        </div>
+      </div>
+      <ol className="release-flow-steps">
+        {steps.map((step, index) => {
+          const state: ReleaseGateState = index < currentIndex ? "done" : index === currentIndex ? "current" : "pending";
+          const Icon = state === "done" ? CheckCircle2 : state === "current" ? AlertTriangle : Clock;
+          return (
+            <li className={state} key={step.label} aria-current={state === "current" ? "step" : undefined}>
+              <span className="release-flow-index">{index + 1}</span>
+              <Icon size={15} />
+              <div>
+                <strong>{step.label}</strong>
+                <small>{step.detail}</small>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 function BrowserFirmwareFlowGuide({ readiness }: { readiness: FirmwareReleaseReadiness }) {
   const steps = releaseFlowSteps(readiness);
 
@@ -5614,6 +5656,7 @@ function BuildWorkbench({
 }) {
   return (
     <div className="workbench-grid build-workbench">
+      <FirmwareFlowStepper current="build" />
       <section className="build-panel">
         <div className="build-panel-heading">
           <div>
