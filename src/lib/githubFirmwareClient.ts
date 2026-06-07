@@ -482,7 +482,7 @@ export function classifyUf2ArtifactsFromManifests(
 
   for (const manifest of [...manifests].sort((left, right) => left.name.localeCompare(right.name))) {
     const targets = targetsFromManifest(manifest, uf2Files);
-    if (targets && (targets.left || targets.right)) {
+    if (targets && (targets.left || targets.reset || targets.right)) {
       return {
         manifestPath: manifest.name,
         targets: mergeManifestTargets(targets, byName, uf2Files),
@@ -510,7 +510,9 @@ function classifyArtifactEntries(
         manifestPath: classification.manifestPath,
         targets: {
           ...classification.targets,
-          unknown: allFiles.filter((file) => file !== classification.targets.left && file !== classification.targets.right),
+          unknown: allFiles.filter(
+            (file) => file !== classification.targets.left && file !== classification.targets.reset && file !== classification.targets.right,
+          ),
         },
       };
     }
@@ -520,11 +522,12 @@ function classifyArtifactEntries(
 }
 
 function mergeManifestTargets(
-  manifestTargets: { left: string | null; right: string | null },
+  manifestTargets: { left: string | null; reset: string | null; right: string | null },
   byName: ClassifiedUf2Artifacts,
   uf2Files: string[],
 ): ClassifiedUf2Artifacts {
   let left = manifestTargets.left ?? byName.left;
+  const reset = manifestTargets.reset ?? byName.reset;
   let right = manifestTargets.right ?? byName.right;
 
   if (left && right && left === right) {
@@ -543,8 +546,9 @@ function mergeManifestTargets(
 
   return {
     left,
+    reset,
     right,
-    unknown: uniqueUf2Files(uf2Files).filter((file) => file !== left && file !== right),
+    unknown: uniqueUf2Files(uf2Files).filter((file) => file !== left && file !== reset && file !== right),
   };
 }
 
@@ -555,7 +559,7 @@ function uniqueUf2Files(files: string[]): string[] {
 function targetsFromManifest(
   manifest: GitHubArtifactManifest,
   uf2Files: string[],
-): { left: string | null; right: string | null } | null {
+): { left: string | null; reset: string | null; right: string | null } | null {
   let value: unknown;
   try {
     value = JSON.parse(manifest.contents);
@@ -568,6 +572,7 @@ function targetsFromManifest(
 
   const baseDir = dirname(manifest.name);
   let left = sideFileFromManifest(value, "left", baseDir, uf2Files);
+  let reset = sideFileFromManifest(value, "reset", baseDir, uf2Files);
   let right = sideFileFromManifest(value, "right", baseDir, uf2Files);
   const outputs = value.outputs;
   if (Array.isArray(outputs)) {
@@ -579,16 +584,18 @@ function targetsFromManifest(
       const side = typeof output.side === "string" ? output.side.toLowerCase() : "";
       if (side === "left" && !left) {
         left = resolved;
+      } else if ((side === "reset" || side === "settings-reset" || side === "settings_reset") && !reset) {
+        reset = resolved;
       } else if (side === "right" && !right) {
         right = resolved;
       }
     }
   }
 
-  return left || right ? { left, right } : null;
+  return left || reset || right ? { left, reset, right } : null;
 }
 
-function sideFileFromManifest(value: Record<string, unknown>, side: "left" | "right", baseDir: string, uf2Files: string[]): string | null {
+function sideFileFromManifest(value: Record<string, unknown>, side: "left" | "reset" | "right", baseDir: string, uf2Files: string[]): string | null {
   const sideValue = value[side];
   if (typeof sideValue === "string") {
     return resolveManifestFile(baseDir, sideValue, uf2Files);

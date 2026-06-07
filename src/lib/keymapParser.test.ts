@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   addCombo,
@@ -5,6 +6,7 @@ import {
   deleteCombo,
   deleteLayer,
   findLayerReferenceSites,
+  findOverlayLayerReferenceSites,
   formatBindings,
   nextLayerId,
   parseKeymap,
@@ -166,6 +168,27 @@ describe("keymap updates", () => {
     ]);
   });
 
+  it("finds overlay temp-layer references before deleting the target layer", () => {
+    const references = findOverlayLayerReferenceSites({
+      leftOverlay: `&tb_right_listener {
+        input-processors = <&zip_temp_layer 3 5000>;
+      };`,
+      rightOverlay: `&tb_right_split {
+        input-processors = <&zip_temp_layer 2 5000>;
+      };`,
+      targetLayerIndex: 3,
+    });
+
+    expect(references).toEqual([
+      {
+        kind: "overlay-temp-layer",
+        overlay: "left",
+        processor: "zip_temp_layer",
+        layer: 3,
+      },
+    ]);
+  });
+
   it("preserves combo layer scope when editing a combo", () => {
     const source = sampleKeymap().replace("bindings = <&kp TAB>;", "layers = <1>;\n            bindings = <&kp TAB>;");
     const combo = parseKeymap(source).combos[0];
@@ -237,6 +260,40 @@ describe("keymap updates", () => {
         timeoutMs: 50,
       }),
     ]);
+  });
+
+  it("adds and updates a combo in the bundled fixture keymap", () => {
+    const source = readFileSync("public/fixtures/KobitoKey.keymap", "utf8");
+    const parsed = parseKeymap(source);
+    const added = addCombo(source, {
+      id: "combo_custom_fixture",
+      binding: "&kp ESC",
+      keyPositions: [0, 1],
+      timeoutMs: 50,
+    });
+
+    expect(added).toContain("        combo_custom_fixture {\n");
+    expect(added).toContain("        };\n    };\n\n    keymap {");
+
+    const addedCombo = parseKeymap(added).combos.find((combo) => combo.id === "combo_custom_fixture");
+    expect(parseKeymap(added).combos).toHaveLength(parsed.combos.length + 1);
+    expect(addedCombo).toMatchObject({
+      binding: "&kp ESC",
+      keyPositions: [0, 1],
+      timeoutMs: 50,
+    });
+
+    const updated = updateCombo(added, addedCombo!, {
+      id: "combo_custom_fixture",
+      binding: "&kp TAB",
+      keyPositions: [0, 1, 4],
+      timeoutMs: 70,
+    });
+    expect(parseKeymap(updated).combos.find((combo) => combo.id === "combo_custom_fixture")).toMatchObject({
+      binding: "&kp TAB",
+      keyPositions: [0, 1, 4],
+      timeoutMs: 70,
+    });
   });
 });
 

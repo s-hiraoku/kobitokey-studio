@@ -57,6 +57,33 @@ describe("browser firmware session", () => {
     });
   });
 
+  it("persists repository and branch preferences before a build exists", () => {
+    const storage = new MemoryStorage();
+
+    writeBrowserFirmwareSession(
+      {
+        branch: "feature/browser-build",
+        buildStatus: "idle",
+        commitSha: null,
+        commitUrl: "",
+        leftFlashed: false,
+        repoUrl: "s-hiraoku/KobitoKey_QWERTY",
+        rightFlashed: false,
+        runId: null,
+        runUrl: "",
+      },
+      storage,
+    );
+
+    expect(readBrowserFirmwareSession(storage)).toMatchObject({
+      branch: "feature/browser-build",
+      buildStatus: "idle",
+      commitSha: null,
+      repoUrl: "s-hiraoku/KobitoKey_QWERTY",
+      runId: null,
+    });
+  });
+
   it("sanitizes corrupt or partial persisted state", () => {
     expect(
       sanitizeBrowserFirmwareSession({

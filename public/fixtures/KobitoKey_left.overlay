@@ -2,8 +2,6 @@
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <input/processors.dtsi>
 #include <input/processors/sensor_rotation.dtsi>
-#include <behaviors/input_gestures_accel.dtsi>
-#include <dt-bindings/zmk/keys.h>
 
 &xiao_serial { status = "disabled"; };
 
@@ -62,147 +60,26 @@
         status = "okay";
         rotation-angle = <24>;
     };
-
-
-    /* トラックボールジェスチャー用 keybind プロセッサ（Magic Trackpad 3本指スワイプ相当） */
-    gesture_keybind: gesture_keybind {
-        compatible = "zmk,input-processor-keybind";
-        #input-processor-cells = <0>;
-        mode = <1>;         /* 4方向モード */
-        threshold = <4>;    /* 初動のさらに軽いフリックも拾いやすくする */
-        tick = <160>;       /* 1ジェスチャでの再発火を抑えて1枚移動を安定化 */
-        wait-ms = <650>;    /* Spacesアニメ中の二重入力を避ける */
-        tap-ms = <10>;
-        bindings = <&kp LC(RIGHT)>,  /* 右: Spaces右へ */
-                   <&kp LC(LEFT)>,   /* 左: Spaces左へ */
-                   <&kp LC(UP)>,     /* 上: Mission Control */
-                   <&kp LC(DOWN)>;   /* 下: アプリウィンドウ */
-    };
-
-    /* ブラウザタブ操作用 keybind プロセッサ */
-    /* デスクトップ操作用 keybind プロセッサ（Magic Trackpad 4本指ピンチ相当） */
-    desktop_keybind: desktop_keybind {
-        compatible = "zmk,input-processor-keybind";
-        #input-processor-cells = <0>;
-        mode = <1>;         /* 4方向モード */
-        threshold = <8>;    /* 誤動作防止のため鈍めに設定 */
-        tick = <200>;       /* 再発火を抑制して単発安定 */
-        wait-ms = <800>;    /* 1操作後のクールダウンを長めに */
-        tap-ms = <10>;
-        bindings = <&kp RIGHT>,            /* 右: Launchpad選択を右へ */
-                   <&kp LEFT>,             /* 左: Launchpad選択を左へ */
-                   <&kp F4>,               /* 上: Launchpad */
-                   <&kp F11>;              /* 下: デスクトップを表示 */
-    };
-
-    tab_keybind: tab_keybind {
-        compatible = "zmk,input-processor-keybind";
-        #input-processor-cells = <0>;
-        mode = <1>;         /* 4方向モード */
-        threshold = <4>;    /* Layer 5 と同じ感度に揃える */
-        tick = <160>;       /* Layer 5 と同じ単発寄り設定 */
-        wait-ms = <650>;    /* Layer 5 と同じ待機時間 */
-        tap-ms = <10>;
-        bindings = <&kp LC(TAB)>,        /* 右: 次のタブ */
-                   <&kp LC(LS(TAB))>,    /* 左: 前のタブ */
-                   <&kp LG(T)>,          /* 上: 新規タブ */
-                   <&kp LG(W)>;          /* 下: タブを閉じる */
-    };
-
-};
-
-/* 左トラックボール加速度設定（スクロール用 / Magic Trackpad 慣性スクロール風） */
-&pointer_accel {
-    input-type = <INPUT_EV_REL>;
-    track-remainders;
-    min-factor = <800>;              /* 0.8倍: 読書時の1行スクロールが軽快 */
-    max-factor = <2500>;             /* 2.5倍: y_scaler×15と掛け算で実効37.5倍 */
-    speed-threshold = <1400>;        /* 立ち上がりをやや早く */
-    speed-max = <6000>;
-    acceleration-exponent = <3>;     /* 三次: 粘ってから急に伸びる=慣性風 */
-};
-
-/ {
-    /* 右トラックボール加速度設定（ポインター用 / Magic Trackpad 風 Phase2 調整版） */
-    pointer_accel_right: pointer_accel_right {
-        compatible = "zmk,input-processor-acceleration";
-        #input-processor-cells = <0>;
-        input-type = <INPUT_EV_REL>;
-        track-remainders;
-        min-factor = <620>;              /* 低速をもう少しだけ短くして止めやすくする */
-        max-factor = <2200>;             /* 高速域も少しだけ抑えて移動距離を短縮 */
-        speed-threshold = <2500>;        /* 加速開始を遅らせて中速の粘りを強化 */
-        speed-max = <10000>;             /* 高速域の伸びをなだらかにする */
-        acceleration-exponent = <3>;     /* 三次: 粘ってから急に伸びるカーブ */
-    };
 };
 
 &tb_left_listener {
     status = "okay";
     device = <&tb_left>;
 
-    /* デフォルト: スクロール動作 + マウスレイヤー自動発動 */
     input-processors =
             <&sensor_rotation_left>,
-            <&pointer_accel>,
             <&zip_x_scaler 0 1>,
             <&zip_y_scaler 1 15>,
             <&zip_xy_to_scroll_mapper>,
             <&zip_scroll_transform INPUT_TRANSFORM_Y_INVERT>,
-            <&zip_scroll_transform INPUT_TRANSFORM_X_INVERT>,
-            <&zip_temp_layer 4 10000>;
-
-    /* Layer 5: ジェスチャーモード（keybind → Ctrl+矢印） */
-    gesture {
-        layers = <5>;
-        input-processors =
-            <&sensor_rotation_left>,
-            <&gesture_keybind>;
-        process-next;
+            <&zip_scroll_transform INPUT_TRANSFORM_X_INVERT>;
     };
-    gesture_suppress {
-        layers = <5>;
-        input-processors = <&zip_xy_scaler 0 1>;
-    };
-
-    /* Layer 6: タブ操作モード */
-    tab_gesture {
-        layers = <6>;
-        input-processors =
-            <&sensor_rotation_left>,
-            <&tab_keybind>;
-        process-next;
-    };
-    tab_suppress {
-        layers = <6>;
-        input-processors = <&zip_xy_scaler 0 1>;
-    };
-
-    /* Layer 7: デスクトップ操作モード */
-    desktop_gesture {
-        layers = <7>;
-        input-processors =
-            <&sensor_rotation_left>,
-            <&desktop_keybind>;
-        process-next;
-    };
-    desktop_suppress {
-        layers = <7>;
-        input-processors = <&zip_xy_scaler 0 1>;
-    };
-
-    /* Layer 9: ズーム操作モード
-     * keymap側の zoom_hold が LCMD を保持するので、左トラックボールは
-     * 通常スクロール扱いで OS に到達 → macOS / Figma / ブラウザは
-     * Cmd+スクロール = 連続ズームと解釈する（Magic Trackpad ピンチ風）
-     * Layer 9 分岐は何もしない（デフォルトのスクロール処理に任せる） */
-};
 
 / {
   /omit-if-no-ref/ zip_temp_layer: zip_temp_layer {
     compatible = "zmk,input-processor-temp-layer";
     #input-processor-cells = <2>;
-    require-prior-idle-ms = <150>; /* キー押下後、何msオートマウスレイヤに入らないようにするか、誤爆防止 */
+    require-prior-idle-ms = <350>; /* キー押下後、何msオートマウスレイヤに入らないようにするか、誤爆防止 */
   };
 };
 
@@ -211,21 +88,14 @@
 
     input-processors =
         <&sensor_rotation_right>,
-        <&pointer_accel_right>,
-        <&zip_temp_layer 4 10000>; /* オートマウスレイヤーの指定とトラボ操作及びマウスボタン押下後に滞留する時間 */
+        <&zip_temp_layer 3 5000>; /* オートマウスレイヤーの指定とトラボ操作及びマウスボタン押下後に滞留する時間 */
 };
 
 &zip_temp_layer {
     excluded-positions = <
-        5
         6
-        15
         7
         8
-        9
-        16
-        18
-        19
         30
         32
         33

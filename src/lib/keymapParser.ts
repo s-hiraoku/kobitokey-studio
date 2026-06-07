@@ -45,6 +45,12 @@ export type LayerReferenceSite =
       kind: "combo-layers";
       comboId: string;
       layers: number[];
+    }
+  | {
+      kind: "overlay-temp-layer";
+      overlay: "left" | "right";
+      processor: string;
+      layer: number;
     };
 
 export type KeymapLayerInput = {
@@ -199,7 +205,7 @@ export function updateLayerBinding(
 export function addLayer(source: string, input: KeymapLayerInput): string {
   const keymapBlock = extractKeymapBody(source);
   const insertAt = keymapBlock.bodyStart + keymapBlock.body.length;
-  return `${source.slice(0, insertAt).trimEnd()}\n\n${indent(formatLayerBlock(input), 8)}\n${source.slice(insertAt)}`;
+  return `${source.slice(0, insertAt).trimEnd()}\n\n${indent(formatLayerBlock(input), 8)}\n${closingIndentForBody(source, keymapBlock.bodyStart)}${source.slice(insertAt)}`;
 }
 
 export function deleteLayer(source: string, layer: KeymapLayer): string {
@@ -232,6 +238,44 @@ export function findLayerReferenceSites(parsed: ParsedKeymap, targetLayerIndex: 
       references.push({ kind: "combo-layers", comboId: combo.id, layers: combo.layers });
     }
   });
+
+  return references;
+}
+
+export function findOverlayLayerReferenceSites({
+  leftOverlay,
+  rightOverlay,
+  targetLayerIndex,
+}: {
+  leftOverlay: string;
+  rightOverlay: string;
+  targetLayerIndex: number;
+}): LayerReferenceSite[] {
+  if (!Number.isInteger(targetLayerIndex) || targetLayerIndex < 0) {
+    return [];
+  }
+
+  return [
+    ...findOverlayTempLayerReferences(leftOverlay, "left", targetLayerIndex),
+    ...findOverlayTempLayerReferences(rightOverlay, "right", targetLayerIndex),
+  ];
+}
+
+function findOverlayTempLayerReferences(
+  source: string,
+  overlay: "left" | "right",
+  targetLayerIndex: number,
+): LayerReferenceSite[] {
+  const references: LayerReferenceSite[] = [];
+  const tempLayerPattern = /&(?<processor>[A-Za-z_][A-Za-z0-9_-]*temp_layer[A-Za-z0-9_-]*)\s+(?<layer>\d+)\b/g;
+
+  for (const match of source.matchAll(tempLayerPattern)) {
+    const layer = Number(match.groups?.layer);
+    const processor = match.groups?.processor;
+    if (processor && layer === targetLayerIndex) {
+      references.push({ kind: "overlay-temp-layer", overlay, processor, layer });
+    }
+  }
 
   return references;
 }
@@ -270,7 +314,7 @@ export function addCombo(source: string, input: KeymapComboInput): string {
   }
 
   const insertAt = combosBlock.bodyStart + combosBlock.body.length;
-  return `${source.slice(0, insertAt)}\n\n${indent(formatComboBlock(input), 8)}${source.slice(insertAt)}`;
+  return `${source.slice(0, insertAt).trimEnd()}\n\n${indent(formatComboBlock(input), 8)}\n${closingIndentForBody(source, combosBlock.bodyStart)}${source.slice(insertAt)}`;
 }
 
 function addComboBlock(source: string, input: KeymapComboInput): string {
@@ -321,6 +365,12 @@ function indent(value: string, spaces: number): string {
     .split("\n")
     .map((line) => `${prefix}${line}`)
     .join("\n");
+}
+
+function closingIndentForBody(source: string, bodyStart: number): string {
+  const openBrace = bodyStart - 1;
+  const lineStart = source.lastIndexOf("\n", openBrace) + 1;
+  return source.slice(lineStart, openBrace).match(/^\s*/)?.[0] ?? "";
 }
 
 export function formatBindings(bindings: string[]): string {

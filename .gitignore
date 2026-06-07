@@ -5,6 +5,7 @@ src-tauri/gen
 .npm-cache
 .playwright-mcp
 .serena
+.claude/worktrees/
 kobitokey-*.png
 .DS_Store
 *.log
