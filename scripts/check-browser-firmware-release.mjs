@@ -25,6 +25,8 @@ const files = {
   uiSmoke: read("scripts/check-browser-firmware-ui-smoke.mjs"),
   main: read("src/main.tsx"),
   styles: read("src/styles.css"),
+  browserUf2Write: read("src/lib/browserUf2Write.ts"),
+  browserUf2WriteTest: read("src/lib/browserUf2Write.test.ts"),
   releaseFlow: read("src/lib/firmwareReleaseFlow.ts"),
   releaseFlowTest: read("src/lib/firmwareReleaseFlow.test.ts"),
   githubFirmware: read("src/lib/githubFirmware.ts"),
@@ -1020,11 +1022,7 @@ const checks = [
     pass: () =>
       allIncludes(files.main, [
         "writeBrowserUf2ToDirectoryHandle",
-        "BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3",
-        "attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS",
-        "UF2 copy failed after",
         "assertUf2BootloaderDirectory(handle)",
-        "isLikelyBootloaderEjectError",
         "FlashConfirmationDialog",
         "firmwareArtifactProvenanceLabel",
         "manifestArtifactName",
@@ -1037,6 +1035,19 @@ const checks = [
         "firmware を直接コピー",
         "reset UF2 を先に書き込みます",
         "コピーを開始",
+      ]) &&
+      allIncludes(files.browserUf2Write, [
+        "BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3",
+        "attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS",
+        "UF2 copy failed after",
+        "isLikelyBootloaderEjectError",
+        "writeAttempted && isLikelyBootloaderEjectError(error)",
+        "return { ambiguousEject: true, attempts: attempt }",
+      ]) &&
+      allIncludes(files.browserUf2WriteTest, [
+        "treats bootloader eject during write as successful ambiguous completion",
+        "retries bootloader-like errors before a write is attempted",
+        "fails after retries when the bootloader handle is stale before writing",
       ]) &&
       !files.main.includes("window.confirm") &&
       !files.main.includes("confirmBrowserFirmwareFlashWrite") &&
