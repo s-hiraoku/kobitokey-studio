@@ -170,14 +170,15 @@ Direct Mode は Web Serial / Web Bluetooth を使うため、ブラウザ版は 
 公開 URL:
 
 - <https://s-hiraoku.github.io/kobitokey-studio/>
-- <https://s-hiraoku.github.io/kobitokey-studio/quick-start/>
-- <https://s-hiraoku.github.io/kobitokey-studio/usage-guide/>
+- <https://s-hiraoku.github.io/kobitokey-studio/firmware-mode/>
+- <https://s-hiraoku.github.io/kobitokey-studio/direct-mode/>
+- <https://s-hiraoku.github.io/kobitokey-studio/faq/>
 - <https://s-hiraoku.github.io/kobitokey-studio/deployment/>
 
 ### ドキュメント更新チェック
 
 1. `README.md` はプロジェクト概要、開発コマンド、主要リンクに留める。
-2. ユーザー向けの手順は `docs/quick-start.md` または `docs/usage-guide.md` に置く。
+2. ユーザー向けの手順は `docs/firmware-mode.md`(Firmware Mode)・`docs/direct-mode.md`(Direct Mode)・`docs/faq.md`(困ったとき)に置く。トップページ `docs/index.md` はモード選択の入口に留める。
 3. 公開、リリース確認、Pages 設定はこのページに置く。
 4. UI の文言、モード名、ボタン名が `src/main.tsx` と一致しているか確認する。
 5. ローカル開発 URL は Vite 設定に合わせて `http://127.0.0.1:1420/` を使う。

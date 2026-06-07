@@ -1,120 +1,114 @@
 ---
 layout: home
-title: KobitoKey Studio ガイド
+title: ホーム
 permalink: /
+description: KobitoKey Studio の使い方ガイド。Firmware Mode と Direct Mode の違い、最短の設定手順、トラブル解決をまとめています。
 ---
 
-# KobitoKey Studio ガイド
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div>
+      <p class="eyebrow">KobitoKey Studio ガイド</p>
+      <h1>キーマップを、迷わず変える。</h1>
+      <p class="lead">KobitoKey のキー配列・Combo・トラックボール・ファームウェアを、PC のブラウザだけでまとめて設定できる専用エディタです。やりたいことに合わせて <strong>2 つのモード</strong> を選ぶだけ。</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://kobitokey-studio.s-hiraoku.workers.dev/" target="_blank" rel="noopener">アプリを開く ↗</a>
+        <a class="btn btn-ghost" href="#modes">どっちのモード？</a>
+      </div>
+    </div>
+    <figure class="hero-figure">
+      <img src="{{ '/assets/img/firmware-editor.png' | relative_url }}" alt="KobitoKey Studio の Firmware Mode 編集画面。左に layer 一覧、中央にキーボード図、右にキー設定パネルが並ぶ。" width="1440" height="900" loading="eager">
+    </figure>
+  </div>
+</section>
 
-KobitoKey Studio は、KobitoKey のキーマップ、Combo、トラックボール設定、ファームウェアのビルド、UF2 書き込みをまとめて扱うための専用設定エディタです。
+<section class="home-section" id="modes">
+  <div class="wrap">
+    <h2>まず、2 つのモードから選ぶ</h2>
+    <p class="section-lead">KobitoKey Studio の操作は、最初に「<strong>ファームを作り直して反映する</strong>」か「<strong>実機へその場で書く</strong>」かを選ぶところから始まります。</p>
 
-設定内容ごとの入口から始める場合は [ユーザガイド](./user-guide/) を開いてください。すぐに手順だけ見る場合は [Quick Start](./quick-start/)、背景や細かい設定まで確認する場合は [使い方ガイド](./usage-guide/) を参照してください。公開直前の確認は [公開チェックリスト](./release-checklist/)、詳細な deploy 設定は [Deployment](./deployment/) にまとめています。
+    <div class="modes">
+      <a class="mode-card is-firmware" href="{{ '/firmware-mode/' | relative_url }}">
+        <span class="mode-badge">⚙ Firmware Mode</span>
+        <h3>じっくり作り込む</h3>
+        <p class="mode-tag">設定ファイルを編集して、ファームウェアを作り直す</p>
+        <ul>
+          <li>キー・Combo・トラックボールを<strong>すべて</strong>変更できる</li>
+          <li>設定がファイルとして残るので見直しやすい</li>
+          <li>ブラウザ上で編集 → GitHub でビルド → 書き込み</li>
+          <li>すでにある artifact を取り込んで<strong>書き込みだけ</strong>もできる</li>
+        </ul>
+        <span class="mode-link">Firmware Mode の使い方 →</span>
+      </a>
 
-ブラウザ版の公開 URL は <https://kobitokey-studio.s-hiraoku.workers.dev/> です。
+      <a class="mode-card is-direct" href="{{ '/direct-mode/' | relative_url }}">
+        <span class="mode-badge">⚡ Direct Mode</span>
+        <h3>すぐに試す</h3>
+        <p class="mode-tag">実機に接続して、キー動作をその場で書き込む</p>
+        <ul>
+          <li>ビルド不要。<strong>数秒</strong>で実機に反映</li>
+          <li>USB をつないでキーを選ぶだけ</li>
+          <li>キーを 1 個だけ素早く試したいときに最適</li>
+          <li>ZMK Studio 対応ファームウェアが必要</li>
+        </ul>
+        <span class="mode-link">Direct Mode の使い方 →</span>
+      </a>
+    </div>
 
-## まず選ぶこと
+    <div class="callout tip">
+      <div><strong>迷ったら Firmware Mode。</strong> 設定がファイルに残るので後から見直せて、Direct Mode が扱えない設定もすべてカバーできます。Direct Mode は「とりあえず 1 キーだけ試したい」ときの近道だと考えてください。</div>
+    </div>
+  </div>
+</section>
 
-最初に決めるのは「ファームウェアを作り直して反映する」か「実機へ直接書き込む」かです。
+<section class="home-section">
+  <div class="wrap">
+    <div class="decide">
+      <h2>やりたいこと別・早見表</h2>
+      <div class="decide-rows">
+        <div class="decide-row"><b>キーを 1 個だけ素早く変えたい</b><span class="pill pill-direct">Direct Mode</span></div>
+        <div class="decide-row"><b>キー配列をしっかり作り込みたい</b><span class="pill pill-firmware">Firmware Mode</span></div>
+        <div class="decide-row"><b>Combo を追加・編集したい</b><span class="pill pill-firmware">Firmware Mode</span></div>
+        <div class="decide-row"><b>トラックボールの感度を変えたい</b><span class="pill pill-firmware">Firmware Mode</span></div>
+        <div class="decide-row"><b>設定をファイルとして残したい</b><span class="pill pill-firmware">Firmware Mode</span></div>
+        <div class="decide-row"><b>すでにある UF2 / artifact を書き込むだけ</b><span class="pill pill-firmware">Firmware Mode</span></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-| 目的 | 選ぶモード | 反映方法 |
-| --- | --- | --- |
-| すべての設定を確実に変更したい | Firmware Mode | ファイル保存 → GitHub Actions でビルド → 左右それぞれ reset UF2、firmware UF2 の順に書き込み |
-| キーを少しだけ素早く変えたい | Direct Mode | USB 推奨。Bluetooth は見つかる場合のみ → 実機へ書き込み |
-| Combo を変更したい | Firmware Mode | `KobitoKey.keymap` を編集 → build + flash |
-| トラックボールを変更したい | Firmware Mode | 左右 overlay を編集 → build + flash。Direct Mode では参照のみ |
+<section class="home-section">
+  <div class="wrap">
+    <h2>最短ルート</h2>
+    <p class="section-lead">PC の <strong>Chrome / Edge</strong> で <a href="https://kobitokey-studio.s-hiraoku.workers.dev/" target="_blank" rel="noopener">アプリ</a> を開いて始めます。スマホブラウザは未対応です。</p>
 
-迷ったら `Firmware Mode` を使ってください。ファイルに残るため見直しやすく、Direct Mode 未対応の設定も扱えます。
+    <div class="routes">
+      <div class="route">
+        <span class="route-num">⚙</span>
+        <h3>初めてしっかり設定する</h3>
+        <p>Firmware を選び、Build &amp; Flash から GitHub に接続して読み込み → キー・Combo・トラックボールを編集 → Diff 確認 → Commit &amp; Build → artifact 取得 → 左右に reset UF2・firmware UF2 の順で書き込み。</p>
+        <p><a href="{{ '/firmware-mode/' | relative_url }}">Firmware Mode を詳しく →</a></p>
+      </div>
+      <div class="route">
+        <span class="route-num">⚡</span>
+        <h3>キーを 1 個だけ試す</h3>
+        <p>Direct を選び、USB で接続 → layer と key を選ぶ → キー動作を選び「書き込み予定に追加」→「実機へ書き込み」。ビルドは不要で、数秒で反映されます。</p>
+        <p><a href="{{ '/direct-mode/' | relative_url }}">Direct Mode を詳しく →</a></p>
+      </div>
+    </div>
+  </div>
+</section>
 
-スマホブラウザでは初版未対応画面を表示します。PC の Chrome / Edge で開いてください。
-
-## 使い方の入口
-
-- [設定内容ごとのアプリ入口を見る](./user-guide/)
-- [Quick Start で最短手順を見る](./quick-start/)
-- [最初の準備を確認する](./usage-guide/#1-事前準備)
-- [モードの違いを確認する](./usage-guide/#2-モード選択の考え方)
-- [作業前チェックリストを見る](./usage-guide/#作業前チェックリスト)
-- [Firmware Mode で設定する](./usage-guide/#3-firmware-mode-で設定する)
-- [ビルドして UF2 を書き込む](./usage-guide/#4-firmware-を-build-して-uf2-を書き込む)
-- [Direct Mode で実機へ書き込む](./usage-guide/#5-direct-mode-で設定する)
-- [公開直前チェックリストを見る](./release-checklist/)
-- [公開とドキュメント更新手順を確認する](./deployment/)
-- [目的別レシピを見る](./usage-guide/#6-目的別レシピ)
-- [困ったときの確認項目を見る](./usage-guide/#7-トラブルシューティング)
-
-## 最短ルート
-
-### 初めて設定する
-
-1. PC の Chrome / Edge でブラウザ版の公開 URL を開く
-2. `Firmware` を選ぶ
-3. `Build & Flash` から GitHub に接続し、repository と branch を指定して `GitHub から読み込み` を押す
-4. keymap、Combo、Trackball を変更する
-5. `Diff` を確認する
-6. `Diff 確認済み`、`Commit & Build`、`Artifact 取得` の順に進める
-7. 左右それぞれで reset UF2、firmware UF2 の順に bootloader へ書き込む
-
-ブラウザ版はローカル clone 不要です。公式 repository に書き込み権限がない場合は、GitHub 上で `KobitoKey_QWERTY` を fork し、その fork を `Firmware repository` に指定してください。
-
-### キーを 1 個だけ試す
-
-1. ZMK Studio 対応 firmware が入った KobitoKey を用意する
-2. `Direct` を選ぶ
-3. USB で接続する(Bluetooth は見つかる場合のみ)
-4. layer と key を選ぶ
-5. キー動作を選び、`書き込み予定に追加`、`実機へ書き込み` の順に押す
-
-### Combo やトラックボールを確実に変える
-
-1. `Firmware` を選ぶ
-2. `Combos` または `Trackball` を開く
-3. 変更する
-4. `Diff` を確認する
-5. ブラウザ版は `Commit & Build` で GitHub Actions build を起動し、UF2 書き込みで反映する
-
-Tauri デスクトップ版は一部ユーザー向けのローカル作業用です。公開版の案内はブラウザ版を基準にしています。
-
-## 設定別の早見表
-
-| やりたいこと | 推奨モード | 保存先 |
-| --- | --- | --- |
-| キー配列をファイルとして編集する | Firmware Mode | `KobitoKey_QWERTY/config/KobitoKey.keymap` |
-| Combo をファイルとして編集する | Firmware Mode | `KobitoKey.keymap` |
-| トラックボール設定をファイルとして編集する | Firmware Mode | 左右 overlay ファイル |
-| ファームウェアをビルドして UF2 を焼く | Firmware Mode | 左右の bootloader volume |
-| 実機へキー動作を即時保存する | Direct Mode | ZMK Studio 対応 device |
-| Combo を確認する | Direct Mode | Firmware keymap を参照表示 |
-| トラックボール感度を確認する | Direct Mode | Firmware overlay を参照表示 |
-
-## 作業の全体像
-
-### ファイル編集で確実に反映する流れ
-
-1. `Firmware` を選ぶ
-2. ブラウザ版では GitHub repository、Tauri 版では `KobitoKey_QWERTY` フォルダを読み込む
-3. キー、Combo、トラックボール設定を編集する
-4. `Diff` で変更内容を確認する
-5. `保存` する
-6. GitHub Actions でビルドする
-7. 左右それぞれで reset UF2、firmware UF2 の順に bootloader にコピーする
-
-### 実機へすぐ反映する流れ
-
-1. `Direct` を選ぶ
-2. USB で KobitoKey を接続する(Bluetooth は見つかる場合のみ)
-3. 実機の keymap を読み込む
-4. 対象 layer と key を選ぶ
-5. キー動作を選ぶ
-6. `書き込み予定に追加`、`実機へ書き込み` の順に押す
-
-## よく使う用語
-
-| 用語 | 意味 |
-| --- | --- |
-| keymap | layer ごとのキー動作と Combo を含む設定ファイル |
-| layer | キーボードの面。`&mo` や `&lt` で一時的に切り替える |
-| キー動作(ZMK 構文) | key に割り当てる動作。例: `&kp A`、`&lt 1 SPACE` |
-| Combo | 複数 key の同時押しで別の動作を発火する設定 |
-| overlay | トラックボールなど、左右 half ごとの hardware 寄り設定 |
-| UF2 | bootloader volume にコピーして書き込む firmware ファイル |
-| ZMK Studio | 実機に接続して対応済み設定を直接読み書きする仕組み |
+<section class="home-section">
+  <div class="wrap">
+    <h2>知っておくと早い用語</h2>
+    <div class="terms">
+      <dl class="term"><dt>keymap</dt><dd>layer ごとのキー動作と Combo を含む設定ファイル。</dd></dl>
+      <dl class="term"><dt>layer</dt><dd>キーボードの面。<code>&amp;mo</code> や <code>&amp;lt</code> で一時的に切り替える。</dd></dl>
+      <dl class="term"><dt>キー動作 (ZMK 構文)</dt><dd>key に割り当てる動作。例: <code>&amp;kp A</code>、<code>&amp;lt 1 SPACE</code>。</dd></dl>
+      <dl class="term"><dt>Combo</dt><dd>複数の key を同時押しすると別の動作を発火する設定。</dd></dl>
+      <dl class="term"><dt>overlay</dt><dd>トラックボールなど、左右それぞれのハードウェア寄りの設定。</dd></dl>
+      <dl class="term"><dt>UF2</dt><dd>bootloader にコピーして書き込むファームウェアファイル。</dd></dl>
+    </div>
+  </div>
+</section>

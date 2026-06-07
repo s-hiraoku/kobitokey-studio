@@ -1,13 +1,33 @@
 title: KobitoKey Studio ガイド
-description: KobitoKey Studio の設定・使い方ガイド
-theme: minima
+description: KobitoKey のキーマップ・Combo・トラックボール・ファームウェアをまとめて設定するエディタの使い方ガイド
+lang: ja
 
-header_pages:
-  - user-guide.md
-  - quick-start.md
-  - usage-guide.md
-  - release-checklist.md
-  - deployment.md
+# 独自レイアウトを使うため Jekyll の minima テーマは使いません。
+# GitHub Pages の Jekyll build がそのまま docs/ 配下を処理します。
+
+app_url: https://kobitokey-studio.s-hiraoku.workers.dev/
+
+# ヘッダーのナビゲーション
+nav:
+  - title: トップ
+    url: /
+  - title: Firmware Mode
+    url: /firmware-mode/
+  - title: Direct Mode
+    url: /direct-mode/
+  - title: 困ったとき
+    url: /faq/
+  - title: 公開・運用
+    url: /deployment/
 
 github_username: s-hiraoku
-show_excerpts: false
+
+# Jekyll が変換対象から外すもの
+exclude:
+  - README.md
+  - browser-firmware-e2e-evidence.template.json
+  - browser-firmware-release-plan.md
+
+# kramdown で見出しに自動 id を振る
+kramdown:
+  toc_levels: 2..3

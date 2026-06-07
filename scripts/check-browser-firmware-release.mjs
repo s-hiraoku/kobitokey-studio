@@ -48,8 +48,9 @@ const files = {
   docsConfig: read("docs/_config.yml"),
   docsIndex: read("docs/index.md"),
   docsUserGuide: read("docs/user-guide.md"),
-  docsQuickStart: read("docs/quick-start.md"),
-  docsUsageGuide: read("docs/usage-guide.md"),
+  docsFirmwareMode: read("docs/firmware-mode.md"),
+  docsDirectMode: read("docs/direct-mode.md"),
+  docsFaq: read("docs/faq.md"),
   docsReleaseChecklist: read("docs/release-checklist.md"),
   docsDeployment: read("docs/deployment.md"),
   pagesCi: read(".github/workflows/pages.yml"),
@@ -403,41 +404,48 @@ const checks = [
         "Browser Firmware Mode can read firmware files from GitHub",
       ]) &&
       allIncludes(files.docsIndex, [
-        "PC の Chrome / Edge でブラウザ版の公開 URL を開く",
-        "Tauri デスクトップ版は一部ユーザー向けのローカル作業用です",
+        "PC の <strong>Chrome / Edge</strong>",
+        "迷ったら Firmware Mode",
       ]) &&
-      allIncludes(files.docsQuickStart, [
-        "✅ GitHub 連携対応",
-        "Tauri デスクトップ版は一部ユーザー向けのローカル作業用です",
-        "公開版の手順はブラウザ版を基準にしてください",
-        "ブラウザ版の Firmware Mode は GitHub 連携で利用できます",
+      allIncludes(files.docsFirmwareMode, [
+        "GitHub から直接読み書きします",
+        "GitHub に接続する",
+        "Commit &amp; Build",
+        "artifact だけ書き込む",
       ]) &&
-      allIncludes(files.docsUsageGuide, [
-        "✅ GitHub 連携対応",
-        "公開版はブラウザ版を基準に案内します",
-        "デスクトップ版は一部ユーザー向けのローカル作業用です",
-        "ブラウザ版 Firmware Mode は GitHub 連携で利用できます",
+      allIncludes(files.docsDirectMode, [
+        "ZMK Studio 対応ファームウェア",
+        "USB 接続を推奨します",
+        "Firmware Mode</a> のファイルにも反映",
       ]) &&
       allIncludes(files.docsDeployment, ["Browser release: Direct Mode と Firmware Mode"]) &&
-      noIncludes(files.readme + files.docsQuickStart + files.docsUsageGuide + files.docsDeployment, ["beta", "Beta", "ベータ", "β", "🧪"]),
+      noIncludes(
+        files.readme + files.docsIndex + files.docsFirmwareMode + files.docsDirectMode + files.docsFaq + files.docsDeployment,
+        ["beta", "Beta", "ベータ", "β", "🧪"],
+      ),
   },
   {
     name: "GitHub Pages user guide links to app entry points by setting area",
     pass: () =>
-      allIncludes(files.docsConfig, ["user-guide.md", "release-checklist.md"]) &&
-      allIncludes(files.docsIndex, ["./user-guide/", "./release-checklist/", "設定内容ごとのアプリ入口"]) &&
+      allIncludes(files.docsConfig, ["/firmware-mode/", "/direct-mode/", "/faq/", "/deployment/"]) &&
+      allIncludes(files.docsIndex, ["/firmware-mode/", "/direct-mode/", "やりたいこと別・早見表"]) &&
       allIncludes(files.docsUserGuide, [
         "permalink: /user-guide/",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
-        "編集に戻る",
-        "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+        "redirect_to: /",
+        "/firmware-mode/",
+        "/direct-mode/",
+        "/faq/",
       ]) &&
-      allIncludes(files.docsQuickStart, ["../user-guide/", "編集をリセット"]) &&
-      allIncludes(files.docsUsageGuide, ["../user-guide/", "編集に戻る"]) &&
+      allIncludes(files.docsFirmwareMode, [
+        "Build &amp; Flash",
+        "編集に戻る",
+        "artifact だけ書き込む",
+      ]) &&
+      allIncludes(files.docsDirectMode, [
+        "Direct を選ぶ",
+        "実機へ書き込み",
+      ]) &&
+      allIncludes(files.docsFaq, ["/firmware-mode/", "/direct-mode/", "GitHub から読み込めない"]) &&
       allIncludes(files.docsReleaseChecklist, [
         "permalink: /release-checklist/",
         "deploy_browser_firmware_worker",
@@ -1100,8 +1108,8 @@ const checks = [
         "目的別公開リンク URL 一覧",
         "ISO UTC の flash 完了時刻",
       ]) &&
-      allIncludes(files.docsUsageGuide, ["GitHub artifact 名 / id", "artifact <name> #<id>"]) &&
-      allIncludes(files.docsUsageGuide, ["settings reset UF2", "runtime keymap", "reset UF2 を先に直接コピー"]) &&
+      allIncludes(files.docsFirmwareMode, ["artifact <name> #<id>", "想定したビルドと一致"]) &&
+      allIncludes(files.docsFirmwareMode, ["reset UF2", "ZMK の永続設定", "reset UF2 を先に"]) &&
       allIncludes(files.docsDeployment, [
         "PR / feature branch の Workers preview",
         "preview preflight の成功は production 公開の証跡にしない",
