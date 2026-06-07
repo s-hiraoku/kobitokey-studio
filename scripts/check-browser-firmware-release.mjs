@@ -1037,15 +1037,17 @@ const checks = [
         "コピーを開始",
       ]) &&
       allIncludes(files.browserUf2Write, [
-        "BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3",
-        "attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS",
-        "UF2 copy failed after",
+        "BROWSER_UF2_WRITE_INITIAL_SETTLE_MS = 1200",
+        "BROWSER_UF2_WRITE_RETRY_DELAYS_MS = [750, 1500, 3000, 5000]",
+        "UF2 copy failed during",
         "isLikelyBootloaderEjectError",
-        "writeAttempted && isLikelyBootloaderEjectError(error)",
-        "return { ambiguousEject: true, attempts: attempt }",
+        "phase = \"write\"",
+        "phase = \"close\"",
+        "discardWritableQuietly",
       ]) &&
       allIncludes(files.browserUf2WriteTest, [
-        "treats bootloader eject during write as successful ambiguous completion",
+        "retries bootloader-like write rejections instead of reporting success",
+        "can recover from a transient write rejection before data is accepted",
         "retries bootloader-like errors before a write is attempted",
         "fails after retries when the bootloader handle is stale before writing",
       ]) &&
