@@ -5,25 +5,45 @@ export type BrowserUf2WriteResult = {
   attempts: number;
 };
 
-export const BROWSER_UF2_WRITE_MAX_ATTEMPTS = 3;
+export const BROWSER_UF2_WRITE_INITIAL_SETTLE_MS = 1200;
+export const BROWSER_UF2_WRITE_RETRY_DELAYS_MS = [750, 1500, 3000, 5000] as const;
+export const BROWSER_UF2_WRITE_MAX_ATTEMPTS = BROWSER_UF2_WRITE_RETRY_DELAYS_MS.length + 1;
+
+type BrowserUf2WritePhase = "open-file" | "open-writable" | "write" | "close";
+
+type BrowserUf2WriteOptions = {
+  initialSettleMs?: number;
+  retryDelaysMs?: readonly number[];
+};
 
 export async function writeBrowserUf2ToDirectoryHandle(
   handle: FileSystemDirectoryHandle,
   file: GitHubArtifactUf2,
+  options: BrowserUf2WriteOptions = {},
 ): Promise<BrowserUf2WriteResult> {
   await ensureWritablePermission(handle);
+  const retryDelays = options.retryDelaysMs ?? BROWSER_UF2_WRITE_RETRY_DELAYS_MS;
+  const maxAttempts = retryDelays.length + 1;
   const filename = file.name.split("/").pop() ?? file.name;
   let lastError: unknown = null;
+  let lastPhase: BrowserUf2WritePhase = "open-file";
 
-  for (let attempt = 1; attempt <= BROWSER_UF2_WRITE_MAX_ATTEMPTS; attempt += 1) {
+  await delay(options.initialSettleMs ?? BROWSER_UF2_WRITE_INITIAL_SETTLE_MS);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     let writable: FileSystemWritableFileStream | null = null;
-    let writeAttempted = false;
+    let phase: BrowserUf2WritePhase = "open-file";
+    let writeCompleted = false;
     try {
+      phase = "open-file";
       const fileHandle = await handle.getFileHandle(filename, { create: true });
+      phase = "open-writable";
       writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
-      writeAttempted = true;
+      phase = "write";
       await writable.write(arrayBufferFromBytes(file.bytes));
+      writeCompleted = true;
       try {
+        phase = "close";
         await writable.close();
         return { ambiguousEject: false, attempts: attempt };
       } catch (error) {
@@ -33,21 +53,19 @@ export async function writeBrowserUf2ToDirectoryHandle(
         throw error;
       }
     } catch (error) {
-      if (writable) {
-        await closeWritableQuietly(writable);
-      }
-      if (writeAttempted && isLikelyBootloaderEjectError(error)) {
-        return { ambiguousEject: true, attempts: attempt };
-      }
-      if (!isLikelyBootloaderEjectError(error) || attempt === BROWSER_UF2_WRITE_MAX_ATTEMPTS) {
-        throw uf2WriteRetryError(error, attempt);
-      }
       lastError = error;
-      await delay(350);
+      lastPhase = phase;
+      if (writable && !writeCompleted) {
+        await discardWritableQuietly(writable);
+      }
+      if (!isLikelyBootloaderEjectError(error) || attempt === maxAttempts) {
+        throw uf2WriteRetryError(error, attempt, phase);
+      }
+      await delay(retryDelays[attempt - 1] ?? retryDelays[retryDelays.length - 1] ?? 0);
     }
   }
 
-  throw uf2WriteRetryError(lastError, BROWSER_UF2_WRITE_MAX_ATTEMPTS);
+  throw uf2WriteRetryError(lastError, maxAttempts, lastPhase);
 }
 
 async function ensureWritablePermission(handle: FileSystemDirectoryHandle): Promise<void> {
@@ -66,16 +84,21 @@ async function ensureWritablePermission(handle: FileSystemDirectoryHandle): Prom
   throw new Error("フォルダへの書き込み権限がありません");
 }
 
-function uf2WriteRetryError(error: unknown, attempts: number): Error {
-  return new Error(`UF2 copy failed after ${attempts} attempts: ${formatError(error)}`);
+function uf2WriteRetryError(error: unknown, attempts: number, phase: BrowserUf2WritePhase): Error {
+  return new Error(`UF2 copy failed during ${phase} after ${attempts} attempts: ${formatError(error)}`);
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
-async function closeWritableQuietly(writable: FileSystemWritableFileStream) {
+async function discardWritableQuietly(writable: FileSystemWritableFileStream) {
   try {
+    const abort = (writable as unknown as { abort?: (reason?: unknown) => Promise<void> }).abort;
+    if (typeof abort === "function") {
+      await abort.call(writable, new Error("UF2 write did not complete"));
+      return;
+    }
     await writable.close();
   } catch {
     // Preserve the original write error.
