@@ -238,7 +238,7 @@ function isCustomLayerTapBehavior(behavior: string | undefined): boolean {
 }
 
 function formatZoomHoldParameter(value: string): string {
-  return value ? `L${value}` : "";
+  return value ? `Layer ${value}` : "";
 }
 
 function formatMouseMotion(value?: string): string {
