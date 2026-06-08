@@ -361,6 +361,7 @@ function App() {
   const [fixtureLoading, setFixtureLoading] = React.useState(true);
   const [fixtureError, setFixtureError] = React.useState("");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
+  const [firmwareFlashError, setFirmwareFlashError] = React.useState("");
   const [firmwareBuildCheck, setFirmwareBuildCheck] = React.useState<FirmwareBuildCheck | null>(null);
   const [uf2Files, setUf2Files] = React.useState<string[]>([]);
   const [bootloaderVolumes, setBootloaderVolumes] = React.useState<string[]>([]);
@@ -585,6 +586,7 @@ function App() {
     setBrowserFirmwareBuildStatus("idle");
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
+    setFirmwareFlashError("");
     clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
@@ -2163,6 +2165,7 @@ function App() {
       setBrowserFirmwareBuildStatus("idle");
       setBrowserFirmwareArtifacts(null);
       setBrowserFirmwareArtifactSource(null);
+      setFirmwareFlashError("");
       clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
@@ -2206,6 +2209,7 @@ function App() {
       setBrowserFirmwareBuildStatus("queued");
       setBrowserFirmwareArtifacts(null);
       setBrowserFirmwareArtifactSource(null);
+      setFirmwareFlashError("");
       clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
@@ -2261,6 +2265,7 @@ function App() {
     setBrowserFirmwareBuildStatus("queued");
     setBrowserFirmwareArtifacts(null);
     setBrowserFirmwareArtifactSource(null);
+    setFirmwareFlashError("");
     clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
@@ -2327,6 +2332,7 @@ function App() {
       setBrowserFirmwareArtifacts(artifacts);
       setBrowserFirmwareArtifactSource("github");
       setBrowserFirmwareBuildStatus("success");
+      setFirmwareFlashError("");
       setBuildStatus(
         `artifact を取得しました: left ${artifacts.targets.left ? "OK" : "未検出"} / reset ${
           artifacts.targets.reset ? "OK" : "未検出"
@@ -2357,6 +2363,7 @@ function App() {
       const artifacts = await readLocalFirmwareArtifactsFromDirectoryHandle(handle);
       setBrowserFirmwareArtifacts(artifacts);
       setBrowserFirmwareArtifactSource("folder");
+      setFirmwareFlashError("");
       clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
@@ -2380,12 +2387,17 @@ function App() {
   }
 
   async function copyBrowserFirmwareUf2(side: FlashSide) {
+    setFirmwareFlashError("");
     if (!canFlashFirmwareSide(browserFirmwareReadiness, side)) {
-      setBuildStatus(browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側を書き込む条件が揃っていません`);
+      const message = browserFirmwareReadiness.blockers[0] ?? `${sideLabel(side)} 側を書き込む条件が揃っていません`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
       return;
     }
     if (typeof window.showDirectoryPicker !== "function") {
-      setBuildStatus("このブラウザではフォルダ選択による直接コピーが使えません。デスクトップ版を使ってください");
+      const message = "このブラウザではフォルダ選択による直接コピーが使えません。デスクトップ版を使ってください";
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
       return;
     }
     if (!beginBrowserFirmwareOperation("flash")) return;
@@ -2394,7 +2406,9 @@ function App() {
       const isFirmwarePhase = browserFirmwareResetDoneRef.current[side];
       const target = isFirmwarePhase ? browserFirmwareUf2Target(side) : browserFirmwareUf2Target("reset");
       if (!target) {
-        setBuildStatus(isFirmwarePhase ? `${sideLabel(side)} UF2 が見つかりません` : "reset UF2 が artifact に見つかりません");
+        const message = isFirmwarePhase ? `${sideLabel(side)} UF2 が見つかりません` : "reset UF2 が artifact に見つかりません";
+        setFirmwareFlashError(message);
+        setBuildStatus(message);
         return;
       }
 
@@ -2411,6 +2425,7 @@ function App() {
       const writeResult = await writeBrowserUf2ToDirectoryHandle(handle, target);
       const retrySuffix = writeResult.attempts > 1 ? `（${writeResult.attempts} 回目で成功）` : "";
       const writeSuffix = `${retrySuffix}${writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : ""}`;
+      setFirmwareFlashError("");
       if (!isFirmwarePhase) {
         setBrowserFirmwareSideResetDone(side, true);
         setBuildStatus(
@@ -2427,7 +2442,9 @@ function App() {
         setBuildStatus(`${sideLabel(side)} UF2 の直接コピーをキャンセルしました`);
         return;
       }
-      setBuildStatus(`${sideLabel(side)} UF2 の直接コピー失敗: ${formatError(error)}`);
+      const message = `${sideLabel(side)} UF2 の直接コピー失敗: ${formatError(error)}`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
     } finally {
       endBrowserFirmwareOperation("flash");
     }
@@ -2505,15 +2522,20 @@ function App() {
   async function refreshFlashTargets() {
     try {
       const { uf2Files: nextUf2Files, bootloaderVolumes: nextVolumes } = await readFlashTargets();
+      setFirmwareFlashError("");
       setBuildStatus(`UF2 ${nextUf2Files.length} 件 / bootloader ${nextVolumes.length} 件`);
     } catch (error) {
-      setBuildStatus(`UF2/volume 確認失敗: ${String(error)}`);
+      const message = `UF2/volume 確認失敗: ${String(error)}`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
     }
   }
 
   async function copySelectedUf2() {
     if (!selectedUf2 || !selectedVolume) {
-      setBuildStatus("UF2 と bootloader volume を選択してください");
+      const message = "UF2 と bootloader volume を選択してください";
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
       return;
     }
 
@@ -2533,26 +2555,32 @@ function App() {
         uf2Path: selectedUf2,
         volumePath: selectedVolume,
       });
+      setFirmwareFlashError("");
       setBuildStatus(`書き込みコピー完了: ${destination}`);
     } catch (error) {
-      setBuildStatus(`UF2 コピー失敗: ${String(error)}`);
+      const message = `UF2 コピー失敗: ${String(error)}`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
     }
   }
 
   async function copyWizardUf2(side: FlashSide) {
     const uf2Path = firmwareUf2Targets[side];
     if (!uf2Path) {
-      setBuildStatus(`${sideLabel(side)} 用 UF2 が見つかりません。Artifact 取得を実行してください`);
+      const message = `${sideLabel(side)} 用 UF2 が見つかりません。Artifact 取得を実行してください`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
       return;
     }
 
     const volumePath = bootloaderVolumes.length === 1 ? bootloaderVolumes[0] : selectedVolume;
     if (!volumePath) {
-      setBuildStatus(
+      const message =
         bootloaderVolumes.length > 1
           ? `複数の bootloader volume が見つかりました。${sideLabel(side)} 側の Bootloader を選択してください`
-          : `${sideLabel(side)} 側を bootloader に入れてから UF2 / Volume を更新してください`,
-      );
+          : `${sideLabel(side)} 側を bootloader に入れてから UF2 / Volume を更新してください`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
       return;
     }
 
@@ -2566,9 +2594,12 @@ function App() {
       const destination = await invoke<string>("copy_uf2_to_volume", { uf2Path, volumePath });
       const nextSide = side === "left" ? "right" : "left";
       setFlashSide(nextSide);
+      setFirmwareFlashError("");
       setBuildStatus(`${sideLabel(side)} 側を書き込みました: ${destination}`);
     } catch (error) {
-      setBuildStatus(`${sideLabel(side)} 側の UF2 コピー失敗: ${formatError(error)}`);
+      const message = `${sideLabel(side)} 側の UF2 コピー失敗: ${formatError(error)}`;
+      setFirmwareFlashError(message);
+      setBuildStatus(message);
     }
   }
 
@@ -2878,6 +2909,7 @@ function App() {
                   canDownloadArtifacts={canAttemptBrowserFirmwareArtifactDownload}
                   commitSha={browserFirmwareCommitSha}
                   commitUrl={browserFirmwareCommitUrl}
+                  flashError={firmwareFlashError}
                   flashSide={flashSide}
                   githubOAuthAvailable={Boolean(githubOAuthClientId())}
                   onBack={closeFirmwareBuildFlash}
@@ -2911,6 +2943,7 @@ function App() {
                   buildCheck={firmwareBuildCheck}
                   buildStatus={buildStatus}
                   flashSide={flashSide}
+                  flashError={firmwareFlashError}
                   firmwareUf2Targets={firmwareUf2Targets}
                   firmwareRepoLabel={firmwareRepoLabel}
                   firmwareRepoUrl={firmwareRepoUrl}
@@ -4936,6 +4969,7 @@ function BrowserFirmwareReleaseWorkbench({
   canDownloadArtifacts,
   commitSha,
   commitUrl,
+  flashError,
   flashSide,
   githubOAuthAvailable,
   onBack,
@@ -4970,6 +5004,7 @@ function BrowserFirmwareReleaseWorkbench({
   canDownloadArtifacts: boolean;
   commitSha: string | null;
   commitUrl: string;
+  flashError: string;
   flashSide: FlashSide;
   githubOAuthAvailable: boolean;
   onBack: () => void;
@@ -5180,6 +5215,7 @@ function BrowserFirmwareReleaseWorkbench({
               {flashTargetArtifactLabel ? ` / ${flashTargetArtifactLabel}` : ""}
             </span>
           </div>
+          <FlashWriteError message={flashError} />
           <FlashCompletionStatus activeSide={flashSide} readiness={readiness} />
           <div className="flash-side-toggle" role="group" aria-label="Flash side">
             {(["left", "right"] as FlashSide[]).map((side) => (
@@ -5407,6 +5443,22 @@ function FlashCompletionStatus({
   );
 }
 
+function FlashWriteError({ message }: { message: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div className="flash-write-error" role="alert" aria-live="assertive">
+      <AlertTriangle size={15} />
+      <div>
+        <strong>書き込みエラー</strong>
+        <span>{message}</span>
+      </div>
+    </div>
+  );
+}
+
 function FlashCompletionPill({ label, state }: { label: string; state: ReleaseGateState }) {
   const Icon = state === "done" ? CheckCircle2 : state === "current" ? AlertTriangle : Clock;
   const text = state === "done" ? "完了" : state === "current" ? "書き込み待ち" : "待機";
@@ -5619,6 +5671,7 @@ function BuildWorkbench({
   bootloaderVolumes,
   buildCheck,
   buildStatus,
+  flashError,
   flashSide,
   firmwareUf2Targets,
   firmwareRepoLabel,
@@ -5643,6 +5696,7 @@ function BuildWorkbench({
   bootloaderVolumes: string[];
   buildCheck: FirmwareBuildCheck | null;
   buildStatus: string;
+  flashError: string;
   flashSide: FlashSide;
   firmwareUf2Targets: FirmwareUf2Targets;
   firmwareRepoLabel: string;
@@ -5729,6 +5783,7 @@ function BuildWorkbench({
             <strong>{sideLabel(flashSide)} 側を書き込み</strong>
             <span>{formatUf2Name(firmwareUf2Targets[flashSide])}</span>
           </div>
+          <FlashWriteError message={flashError} />
           <div className="flash-side-toggle" role="group" aria-label="Flash side">
             {(["left", "right"] as FlashSide[]).map((side) => (
               <button
