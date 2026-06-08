@@ -2,7 +2,7 @@
    KobitoKey Studio — "Workbench" theme (polished)
    Quieter background · cleaner type scale · tighter rhythm
    Keycaps + keyboard plate keep their honey/pine identity.
-   Fraunces (display) / Hanken Grotesk (UI) / JetBrains Mono (data)
+   Fraunces (display) / Inter (UI) / JetBrains Mono (data)
    ============================================================ */
 
 :root {
@@ -12,6 +12,13 @@
   --paper-3:      #dde3e7;
   --card:         #f5f8fa;
   --card-sunk:    #e7ebee;
+  /* top face for raised controls (inputs, light buttons) — white on light,
+     a lifted slate on dark so they don't glow against the dark chrome. */
+  --field-face:   #ffffff;
+  /* translucent "glass" face for chips / link buttons over paper — a faint
+     white veil on light, a faint light veil on dark. */
+  --glass:        rgba(255, 255, 255, 0.62);
+  --glass-soft:   rgba(255, 255, 255, 0.52);
 
   /* ink — cool neutral, slight blue undertone */
   --ink:          #1a1f24;
@@ -40,6 +47,7 @@
      shifts toward a cooler tone. */
   --pine:         #2c4250;
   --pine-deep:    #1c2c38;
+  --pine-darker:  #14201a;
   --pine-bright:  #3f6883;
   --pine-wash:    #e1e9ef;
   --pine-line:    #b3c2d0;
@@ -47,10 +55,17 @@
   /* on-pine text — soft cool cream that reads cleanly on dark slate. */
   --on-pine:      #e6ecf1;
   --on-pine-soft: #c4cdd6;
+  /* text color for "active" chips drawn on a light --pine-wash fill. Deep pine
+     reads well on light; on dark the wash is dim, so this flips to bright ink. */
+  --pine-active-ink: var(--pine-deep);
 
   /* signal */
   --amber-warn:   #b67d12;
   --amber-warn-bg:#fbeec6;
+  --danger:       #8a2918;
+  --danger-line:  #a83a2b;
+  --danger-wash:  #fbe8e2;
+  --danger-ink:   #5a1d10;
 
   /* spacing scale — 4px base */
   --sp-1: 4px;
@@ -69,6 +84,10 @@
   --r-xl: 16px;
   --r-full: 999px;
 
+  /* font stacks — Inter for Latin/UI, with system Japanese faces for kana/kanji */
+  --font-ui: "Inter", ui-sans-serif, system-ui, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+
   /* shadows */
   --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
   --shadow-2: 0 1px 2px rgba(31, 29, 23, 0.06), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
@@ -83,11 +102,85 @@
 
   color: var(--ink);
   background: var(--paper);
-  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  /* Inter for Latin/UI; the system Japanese faces render the kana/kanji
+     (Inter has no JP glyphs, so they fall through to these). */
+  font-family: var(--font-ui);
+  /* Keep the fallback (and the JP faces) visually matched to Inter's x-height
+     so the swap on load doesn't shift or shrink text. */
+  font-size-adjust: from-font;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+@supports not (font-size-adjust: from-font) {
+  body { font-size-adjust: none; }
+}
+
+/* ------------------------------------------------------------
+   Dark mode — override the surface/ink/hairline tokens. The keyboard
+   body keeps its honey/pine identity (keycaps are intentionally bright
+   on any background); only the workbench chrome flips to a cool dark
+   slate. Driven entirely by tokens so component rules need no changes.
+   ------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:        #14181d;
+    --paper-2:      #1b2026;
+    --paper-3:      #232a31;
+    --card:         #1e242b;
+    --card-sunk:    #161b20;
+
+    --ink:          #e6ecf1;
+    --ink-strong:   #f5f8fa;
+    --ink-soft:     #c4cdd6;
+    --ink-muted:    #98a4b0;
+    --ink-faint:    #6f7c89;
+
+    --hairline:     #38424d;
+    --hairline-soft:#2c343d;
+    --hairline-fine:#242b32;
+
+    /* pine accent lightens so it reads as "active" on dark slate. --pine-deep
+       doubles as text on the dim --pine-wash, so it's kept bright enough to
+       clear WCAG AA there. */
+    --pine:         #4a7793;
+    --pine-deep:    #7ba6c2;
+    --pine-darker:  #2c4250;
+    --pine-bright:  #8fb6d0;
+    --pine-wash:    #233039;
+    --pine-line:    #41525f;
+    --on-pine:      #f3f7fa;
+    --on-pine-soft: #cdd8e1;
+
+    --amber-warn:   #d6a23e;
+    --amber-warn-bg:#3a2f14;
+    --danger:       #f08a72;
+    --danger-line:  #b65442;
+    --danger-wash:  #3a1d16;
+    --danger-ink:   #f6b3a3;
+    --pine-active-ink: var(--ink-strong);
+
+    /* Inset white highlights look wrong on dark; soften the shadow set. */
+    --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    --shadow-3: 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+
+    --field-face:   #2a323a;
+    --glass:        rgba(180, 200, 220, 0.07);
+    --glass-soft:   rgba(180, 200, 220, 0.05);
+  }
+  /* The dotted plate background is tuned for light paper; calm it on dark. */
+  .keyboard-viewport {
+    background-color: #1a2028;
+    background-image:
+      radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
+  }
+  /* The body dot grid uses a dark ink that vanishes on dark; use a light fleck. */
+  body {
+    background-image:
+      radial-gradient(circle, rgba(180, 200, 220, 0.035) 0.9px, transparent 1.3px);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -188,7 +281,7 @@ textarea {
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
   padding: 0 var(--sp-3);
-  background: linear-gradient(180deg, #ffffff 0%, var(--card) 100%);
+  background: linear-gradient(180deg, var(--field-face) 0%, var(--card) 100%);
   color: var(--ink);
   font-family: inherit;
   font-size: 13px;
@@ -223,7 +316,7 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--pine);
-  background: #ffffff;
+  background: var(--field-face);
   box-shadow: var(--focus-ring);
   color: var(--ink-strong);
 }
@@ -435,11 +528,11 @@ input[type="url"] {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--pine-bright) 22%,
-    var(--pine-bright) 78%,
+    var(--honey) 22%,
+    var(--honey) 78%,
     transparent 100%
   );
-  opacity: 0.45;
+  opacity: 0.7;
 }
 
 .topbar h1,
@@ -504,7 +597,7 @@ input[type="url"] {
   border-radius: 0;
   padding: 0 var(--sp-4);
   background: transparent;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 11px;
   letter-spacing: 0.16em;
@@ -542,7 +635,7 @@ input[type="url"] {
     inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 .mode-toggle button.active:hover {
-  background: linear-gradient(180deg, var(--pine-deep) 0%, #14201a 100%);
+  background: linear-gradient(180deg, var(--pine-deep) 0%, var(--pine-darker) 100%);
 }
 
 .topbar-links {
@@ -561,7 +654,7 @@ input[type="url"] {
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
   padding: 0 var(--sp-3);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--glass);
   color: var(--ink-muted);
   font-size: 12px;
   font-weight: 600;
@@ -651,7 +744,7 @@ input[type="url"] {
   min-width: 0;
   padding-left: 32px;
   background-image:
-    linear-gradient(180deg, #ffffff 0%, var(--card) 100%),
+    linear-gradient(180deg, var(--field-face) 0%, var(--card) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235e6976' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat;
   background-position: 0 0, 10px center;
@@ -663,7 +756,7 @@ input[type="url"] {
 }
 .project-loader input:focus {
   background-image:
-    linear-gradient(180deg, #ffffff 0%, #ffffff 100%),
+    linear-gradient(180deg, var(--field-face) 0%, var(--field-face) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231c2c38' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
 }
 
@@ -677,7 +770,7 @@ input[type="url"] {
 select {
   cursor: pointer;
   background-image:
-    linear-gradient(180deg, #ffffff 0%, var(--card) 100%),
+    linear-gradient(180deg, var(--field-face) 0%, var(--card) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%234b463a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat;
   background-position: 0 0, right 12px center;
@@ -689,7 +782,7 @@ select {
 select:focus,
 select:focus-visible {
   background-image:
-    linear-gradient(180deg, #ffffff 0%, #ffffff 100%),
+    linear-gradient(180deg, var(--field-face) 0%, var(--field-face) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231d2e24' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
@@ -745,6 +838,11 @@ select:focus-visible {
   border-radius: 50%;
   background: var(--pine-bright);
   box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18);
+  animation: chip-pulse 2.2s var(--ease-in-out) infinite;
+}
+@keyframes chip-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18); }
+  50%      { box-shadow: 0 0 0 4px rgba(63, 104, 131, 0.06); }
 }
 .connected-chip svg { flex: 0 0 auto; color: var(--pine-deep); }
 .connected-chip strong {
@@ -793,15 +891,15 @@ select:focus-visible {
 .primary:focus-visible { border-color: var(--pine-deep); }
 
 .danger {
-  border-color: #a83a2b;
+  border-color: var(--danger-line);
   background: var(--card);
-  color: #8a2918;
+  color: var(--danger);
   font-weight: 600;
 }
 .danger:hover {
-  border-color: #8a2918;
-  background: #fbe8e2;
-  color: #5a1d10;
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 
 /* ----------------------------------------------------------------
@@ -908,7 +1006,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-md);
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.52);
+  background: var(--glass-soft);
 }
 .direct-connect-steps strong {
   display: grid;
@@ -948,7 +1046,7 @@ select:focus-visible {
 
 .direct-connect-controls select {
   min-height: 44px;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: 0;
@@ -999,6 +1097,26 @@ select:focus-visible {
   color: #5a4209;
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Inline "open Firmware Mode" affordance inside the pine reference notice */
+.reference-notice-action {
+  justify-self: start;
+  margin-top: 2px;
+  min-height: 30px;
+  border: 1px solid var(--pine-line);
+  border-radius: var(--r-sm);
+  padding: 0 var(--sp-3);
+  background: var(--glass);
+  color: var(--pine-deep);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out);
+}
+.reference-notice-action:hover {
+  background: var(--field-face);
+  border-color: var(--pine-bright);
 }
 
 .runtime-diagnostics {
@@ -1069,7 +1187,7 @@ select:focus-visible {
 }
 .connect-transport-field select {
   min-height: 44px;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1186,24 +1304,24 @@ select:focus-visible {
   flex: 0 0 auto;
 }
 .direct-pending-actions button.danger-ghost {
-  border: 1px solid #e2c1c1;
-  background: #fff;
-  color: #8a3a3a;
+  border: 1px solid var(--danger-line);
+  background: var(--field-face);
+  color: var(--danger);
 }
 .direct-pending-actions button.danger-ghost:hover:not(:disabled) {
-  border-color: #c98484;
-  background: #fbeeee;
-  color: #6e2a2a;
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 .direct-pending-actions button.primary-ghost {
-  border: 1px solid #b9d3da;
-  background: #fff;
-  color: #1f5b6b;
+  border: 1px solid var(--pine-line);
+  background: var(--field-face);
+  color: var(--pine-deep);
 }
 .direct-pending-actions button.primary-ghost:hover:not(:disabled) {
-  border-color: #2d7b8f;
-  background: #e7f7f9;
-  color: #16475a;
+  border-color: var(--pine-bright);
+  background: var(--pine-wash);
+  color: var(--pine-active-ink);
 }
 .direct-pending-actions button:disabled {
   opacity: 0.45;
@@ -1268,7 +1386,7 @@ select:focus-visible {
 }
 .direct-capability-strip.compact li {
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.52);
+  background: var(--glass-soft);
 }
 .direct-capability-strip.compact .capability-label {
   font-size: 11px;
@@ -1347,7 +1465,7 @@ select:focus-visible {
   height: 32px;
   padding: 0;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--glass);
   color: var(--ink-muted);
 }
 
@@ -1409,9 +1527,9 @@ select:focus-visible {
 .layer-list button.active {
   border-color: var(--pine-line);
   background: var(--pine-wash);
-  color: var(--pine-deep);
+  color: var(--pine-active-ink);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    var(--shadow-1),
     0 1px 2px rgba(28, 26, 14, 0.08);
 }
 .layer-list button.active span {
@@ -1573,8 +1691,8 @@ select:focus-visible {
   border-radius: var(--r-xl);
   background-color: #f1f4f7;
   background-image:
-    radial-gradient(circle, rgba(28, 44, 56, 0.06) 1px, transparent 1.3px);
-  background-size: 18px 18px;
+    radial-gradient(circle, rgba(28, 44, 56, 0.09) 1px, transparent 1.4px);
+  background-size: 20px 20px;
   background-position: center;
   box-shadow: inset 0 2px 14px -8px rgba(28, 44, 56, 0.18);
   min-height: 220px;
@@ -1717,12 +1835,23 @@ select:focus-visible {
     border-color 120ms ease;
 }
 .physical-key:hover {
+  /* Deepen the keycap's "thickness" + cast a taller shadow so it reads as
+     lifted/press-ready. (Transform is reserved for the inline per-key rotation,
+     so the lift is expressed through shadow, not translate.) */
   border-color: var(--pine-bright);
   box-shadow:
     inset 0 1px 0 rgba(255, 244, 200, 0.85),
     inset 0 -2px 4px rgba(120, 86, 8, 0.18),
+    0 7px 0 #a86c0c,
+    0 14px 20px -6px rgba(44, 64, 52, 0.32);
+}
+.physical-key:focus-visible {
+  outline: none;
+  border-color: var(--pine-bright);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 200, 0.85),
     0 5px 0 #a86c0c,
-    0 10px 16px -4px rgba(44, 64, 52, 0.28);
+    var(--focus-ring);
 }
 .physical-key.draft {
   border-color: #2d7b8f;
@@ -1833,6 +1962,13 @@ select:focus-visible {
   pointer-events: none;
 }
 .combo-label { pointer-events: auto; cursor: pointer; }
+.combo-label:focus { outline: none; }
+.combo-label:focus-visible rect {
+  stroke: var(--pine-bright);
+  stroke-opacity: 1;
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 0 2px rgba(63, 104, 131, 0.4));
+}
 .combo-label rect {
   fill: rgba(253, 249, 238, 0.58);
   stroke: var(--pine-line);
@@ -2109,21 +2245,6 @@ select:focus-visible {
   font-weight: 700;
 }
 
-.diff-panel pre {
-  height: 196px;
-  margin: var(--sp-3) 0 0;
-  border: 1px solid var(--pine-deep);
-  border-radius: var(--r-lg);
-  padding: var(--sp-4);
-  overflow: auto;
-  background: linear-gradient(180deg, #1f2c36 0%, #16212a 100%);
-  color: #d4dde6;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
-  line-height: 1.65;
-  box-shadow: inset 0 2px 12px -4px rgba(0, 0, 0, 0.4);
-}
-
 /* ----------------------------------------------------------------
    Structured diff viewer (replaces <pre>)
    ---------------------------------------------------------------- */
@@ -2255,7 +2376,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-full);
   padding: 0 10px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--glass);
   color: var(--ink-muted);
   font-family: "JetBrains Mono", monospace;
   font-size: 10.5px;
@@ -2301,13 +2422,14 @@ select:focus-visible {
 .firmware-workbench-actions .project-save-action {
   min-width: 196px;
   border-color: var(--hairline);
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--field-face);
   color: var(--ink-soft);
   font-weight: 700;
 }
 .firmware-workbench-actions .project-save-action:hover:not(:disabled) {
-  background: #fff;
+  background: var(--field-face);
   border-color: var(--pine-deep);
+  color: var(--ink-strong);
 }
 .firmware-workbench-actions .project-save-action:disabled {
   opacity: 0.58;
@@ -2320,7 +2442,7 @@ select:focus-visible {
   border-left: 1px solid var(--hairline);
 }
 .firmware-workbench-actions .reset-action {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass);
 }
 .firmware-workbench-actions button svg {
   flex: 0 0 auto;
@@ -2367,7 +2489,7 @@ select:focus-visible {
   padding: 0 var(--sp-4);
   background: transparent;
   color: var(--ink-muted);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 12.5px;
   letter-spacing: 0.005em;
@@ -2385,6 +2507,12 @@ select:focus-visible {
 .workbench-tablist button.active {
   color: var(--ink-strong);
   border-bottom-color: var(--pine-deep);
+}
+.workbench-tablist button:focus-visible {
+  outline: none;
+  color: var(--ink-strong);
+  border-bottom-color: var(--pine);
+  box-shadow: var(--focus-ring);
 }
 .workbench-tablist button em {
   display: inline-grid;
@@ -2586,7 +2714,7 @@ select:focus-visible {
 .combo-editor label > input,
 .combo-editor label > select {
   color: var(--ink-strong);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
@@ -2607,7 +2735,6 @@ select:focus-visible {
   padding: 0;
   background: transparent;
 }
-.workbench-grid .diff-panel pre { margin-top: var(--sp-3); }
 
 /* ----------------------------------------------------------------
    Inspector — right rail
@@ -2615,18 +2742,34 @@ select:focus-visible {
 .inspector {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--sp-5);
   min-height: 0;
-  padding: 24px 22px 28px;
+  padding: var(--sp-6) var(--sp-5) var(--sp-7);
   border-left: 1px solid var(--hairline);
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
   overflow: auto;
 }
-.inspector section {
-  border-bottom: 1px dashed var(--hairline);
-  padding-bottom: var(--sp-6);
+/* The inspector shell sections (.firmware-inspector / .direct-inspector) stay
+   transparent layout wrappers. Only the meaningful content sections inside them
+   become light cards, so each region (key editor, combos, trackball) reads as a
+   distinct group instead of blurring together with dashed dividers. */
+.firmware-inspector,
+.direct-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 0;
 }
-.inspector section:last-child { border-bottom: 0; padding-bottom: 0; }
+.firmware-key-inspector > section,
+.combo-panel,
+.combo-reference-panel,
+.trackball-parameters {
+  padding: var(--sp-4);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
 
 .inspector h2 {
   font-family: "Fraunces", Georgia, serif;
@@ -2654,7 +2797,7 @@ select:focus-visible {
 .inspector label > select,
 .inspector label > textarea {
   color: var(--ink-strong);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
@@ -2674,7 +2817,7 @@ select:focus-visible {
 }
 .direct-key-editor {
   border-color: var(--pine-line);
-  background: linear-gradient(180deg, #eef3f6 0%, #e1e9ef 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
 }
 .direct-key-editor-heading {
   display: grid;
@@ -2989,12 +3132,23 @@ select:focus-visible {
 .binding-editor label,
 .trackball-editor label { margin-top: 0; }
 
-.firmware-key-inspector .binding-editor > .wide-action {
+/* The apply button anchors to the bottom of the scrolling inspector so it stays
+   reachable without scrolling past the (often long) key palette. Used by both the
+   Firmware key inspector and the Direct "Key Config" tab. */
+.firmware-key-inspector .binding-editor > .wide-action,
+.direct-key-editor .binding-editor > .wide-action {
+  position: sticky;
+  bottom: calc(-1 * var(--sp-7));
+  z-index: 2;
   min-height: 42px;
-  margin-top: var(--sp-2);
-  box-shadow: 0 0 0 3px rgba(42, 75, 82, 0.08);
+  margin-top: var(--sp-3);
+  /* A soft backing fades the scrolled palette out behind the pinned button. */
+  box-shadow:
+    0 0 0 3px rgba(42, 75, 82, 0.08),
+    0 -10px 14px -8px var(--paper-2);
 }
-.firmware-key-inspector .binding-editor > .wide-action:disabled {
+.firmware-key-inspector .binding-editor > .wide-action:disabled,
+.direct-key-editor .binding-editor > .wide-action:disabled {
   box-shadow: none;
   opacity: 0.62;
 }
@@ -3015,7 +3169,7 @@ select:focus-visible {
   gap: 4px;
   border: 1px solid var(--pine-line);
   border-radius: var(--r-md);
-  background: linear-gradient(180deg, var(--pine-wash) 0%, #eef3f6 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
   padding: var(--sp-3) var(--sp-4);
   box-shadow:
     var(--shadow-1),
@@ -3046,7 +3200,7 @@ select:focus-visible {
 }
 .binding-summary code {
   overflow: hidden;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -3070,7 +3224,7 @@ select:focus-visible {
 }
 .binding-review > div.changed {
   border-color: var(--pine-line);
-  background: linear-gradient(180deg, var(--pine-wash) 0%, #eef3f6 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
 }
 .binding-review span {
   color: var(--ink-muted);
@@ -3402,7 +3556,7 @@ select:focus-visible {
   border: 1px solid rgba(182, 125, 18, 0.35);
   border-radius: var(--r-sm);
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--glass);
   color: #5a4209;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10.5px;
@@ -3588,7 +3742,8 @@ select:focus-visible {
   margin-top: 6px;
 }
 
-.browser-release-workbench > .release-flow-guide {
+.browser-release-workbench > .release-flow-guide,
+.build-workbench > .release-flow-guide {
   grid-column: 1 / -1;
 }
 .release-flow-guide {
@@ -3637,7 +3792,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .release-flow-steps li.done {
   border-color: var(--pine-line);
@@ -3729,7 +3884,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .artifact-folder-import > div {
   display: grid;
@@ -3769,7 +3924,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--glass-soft);
 }
 .flash-sequence-intro {
   display: grid;
@@ -3860,7 +4015,7 @@ select:focus-visible {
   border: 1px solid rgba(39, 81, 92, 0.18);
   border-radius: 4px;
   padding: 0 4px;
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--glass);
   color: var(--pine-deep);
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
@@ -3872,7 +4027,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--glass);
 }
 .flash-completion-row {
   display: grid;
@@ -4065,7 +4220,7 @@ select:focus-visible {
   border-radius: var(--r-sm);
   margin: var(--sp-2) 0 var(--sp-3);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .build-check-item {
   display: grid;
@@ -4118,7 +4273,7 @@ select:focus-visible {
   gap: var(--sp-2);
   margin-top: var(--sp-2);
   color: var(--ink-soft);
-  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
 }
 .release-next-action {
@@ -4129,7 +4284,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--glass);
 }
 .release-next-action > span {
   color: var(--ink-faint);
@@ -4261,7 +4416,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.44);
+  background: var(--glass);
 }
 .flash-direct-copy-details,
 .flash-desktop-note {
@@ -4339,7 +4494,7 @@ select:focus-visible {
   border-radius: var(--r-sm);
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--glass);
 }
 .flash-advanced summary {
   cursor: pointer;
@@ -4473,10 +4628,10 @@ select:focus-visible {
   display: flex;
   align-items: center;
   min-height: 30px;
-  border-top: 1px solid var(--pine-deep);
+  border-top: 1px solid var(--hairline);
   padding: 6px var(--sp-5);
-  background: linear-gradient(180deg, #243528 0%, #16221b 100%);
-  color: #d9d1b8;
+  background: linear-gradient(180deg, var(--card) 0%, var(--paper-2) 100%);
+  color: var(--ink-muted);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
   letter-spacing: 0.02em;
@@ -4484,7 +4639,7 @@ select:focus-visible {
 .statusbar::before {
   content: "▸";
   margin-right: var(--sp-2);
-  color: var(--on-pine);
+  color: var(--pine-bright);
   font-size: 10.5px;
 }
 
@@ -4496,8 +4651,7 @@ select:focus-visible {
 .combo-list::-webkit-scrollbar,
 .keyboard-viewport::-webkit-scrollbar,
 .workbench-panel::-webkit-scrollbar,
-.keyboard-panel > .direct-summary::-webkit-scrollbar,
-.diff-panel pre::-webkit-scrollbar {
+.keyboard-panel > .direct-summary::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
@@ -4524,11 +4678,6 @@ select:focus-visible {
 .choice-grid::-webkit-scrollbar-thumb:hover,
 .combo-list::-webkit-scrollbar-thumb:hover,
 .workbench-panel::-webkit-scrollbar-thumb:hover { background-color: var(--ink-soft); }
-.diff-panel pre::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
-.diff-panel pre::-webkit-scrollbar-thumb {
-  border-radius: var(--r-full);
-  background-color: #4a5b4d;
-}
 
 /* ----------------------------------------------------------------
    Page-load reveal
