@@ -62,6 +62,6 @@ describe("bindingDisplay", () => {
   });
 
   it("renders zoom hold parameters as custom behavior values", () => {
-    expect(bindingDisplay("&zoom_hold 9")).toEqual({ badge: "ZH", label: "9" });
+    expect(bindingDisplay("&zoom_hold 9")).toEqual({ badge: "ZH", label: "Layer 9" });
   });
 });
