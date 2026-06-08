@@ -55,10 +55,17 @@
   /* on-pine text — soft cool cream that reads cleanly on dark slate. */
   --on-pine:      #e6ecf1;
   --on-pine-soft: #c4cdd6;
+  /* text color for "active" chips drawn on a light --pine-wash fill. Deep pine
+     reads well on light; on dark the wash is dim, so this flips to bright ink. */
+  --pine-active-ink: var(--pine-deep);
 
   /* signal */
   --amber-warn:   #b67d12;
   --amber-warn-bg:#fbeec6;
+  --danger:       #8a2918;
+  --danger-line:  #a83a2b;
+  --danger-wash:  #fbe8e2;
+  --danger-ink:   #5a1d10;
 
   /* spacing scale — 4px base */
   --sp-1: 4px;
@@ -122,11 +129,13 @@
     --hairline-soft:#2c343d;
     --hairline-fine:#242b32;
 
-    /* pine accent lightens so it reads as "active" on dark slate. */
-    --pine:         #3f6883;
-    --pine-deep:    #5a86a3;
+    /* pine accent lightens so it reads as "active" on dark slate. --pine-deep
+       doubles as text on the dim --pine-wash, so it's kept bright enough to
+       clear WCAG AA there. */
+    --pine:         #4a7793;
+    --pine-deep:    #7ba6c2;
     --pine-darker:  #2c4250;
-    --pine-bright:  #6f9cba;
+    --pine-bright:  #8fb6d0;
     --pine-wash:    #233039;
     --pine-line:    #41525f;
     --on-pine:      #f3f7fa;
@@ -134,6 +143,11 @@
 
     --amber-warn:   #d6a23e;
     --amber-warn-bg:#3a2f14;
+    --danger:       #f08a72;
+    --danger-line:  #b65442;
+    --danger-wash:  #3a1d16;
+    --danger-ink:   #f6b3a3;
+    --pine-active-ink: var(--ink-strong);
 
     /* Inset white highlights look wrong on dark; soften the shadow set. */
     --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
@@ -149,6 +163,11 @@
     background-color: #1a2028;
     background-image:
       radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
+  }
+  /* The body dot grid uses a dark ink that vanishes on dark; use a light fleck. */
+  body {
+    background-image:
+      radial-gradient(circle, rgba(180, 200, 220, 0.035) 0.9px, transparent 1.3px);
   }
 }
 
@@ -860,15 +879,15 @@ select:focus-visible {
 .primary:focus-visible { border-color: var(--pine-deep); }
 
 .danger {
-  border-color: #a83a2b;
+  border-color: var(--danger-line);
   background: var(--card);
-  color: #8a2918;
+  color: var(--danger);
   font-weight: 600;
 }
 .danger:hover {
-  border-color: #8a2918;
-  background: #fbe8e2;
-  color: #5a1d10;
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 
 /* ----------------------------------------------------------------
@@ -1496,9 +1515,9 @@ select:focus-visible {
 .layer-list button.active {
   border-color: var(--pine-line);
   background: var(--pine-wash);
-  color: var(--pine-deep);
+  color: var(--pine-active-ink);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    var(--shadow-1),
     0 1px 2px rgba(28, 26, 14, 0.08);
 }
 .layer-list button.active span {
@@ -2391,13 +2410,14 @@ select:focus-visible {
 .firmware-workbench-actions .project-save-action {
   min-width: 196px;
   border-color: var(--hairline);
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--field-face);
   color: var(--ink-soft);
   font-weight: 700;
 }
 .firmware-workbench-actions .project-save-action:hover:not(:disabled) {
-  background: #fff;
+  background: var(--field-face);
   border-color: var(--pine-deep);
+  color: var(--ink-strong);
 }
 .firmware-workbench-actions .project-save-action:disabled {
   opacity: 0.58;
