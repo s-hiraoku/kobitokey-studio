@@ -714,6 +714,25 @@ function App() {
     isDesktopRuntime,
   ]);
 
+  // Ctrl/Cmd+S saves the firmware project, matching desktop-app expectations.
+  // Only active in Firmware mode with a loaded project; otherwise the browser's
+  // default save dialog is left alone.
+  React.useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const isSaveChord = (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "s";
+      if (!isSaveChord) {
+        return;
+      }
+      if (editorMode !== "firmware" || !files) {
+        return;
+      }
+      event.preventDefault();
+      void saveProjectFiles();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editorMode, files, saveProjectFiles]);
+
   function showToast(kind: ToastKind, message: string) {
     setToast({ id: Date.now(), kind, message });
   }
@@ -893,6 +912,13 @@ function App() {
   function resetFirmwareEdits() {
     if (!files || keymapDiff.length === 0) {
       setStatus("リセットする firmware 編集はありません");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `未保存の編集（${keymapDiff.length} ファイル）をすべて破棄して、読み込み時点に戻します。よろしいですか？`,
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -1126,6 +1152,11 @@ function App() {
 
     if (activeLayerReferences.length > 0) {
       setStatus(`参照中の layer は削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`);
+      return;
+    }
+
+    const confirmed = window.confirm(`レイヤー「${activeLayer.label}」を削除します。よろしいですか？`);
+    if (!confirmed) {
       return;
     }
 
@@ -3426,6 +3457,10 @@ function PhysicalKeyButton({
   width: number;
 }) {
   const display = bindingDisplay(binding);
+  // Describe the key for screen readers: position + intent + state, so the
+  // selected/draft state is conveyed by more than color alone.
+  const stateLabel = [isSelected ? "選択中" : null, isDraft ? "書き込み予定" : null].filter(Boolean).join(", ");
+  const ariaLabel = `キー ${index + 1}: ${bindingIntentSummary(binding)}${stateLabel ? `（${stateLabel}）` : ""}`;
 
   return (
     <button
@@ -3440,6 +3475,9 @@ function PhysicalKeyButton({
         transform: `rotate(${rotation}deg)`,
       }}
       title={binding}
+      aria-label={ariaLabel}
+      aria-pressed={isSelected}
+      data-draft={isDraft ? "true" : undefined}
       onClick={() => onSelect(index)}
     >
       <span className="key-index">{index + 1}</span>
@@ -3490,7 +3528,20 @@ function ComboOverlay({
             {combo.points.map((point, index) => (
               <circle key={index} cx={point.x} cy={point.y} r="4.2" />
             ))}
-            <g className="combo-label" role="button" tabIndex={0} onClick={() => onSelect(combo.id)}>
+            <g
+              className="combo-label"
+              role="button"
+              tabIndex={0}
+              aria-label={`コンボ ${combo.label.text}${isSelected ? "（選択中）" : ""}`}
+              aria-pressed={isSelected}
+              onClick={() => onSelect(combo.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(combo.id);
+                }
+              }}
+            >
               <rect
                 x={combo.label.x - combo.label.width / 2}
                 y={combo.label.y - 13}
@@ -4331,7 +4382,7 @@ function DirectWelcome({
         />
         {!isDesktopRuntime ? (
           <p className="direct-capability-note">
-            ブラウザ版では key の Direct 書き込みを試せます。Combo と Trackball は参照のみです。USB 接続を推奨します。
+            ブラウザ版では key の Direct 書き込みを試せます。コンボとトラックボールは読み込み専用です。USB 接続を推奨します。
           </p>
         ) : null}
       </div>
@@ -4466,18 +4517,8 @@ function DirectInspectorTabs({
       ) : activeTab === "combo" ? (
         <DirectComboPanel
           canOpenFirmwareMode={canOpenFirmwareMode}
-          canWrite={canWriteCombos}
-          comboError=""
           combos={combos}
-          connectionState={connectionState}
-          comboSource={comboSource}
-          maxCombos={maxCombos}
-          onCreate={onCreateCombo}
-          onDelete={onDeleteCombo}
           onFirmwareMode={onFirmwareMode}
-          onPreview={onPreviewCombo}
-          onRefresh={onRefreshCombos}
-          onSave={onSaveCombo}
           onSelect={onSelectCombo}
           selectedCombo={selectedCombo}
           selectedCombos={selectedCombos}
@@ -4509,9 +4550,9 @@ function DirectTrackballPanel({
       {/* Consolidated reference notice replaces the former heading blurb +
           combo-write-warning + trailing duplicate button. */}
       <div className="runtime-notice direct-reference-notice">
-        <strong>Trackball は参照のみです</strong>
+        <strong>トラックボールは読み込み専用です</strong>
         <span>
-          firmware overlay の値を参照表示しています。現在の firmware では Trackball を runtime 保存できないため、変更は
+          firmware overlay の値を表示しています。現在の firmware ではトラックボールを runtime 保存できないため、変更は
           {canOpenFirmwareMode ? " Firmware Mode" : " デスクトップ版の Firmware Mode"} で左右 overlay を編集し、build + flash で反映します。
         </span>
         {canOpenFirmwareMode ? (
@@ -4545,35 +4586,15 @@ function DirectTrackballPanel({
 
 function DirectComboPanel({
   canOpenFirmwareMode,
-  canWrite,
-  comboError,
   combos,
-  connectionState,
-  comboSource,
-  maxCombos,
-  onCreate,
-  onDelete,
   onFirmwareMode,
-  onPreview,
-  onRefresh,
-  onSave,
   onSelect,
   selectedCombo,
   selectedCombos,
 }: {
   canOpenFirmwareMode: boolean;
-  canWrite: boolean;
-  comboError: string;
   combos: KeymapCombo[];
-  connectionState: StudioConnectionState;
-  comboSource: DirectComboSource;
-  maxCombos: number;
-  onCreate: () => void;
-  onDelete: (combo: KeymapCombo) => void;
   onFirmwareMode?: () => void;
-  onPreview: (combo: KeymapCombo, input: ComboFormValue, options?: { silent?: boolean }) => void;
-  onRefresh: () => void;
-  onSave: (combo: KeymapCombo, input: ComboFormValue) => void;
   onSelect: (comboId: string) => void;
   selectedCombo?: KeymapCombo;
   selectedCombos: KeymapCombo[];
@@ -4581,12 +4602,12 @@ function DirectComboPanel({
   const firmwareModeName = canOpenFirmwareMode ? "Firmware Mode" : "デスクトップ版の Firmware Mode";
   return (
     <div className="direct-combo-panel">
-      {/* One consolidated, on-theme "reference only" notice replaces the former
+      {/* One consolidated, on-theme "read-only" notice replaces the former
           duplicated combo-write-warning blocks (connected / disconnected). */}
       <div className="runtime-notice direct-reference-notice">
-        <strong>Combo は参照のみです</strong>
+        <strong>コンボは読み込み専用です</strong>
         <span>
-          firmware keymap の Combo を参照表示しています（{combos.length} combos）。変更は
+          firmware keymap のコンボを表示しています（{combos.length} 件）。変更は
           {` ${firmwareModeName}`} で編集し、build + flash で反映します。
         </span>
         {onFirmwareMode && canOpenFirmwareMode ? (
