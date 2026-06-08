@@ -915,13 +915,6 @@ function App() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `未保存の編集（${keymapDiff.length} ファイル）をすべて破棄して、読み込み時点に戻します。よろしいですか？`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
     setFiles({
       ...files,
       keymap: savedKeymap,
@@ -1152,11 +1145,6 @@ function App() {
 
     if (activeLayerReferences.length > 0) {
       setStatus(`参照中の layer は削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`);
-      return;
-    }
-
-    const confirmed = window.confirm(`レイヤー「${activeLayer.label}」を削除します。よろしいですか？`);
-    if (!confirmed) {
       return;
     }
 
