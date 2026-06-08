@@ -155,6 +155,9 @@ export function bindingDisplay(binding: string): BindingDisplay {
       if (isCustomLayerTapBehavior(behavior)) {
         return { badge: `L${parts[1] ?? "?"}`, label: formatKey(parts.slice(2).join(" ")) };
       }
+      if (behavior === "&zoom_hold") {
+        return { badge: "ZH", label: parts.slice(1).join(" ") };
+      }
       return { badge: behavior.replace("&", "").toUpperCase(), label: formatKey(parts.slice(1).join(" ")) };
   }
 }
