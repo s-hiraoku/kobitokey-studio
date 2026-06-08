@@ -2,7 +2,7 @@
    KobitoKey Studio — "Workbench" theme (polished)
    Quieter background · cleaner type scale · tighter rhythm
    Keycaps + keyboard plate keep their honey/pine identity.
-   Fraunces (display) / Hanken Grotesk (UI) / JetBrains Mono (data)
+   Fraunces (display) / Inter (UI) / JetBrains Mono (data)
    ============================================================ */
 
 :root {
@@ -84,6 +84,10 @@
   --r-xl: 16px;
   --r-full: 999px;
 
+  /* font stacks — Inter for Latin/UI, with system Japanese faces for kana/kanji */
+  --font-ui: "Inter", ui-sans-serif, system-ui, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+
   /* shadows */
   --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
   --shadow-2: 0 1px 2px rgba(31, 29, 23, 0.06), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
@@ -98,11 +102,19 @@
 
   color: var(--ink);
   background: var(--paper);
-  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  /* Inter for Latin/UI; the system Japanese faces render the kana/kanji
+     (Inter has no JP glyphs, so they fall through to these). */
+  font-family: var(--font-ui);
+  /* Keep the fallback (and the JP faces) visually matched to Inter's x-height
+     so the swap on load doesn't shift or shrink text. */
+  font-size-adjust: from-font;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+@supports not (font-size-adjust: from-font) {
+  body { font-size-adjust: none; }
 }
 
 /* ------------------------------------------------------------
@@ -585,7 +597,7 @@ input[type="url"] {
   border-radius: 0;
   padding: 0 var(--sp-4);
   background: transparent;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 11px;
   letter-spacing: 0.16em;
@@ -1034,7 +1046,7 @@ select:focus-visible {
 
 .direct-connect-controls select {
   min-height: 44px;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: 0;
@@ -1175,7 +1187,7 @@ select:focus-visible {
 }
 .connect-transport-field select {
   min-height: 44px;
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
 }
@@ -2477,7 +2489,7 @@ select:focus-visible {
   padding: 0 var(--sp-4);
   background: transparent;
   color: var(--ink-muted);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 12.5px;
   letter-spacing: 0.005em;
@@ -2702,7 +2714,7 @@ select:focus-visible {
 .combo-editor label > input,
 .combo-editor label > select {
   color: var(--ink-strong);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
@@ -2785,7 +2797,7 @@ select:focus-visible {
 .inspector label > select,
 .inspector label > textarea {
   color: var(--ink-strong);
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0;
@@ -4261,7 +4273,7 @@ select:focus-visible {
   gap: var(--sp-2);
   margin-top: var(--sp-2);
   color: var(--ink-soft);
-  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
 }
 .release-next-action {
