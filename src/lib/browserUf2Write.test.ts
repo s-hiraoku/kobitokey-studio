@@ -40,21 +40,53 @@ function fakeFileHandle(writable: FakeWritable) {
 }
 
 describe("writeBrowserUf2ToDirectoryHandle", () => {
-  it("treats bootloader eject during write as successful ambiguous completion", async () => {
-    const writable = fakeWritable({
-      writeError: new DOMException("A requested file or directory could not be found", "NotFoundError"),
-    });
-    const getFileHandle = vi.fn(async () => fakeFileHandle(writable));
+  it("retries bootloader-like write rejections instead of reporting success", async () => {
+    const writables = [
+      fakeWritable({ writeError: new DOMException("A requested file or directory could not be found", "NotFoundError") }),
+      fakeWritable({ writeError: new DOMException("The device was disconnected", "NetworkError") }),
+      fakeWritable({ writeError: new DOMException("The directory is gone", "NotFoundError") }),
+    ];
+    const getFileHandle = vi
+      .fn()
+      .mockResolvedValueOnce(fakeFileHandle(writables[0]))
+      .mockResolvedValueOnce(fakeFileHandle(writables[1]))
+      .mockResolvedValueOnce(fakeFileHandle(writables[2]));
     const handle = fakeDirectoryHandle(getFileHandle);
 
     await expect(
       writeBrowserUf2ToDirectoryHandle(handle, {
         bytes: new Uint8Array([1, 2, 3]),
         name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
       }),
-    ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
-    expect(getFileHandle).toHaveBeenCalledTimes(1);
-    expect(writable.close).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow("UF2 copy failed during write after 3 attempts");
+    expect(getFileHandle).toHaveBeenCalledTimes(3);
+    expect(writables.map((writable) => writable.write).every((write) => write.mock.calls.length === 1)).toBe(true);
+  });
+
+  it("can recover from a transient write rejection before data is accepted", async () => {
+    const firstWritable = fakeWritable({
+      writeError: new DOMException("A requested file or directory could not be found", "NotFoundError"),
+    });
+    const secondWritable = fakeWritable();
+    const getFileHandle = vi
+      .fn()
+      .mockResolvedValueOnce(fakeFileHandle(firstWritable))
+      .mockResolvedValueOnce(fakeFileHandle(secondWritable));
+    const handle = fakeDirectoryHandle(getFileHandle);
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array([1, 2, 3]),
+        name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0],
+      }),
+    ).resolves.toEqual({ ambiguousEject: false, attempts: 2 });
+    expect(getFileHandle).toHaveBeenCalledTimes(2);
   });
 
   it("retries bootloader-like errors before a write is attempted", async () => {
@@ -70,6 +102,9 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       writeBrowserUf2ToDirectoryHandle(handle, {
         bytes: new Uint8Array([4, 5, 6]),
         name: "KobitoKey_left.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
       }),
     ).resolves.toEqual({ ambiguousEject: false, attempts: 3 });
     expect(getFileHandle).toHaveBeenCalledTimes(3);
@@ -86,6 +121,9 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       writeBrowserUf2ToDirectoryHandle(handle, {
         bytes: new Uint8Array([7, 8, 9]),
         name: "KobitoKey_right.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [],
       }),
     ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
   });
@@ -100,8 +138,11 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       const result = writeBrowserUf2ToDirectoryHandle(handle, {
         bytes: new Uint8Array([10]),
         name: "settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [100, 100],
       });
-      const rejection = expect(result).rejects.toThrow("UF2 copy failed after 3 attempts");
+      const rejection = expect(result).rejects.toThrow("UF2 copy failed during open-file after 3 attempts");
 
       await vi.runAllTimersAsync();
 
