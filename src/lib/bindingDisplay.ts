@@ -156,7 +156,7 @@ export function bindingDisplay(binding: string): BindingDisplay {
         return { badge: `L${parts[1] ?? "?"}`, label: formatKey(parts.slice(2).join(" ")) };
       }
       if (behavior === "&zoom_hold") {
-        return { badge: "ZH", label: parts.slice(1).join(" ") };
+        return { badge: "ZH", label: formatZoomHoldParameter(parts.slice(1).join(" ")) };
       }
       return { badge: behavior.replace("&", "").toUpperCase(), label: formatKey(parts.slice(1).join(" ")) };
   }
@@ -235,6 +235,10 @@ function parseDecimalHidUsage(value: string): string | undefined {
 
 function isCustomLayerTapBehavior(behavior: string | undefined): boolean {
   return behavior?.toLowerCase().startsWith("&lt_") ?? false;
+}
+
+function formatZoomHoldParameter(value: string): string {
+  return value ? `L${value}` : "";
 }
 
 function formatMouseMotion(value?: string): string {
