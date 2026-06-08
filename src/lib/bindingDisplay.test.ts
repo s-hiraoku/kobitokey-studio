@@ -60,4 +60,8 @@ describe("bindingDisplay", () => {
     expect(bindingDisplay("&lt_right_thumb 3 458981")).toEqual({ badge: "L3", label: "RSFT" });
     expect(formatBindingForDisplay("&lt_left_thumb 1 458796")).toBe("&lt_left_thumb 1 SPACE");
   });
+
+  it("renders zoom hold parameters as custom behavior values", () => {
+    expect(bindingDisplay("&zoom_hold 9")).toEqual({ badge: "ZH", label: "9" });
+  });
 });
