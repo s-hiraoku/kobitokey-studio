@@ -304,7 +304,7 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--pine);
-  background: #ffffff;
+  background: var(--field-face);
   box-shadow: var(--focus-ring);
   color: var(--ink-strong);
 }
@@ -1103,7 +1103,7 @@ select:focus-visible {
   transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out);
 }
 .reference-notice-action:hover {
-  background: #fff;
+  background: var(--field-face);
   border-color: var(--pine-bright);
 }
 
@@ -1292,24 +1292,24 @@ select:focus-visible {
   flex: 0 0 auto;
 }
 .direct-pending-actions button.danger-ghost {
-  border: 1px solid #e2c1c1;
-  background: #fff;
-  color: #8a3a3a;
+  border: 1px solid var(--danger-line);
+  background: var(--field-face);
+  color: var(--danger);
 }
 .direct-pending-actions button.danger-ghost:hover:not(:disabled) {
-  border-color: #c98484;
-  background: #fbeeee;
-  color: #6e2a2a;
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 .direct-pending-actions button.primary-ghost {
-  border: 1px solid #b9d3da;
-  background: #fff;
-  color: #1f5b6b;
+  border: 1px solid var(--pine-line);
+  background: var(--field-face);
+  color: var(--pine-deep);
 }
 .direct-pending-actions button.primary-ghost:hover:not(:disabled) {
-  border-color: #2d7b8f;
-  background: #e7f7f9;
-  color: #16475a;
+  border-color: var(--pine-bright);
+  background: var(--pine-wash);
+  color: var(--pine-active-ink);
 }
 .direct-pending-actions button:disabled {
   opacity: 0.45;
@@ -2430,7 +2430,7 @@ select:focus-visible {
   border-left: 1px solid var(--hairline);
 }
 .firmware-workbench-actions .reset-action {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass);
 }
 .firmware-workbench-actions button svg {
   flex: 0 0 auto;
@@ -2805,7 +2805,7 @@ select:focus-visible {
 }
 .direct-key-editor {
   border-color: var(--pine-line);
-  background: linear-gradient(180deg, #eef3f6 0%, #e1e9ef 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
 }
 .direct-key-editor-heading {
   display: grid;
@@ -3157,7 +3157,7 @@ select:focus-visible {
   gap: 4px;
   border: 1px solid var(--pine-line);
   border-radius: var(--r-md);
-  background: linear-gradient(180deg, var(--pine-wash) 0%, #eef3f6 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
   padding: var(--sp-3) var(--sp-4);
   box-shadow:
     var(--shadow-1),
@@ -3188,7 +3188,7 @@ select:focus-visible {
 }
 .binding-summary code {
   overflow: hidden;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -3212,7 +3212,7 @@ select:focus-visible {
 }
 .binding-review > div.changed {
   border-color: var(--pine-line);
-  background: linear-gradient(180deg, var(--pine-wash) 0%, #eef3f6 100%);
+  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
 }
 .binding-review span {
   color: var(--ink-muted);
@@ -3544,7 +3544,7 @@ select:focus-visible {
   border: 1px solid rgba(182, 125, 18, 0.35);
   border-radius: var(--r-sm);
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--glass);
   color: #5a4209;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10.5px;
@@ -3780,7 +3780,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .release-flow-steps li.done {
   border-color: var(--pine-line);
@@ -3872,7 +3872,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .artifact-folder-import > div {
   display: grid;
@@ -3912,7 +3912,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--glass-soft);
 }
 .flash-sequence-intro {
   display: grid;
@@ -4003,7 +4003,7 @@ select:focus-visible {
   border: 1px solid rgba(39, 81, 92, 0.18);
   border-radius: 4px;
   padding: 0 4px;
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--glass);
   color: var(--pine-deep);
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
@@ -4015,7 +4015,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--glass);
 }
 .flash-completion-row {
   display: grid;
@@ -4208,7 +4208,7 @@ select:focus-visible {
   border-radius: var(--r-sm);
   margin: var(--sp-2) 0 var(--sp-3);
   padding: var(--sp-2);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass);
 }
 .build-check-item {
   display: grid;
@@ -4272,7 +4272,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--glass);
 }
 .release-next-action > span {
   color: var(--ink-faint);
@@ -4404,7 +4404,7 @@ select:focus-visible {
   border: 1px solid var(--hairline-soft);
   border-radius: var(--r-sm);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.44);
+  background: var(--glass);
 }
 .flash-direct-copy-details,
 .flash-desktop-note {
@@ -4482,7 +4482,7 @@ select:focus-visible {
   border-radius: var(--r-sm);
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--glass);
 }
 .flash-advanced summary {
   cursor: pointer;
