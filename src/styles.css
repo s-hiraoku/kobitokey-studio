@@ -2575,7 +2575,8 @@ select:focus-visible {
   }
 }
 @supports not (container-type: inline-size) {
-  .build-workbench {
+  .build-workbench,
+  .keyboard-panel.firmware-build-mode > .browser-release-workbench {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }

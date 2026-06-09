@@ -2007,6 +2007,7 @@ function App() {
         bootloaderVolumes: nextVolumes,
         firmwareUf2Targets: targets,
       } = await readFlashTargets();
+      setFirmwareFlashError("");
       setBuildStatus(
         output ||
           `最新成功 build の artifact を取得しました。left ${targets.left ? "OK" : "未検出"} / right ${
@@ -2532,6 +2533,7 @@ function App() {
   }
 
   async function copySelectedUf2() {
+    setFirmwareFlashError("");
     if (!selectedUf2 || !selectedVolume) {
       const message = "UF2 と bootloader volume を選択してください";
       setFirmwareFlashError(message);
@@ -2565,6 +2567,7 @@ function App() {
   }
 
   async function copyWizardUf2(side: FlashSide) {
+    setFirmwareFlashError("");
     const uf2Path = firmwareUf2Targets[side];
     if (!uf2Path) {
       const message = `${sideLabel(side)} 用 UF2 が見つかりません。Artifact 取得を実行してください`;
