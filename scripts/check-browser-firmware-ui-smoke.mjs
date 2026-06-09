@@ -65,9 +65,11 @@ async function runSmoke() {
         await page.getByRole("button", { name: "Build & Flash" }).click();
         await page.getByText("GitHub Commit & Build").waitFor();
         failures.push(...(await inspectBuildFlashScrollArea(page, viewport.name)));
+        failures.push(...(await inspectBuildFlashSpacing(page, viewport.name)));
         if (viewport.name === "narrow-desktop") {
           await page.setViewportSize({ width: 1024, height: 640 });
           failures.push(...(await inspectBuildFlashScrollArea(page, "short-desktop")));
+          failures.push(...(await inspectBuildFlashSpacing(page, "short-desktop")));
           await page.setViewportSize(viewport);
         }
         failures.push(...(await inspectReleaseWizardPreconditions(page, viewport.name)));
@@ -1002,6 +1004,52 @@ async function inspectBuildFlashScrollArea(page, label) {
     return [`${label}: Build & Flash panel content cannot be scrolled to the bottom`];
   }
   return [];
+}
+
+async function inspectBuildFlashSpacing(page, label) {
+  const states = await page.evaluate(() => {
+    const selectors = [
+      ".workbench-grid .build-panel .build-repo-field",
+      ".workbench-grid .build-panel .build-status",
+      ".workbench-grid .build-panel .build-note",
+      ".workbench-grid .build-panel .build-check-list",
+      ".workbench-grid .browser-release-meta",
+      ".workbench-grid .flash-panel .flash-guide",
+      ".workbench-grid .flash-panel .flash-wizard",
+    ];
+
+    return selectors.map((selector) => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      return {
+        count: elements.length,
+        selector,
+        margins: elements.map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            marginBottom: style.marginBottom,
+            marginTop: style.marginTop,
+            text: element.textContent?.replace(/\s+/g, " ").trim().slice(0, 80) ?? "",
+          };
+        }),
+      };
+    });
+  });
+
+  const failures = [];
+  for (const state of states) {
+    if (state.count === 0) {
+      failures.push(`${label}: Build & Flash spacing selector ${state.selector} did not match any elements`);
+      continue;
+    }
+    for (const margin of state.margins) {
+      if (margin.marginTop !== "0px" || margin.marginBottom !== "0px") {
+        failures.push(
+          `${label}: ${state.selector} should reset vertical margins to 0px, got top ${margin.marginTop} / bottom ${margin.marginBottom} on "${margin.text}"`,
+        );
+      }
+    }
+  }
+  return failures;
 }
 
 async function inspectTrackballEditActions(page, label) {
