@@ -27,6 +27,7 @@ exclude:
   - README.md
   - browser-firmware-e2e-evidence.template.json
   - browser-firmware-release-plan.md
+  - project-evaluation-2026-06-10.md
 
 # kramdown で見出しに自動 id を振る
 kramdown:
