@@ -238,6 +238,29 @@ describe("worker GitHub API proxy", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects artifact redirects to untrusted HTTPS hosts", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: "https://example.test/artifact.zip" },
+      }),
+    );
+
+    const response = await worker.fetch(
+      jsonRequest("https://app.example/api/github/artifact-zip", {
+        artifactId: 123,
+        owner: "owner",
+        repo: "repo",
+        token: "secret-token",
+      }),
+      env,
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: "github_artifact_redirect_invalid_location", status: 302 });
+    expect(response.status).toBe(502);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects malformed artifact redirect locations", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, {
@@ -293,6 +316,31 @@ describe("worker GitHub API proxy", () => {
     await expect(response.json()).resolves.toEqual({ error: "invalid_artifact_id" });
     expect(response.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects artifact zip responses over the size limit", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]), {
+        headers: { "Content-Length": String(50 * 1024 * 1024 + 1) },
+      }),
+    );
+
+    const response = await worker.fetch(
+      jsonRequest("https://app.example/api/github/artifact-zip", {
+        artifactId: 123,
+        owner: "owner",
+        repo: "repo",
+        token: "token",
+      }),
+      env,
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: "github_artifact_too_large",
+      maxBytes: 50 * 1024 * 1024,
+      sizeBytes: 50 * 1024 * 1024 + 1,
+    });
+    expect(response.status).toBe(413);
   });
 
   it("sanitizes failed artifact download responses", async () => {

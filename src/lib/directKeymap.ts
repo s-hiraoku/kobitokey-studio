@@ -120,6 +120,7 @@ export function studioKeymapToParsedKeymap(keymap: StudioKeymap, combos: KeymapC
       blockEnd: index,
     })),
     combos,
+    warnings: [],
   };
 }
 

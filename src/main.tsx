@@ -84,6 +84,7 @@ import {
 import {
   KeymapCombo,
   KeymapLayer,
+  KeymapParseWarning,
   LayerReferenceSite,
   addCombo,
   addLayer,
@@ -443,6 +444,7 @@ function App() {
   const parsedKeymap = isDirectMode ? directParsedKeymap : firmwareParsedKeymap;
   const layers = parsedKeymap.layers;
   const combos = parsedKeymap.combos;
+  const keymapParseWarnings = isDirectMode ? [] : firmwareParsedKeymap.warnings;
   const activeCombos = combos;
   const displayedDirectComboSource: DirectComboSource = directComboSource === "device" ? "device" : "firmware";
   const displayedDirectMaxCombos = directKeymap ? directMaxCombos : activeCombos.length;
@@ -717,6 +719,56 @@ function App() {
     isDesktopRuntime,
   ]);
 
+  const saveProjectFiles = React.useCallback(async () => {
+    if (!files) {
+      setStatus("保存対象のファイルがありません");
+      return;
+    }
+
+    // Browser path: try the FS Access API directory handle first so the
+    // edit lands back in the user's original folder.
+    if (!files.keymapPath) {
+      if (projectDirHandle) {
+        try {
+          await writeProjectToDirectoryHandle(projectDirHandle, files);
+          setSavedKeymap(files.keymap);
+          setSavedLeftOverlay(files.leftOverlay);
+          setSavedRightOverlay(files.rightOverlay);
+          setStatus(`フォルダ "${projectDirHandle.name}" に保存しました`);
+          return;
+        } catch (error) {
+          // Permission revoked, handle stale, etc. — fall through to download.
+          setStatus(`直接書き込みに失敗したためダウンロードに切り替えます: ${String(error)}`);
+        }
+      }
+      downloadText("KobitoKey.keymap", files.keymap);
+      downloadText("KobitoKey_left.overlay", files.leftOverlay);
+      downloadText("KobitoKey_right.overlay", files.rightOverlay);
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+      setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
+      return;
+    }
+
+    if (!files.leftOverlayPath || !files.rightOverlayPath) {
+      setStatus("overlay の保存先パスが不足しています");
+      return;
+    }
+
+    try {
+      await invoke("write_text_file", { path: files.keymapPath, contents: files.keymap });
+      await invoke("write_text_file", { path: files.leftOverlayPath, contents: files.leftOverlay });
+      await invoke("write_text_file", { path: files.rightOverlayPath, contents: files.rightOverlay });
+      setSavedKeymap(files.keymap);
+      setSavedLeftOverlay(files.leftOverlay);
+      setSavedRightOverlay(files.rightOverlay);
+      setStatus("変更ファイルを保存しました");
+    } catch (error) {
+      setStatus(`保存失敗: ${formatError(error)}`);
+    }
+  }, [files, projectDirHandle]);
+
   // Ctrl/Cmd+S saves the firmware project, matching desktop-app expectations.
   // Only active in Firmware mode with a loaded project; otherwise the browser's
   // default save dialog is left alone.
@@ -859,56 +911,6 @@ function App() {
       setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
-    }
-  }
-
-  async function saveProjectFiles() {
-    if (!files) {
-      setStatus("保存対象のファイルがありません");
-      return;
-    }
-
-    // Browser path: try the FS Access API directory handle first so the
-    // edit lands back in the user's original folder.
-    if (!files.keymapPath) {
-      if (projectDirHandle) {
-        try {
-          await writeProjectToDirectoryHandle(projectDirHandle, files);
-          setSavedKeymap(files.keymap);
-          setSavedLeftOverlay(files.leftOverlay);
-          setSavedRightOverlay(files.rightOverlay);
-          setStatus(`フォルダ "${projectDirHandle.name}" に保存しました`);
-          return;
-        } catch (error) {
-          // Permission revoked, handle stale, etc. — fall through to download.
-          setStatus(`直接書き込みに失敗したためダウンロードに切り替えます: ${String(error)}`);
-        }
-      }
-      downloadText("KobitoKey.keymap", files.keymap);
-      downloadText("KobitoKey_left.overlay", files.leftOverlay);
-      downloadText("KobitoKey_right.overlay", files.rightOverlay);
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
-      setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
-      return;
-    }
-
-    if (!files.leftOverlayPath || !files.rightOverlayPath) {
-      setStatus("overlay の保存先パスが不足しています");
-      return;
-    }
-
-    try {
-      await invoke("write_text_file", { path: files.keymapPath, contents: files.keymap });
-      await invoke("write_text_file", { path: files.leftOverlayPath, contents: files.leftOverlay });
-      await invoke("write_text_file", { path: files.rightOverlayPath, contents: files.rightOverlay });
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
-      setStatus("変更ファイルを保存しました");
-    } catch (error) {
-      setStatus(`保存失敗: ${formatError(error)}`);
     }
   }
 
@@ -2868,6 +2870,10 @@ function App() {
             onSelect={setSelectedKeyIndex}
           />
 
+          {!isDirectMode && keymapParseWarnings.length > 0 ? (
+            <KeymapParseWarningPanel warnings={keymapParseWarnings} />
+          ) : null}
+
           {isDirectMode ? (
             <DirectPendingChangesBar
               canWrite={studioConnectionState === "connected"}
@@ -4007,6 +4013,28 @@ function ToastViewport({ onDismiss, toast }: { onDismiss: () => void; toast: Toa
           x
         </button>
       </div>
+    </div>
+  );
+}
+
+function KeymapParseWarningPanel({ warnings }: { warnings: KeymapParseWarning[] }) {
+  return (
+    <div className="keymap-parse-warning" role="status" aria-live="polite" aria-atomic="true">
+      <div className="keymap-parse-warning-heading">
+        <AlertTriangle size={16} />
+        <strong>読み込めなかったレイヤーがあります</strong>
+      </div>
+      <span>キー数が KobitoKey の 40 キー構成と一致しないレイヤーは、誤編集を避けるため編集対象から外しています。</span>
+      <ul>
+        {warnings.map((warning) => (
+          <li key={`${warning.kind}-${warning.id}-${warning.blockStart}`}>
+            <code>{warning.id}</code>
+            <span>
+              {warning.label}: {warning.actualBindings}/{warning.expectedBindings} keys
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

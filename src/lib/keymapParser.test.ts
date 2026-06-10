@@ -67,6 +67,7 @@ describe("parseKeymap", () => {
         timeoutMs: 35,
       }),
     ]);
+    expect(parsed.warnings).toEqual([]);
     expect(parsed.combos[0].layers).toBeUndefined();
     expect(parsed.layers[0].blockEnd).toBeGreaterThan(parsed.layers[0].blockStart);
     expect(parsed.combos[0].blockEnd).toBeGreaterThan(parsed.combos[0].blockStart);
@@ -82,6 +83,16 @@ describe("parseKeymap", () => {
     };`);
 
     expect(parsed.layers).toEqual([]);
+    expect(parsed.warnings).toEqual([
+      expect.objectContaining({
+        kind: "skipped-layer",
+        id: "broken_layer",
+        label: "Layer 0",
+        expectedBindings: 40,
+        actualBindings: 2,
+      }),
+    ]);
+    expect(parsed.warnings[0].blockEnd).toBeGreaterThan(parsed.warnings[0].blockStart);
   });
 
   it("parses labelled keymap and combos nodes", () => {

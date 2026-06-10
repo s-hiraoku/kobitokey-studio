@@ -35,6 +35,12 @@ const APP_COMMIT_SHA =
 const GITHUB_OAUTH_CLIENT_CONFIGURED =
   typeof __KOBITOKEY_GITHUB_OAUTH_CLIENT_CONFIGURED__ === "boolean" &&
   __KOBITOKEY_GITHUB_OAUTH_CLIENT_CONFIGURED__ === true;
+const ARTIFACT_ZIP_MAX_BYTES = 50 * 1024 * 1024;
+const TRUSTED_ARTIFACT_REDIRECT_HOSTS = [
+  "github.com",
+  "githubusercontent.com",
+  "actions.githubusercontent.com",
+];
 
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
@@ -147,7 +153,7 @@ async function proxyArtifactZip(request: Request): Promise<Response> {
     if (!location) {
       return json({ error: "github_artifact_redirect_missing_location", status: response.status }, 502);
     }
-    const zipUrl = parseHttpsUrl(location);
+    const zipUrl = parseTrustedArtifactRedirectUrl(location);
     if (!zipUrl) {
       return json({ error: "github_artifact_redirect_invalid_location", status: response.status }, 502);
     }
@@ -170,6 +176,18 @@ async function proxyArtifactZip(request: Request): Promise<Response> {
 }
 
 function artifactZipResponse(response: Response): Response {
+  const contentLength = parseContentLength(response.headers.get("Content-Length"));
+  if (contentLength !== null && contentLength > ARTIFACT_ZIP_MAX_BYTES) {
+    return json(
+      {
+        error: "github_artifact_too_large",
+        maxBytes: ARTIFACT_ZIP_MAX_BYTES,
+        sizeBytes: contentLength,
+      },
+      413,
+    );
+  }
+
   return new Response(response.body, {
     status: 200,
     headers: {
@@ -190,6 +208,32 @@ function parseHttpsUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+function parseTrustedArtifactRedirectUrl(value: string): URL | null {
+  const url = parseHttpsUrl(value);
+  if (!url || !isTrustedArtifactRedirectHost(url.hostname)) {
+    return null;
+  }
+  return url;
+}
+
+function isTrustedArtifactRedirectHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return TRUSTED_ARTIFACT_REDIRECT_HOSTS.some(
+    (trustedHost) => normalized === trustedHost || normalized.endsWith(`.${trustedHost}`),
+  );
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
 }
 
 async function readJson<T>(request: Request): Promise<JsonReadResult<T>> {

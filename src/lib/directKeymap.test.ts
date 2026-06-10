@@ -285,6 +285,7 @@ describe("direct keymap conversion", () => {
           },
         ],
         combos,
+        warnings: [],
       },
     );
 
@@ -325,6 +326,7 @@ describe("direct keymap conversion", () => {
           },
         ],
         combos,
+        warnings: [],
       },
     );
 
@@ -478,6 +480,7 @@ describe("direct keymap conversion", () => {
         },
       ],
       combos,
+      warnings: [],
     };
 
     expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
