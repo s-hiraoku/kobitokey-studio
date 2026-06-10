@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { writeBrowserUf2ToDirectoryHandle } from "./browserUf2Write";
+import { UF2_BOOTLOADER_MARKER_FILES } from "./uf2Bootloader";
 
 type FakeWritable = {
   close: ReturnType<typeof vi.fn<() => Promise<void>>>;
@@ -25,9 +26,16 @@ function fakeWritable({
 
 function fakeDirectoryHandle(
   getFileHandle: ReturnType<typeof vi.fn<(name: string, options?: { create?: boolean }) => Promise<unknown>>>,
+  { driveStillMounted = () => true }: { driveStillMounted?: () => boolean } = {},
 ): FileSystemDirectoryHandle {
   return {
-    getFileHandle,
+    getFileHandle: vi.fn(async (name: string, options?: { create?: boolean }) => {
+      if ((UF2_BOOTLOADER_MARKER_FILES as readonly string[]).includes(name)) {
+        if (driveStillMounted()) return {};
+        throw new DOMException("The directory is gone", "NotFoundError");
+      }
+      return getFileHandle(name, options);
+    }),
     name: "KOBITOKEY",
     queryPermission: vi.fn(async () => "granted" as PermissionState),
   } as unknown as FileSystemDirectoryHandle;
@@ -60,6 +68,7 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       }, {
         initialSettleMs: 0,
         retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
       }),
     ).rejects.toThrow("UF2 copy failed during write after 3 attempts");
     expect(getFileHandle).toHaveBeenCalledTimes(3);
@@ -84,8 +93,57 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       }, {
         initialSettleMs: 0,
         retryDelaysMs: [0],
+        ejectProbeDelayMs: 0,
       }),
     ).resolves.toEqual({ ambiguousEject: false, attempts: 2 });
+    expect(getFileHandle).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a write rejection with a vanished drive as a completed flash", async () => {
+    const writable = fakeWritable({
+      writeError: new DOMException("The device was disconnected", "NetworkError"),
+    });
+    const getFileHandle = vi.fn().mockResolvedValueOnce(fakeFileHandle(writable));
+    const handle = fakeDirectoryHandle(getFileHandle, { driveStillMounted: () => false });
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array([1, 2, 3]),
+        name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
+      }),
+    ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
+    expect(getFileHandle).toHaveBeenCalledTimes(1);
+    expect(writable.write).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a drive that vanishes during retry as a completed flash once data was written", async () => {
+    let mounted = true;
+    const firstWritable = fakeWritable({
+      writeError: new DOMException("The device was disconnected", "NetworkError"),
+    });
+    const getFileHandle = vi
+      .fn()
+      .mockResolvedValueOnce(fakeFileHandle(firstWritable))
+      .mockImplementation(async () => {
+        mounted = false;
+        throw new DOMException("A requested file or directory could not be found", "NotFoundError");
+      });
+    const handle = fakeDirectoryHandle(getFileHandle, { driveStillMounted: () => mounted });
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array([1, 2, 3]),
+        name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
+      }),
+    ).resolves.toEqual({ ambiguousEject: true, attempts: 2 });
     expect(getFileHandle).toHaveBeenCalledTimes(2);
   });
 
@@ -105,6 +163,7 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       }, {
         initialSettleMs: 0,
         retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
       }),
     ).resolves.toEqual({ ambiguousEject: false, attempts: 3 });
     expect(getFileHandle).toHaveBeenCalledTimes(3);
@@ -124,6 +183,7 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       }, {
         initialSettleMs: 0,
         retryDelaysMs: [],
+        ejectProbeDelayMs: 0,
       }),
     ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
   });
@@ -141,6 +201,7 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
       }, {
         initialSettleMs: 0,
         retryDelaysMs: [100, 100],
+        ejectProbeDelayMs: 0,
       });
       const rejection = expect(result).rejects.toThrow("UF2 copy failed during open-file after 3 attempts");
 
