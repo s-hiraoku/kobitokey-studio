@@ -1089,6 +1089,55 @@ select:focus-visible {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.keymap-parse-warning {
+  display: grid;
+  gap: 8px;
+  margin-top: var(--sp-3);
+  border: 1px solid var(--amber-warn);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--amber-warn-bg);
+  color: #5a4209;
+}
+.keymap-parse-warning-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.keymap-parse-warning-heading svg {
+  flex: 0 0 auto;
+  color: var(--amber-warn);
+}
+.keymap-parse-warning strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.keymap-parse-warning span {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.keymap-parse-warning ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.keymap-parse-warning li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+.keymap-parse-warning code {
+  max-width: 100%;
+  color: #4f3a07;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 .runtime-actions {
   display: grid;
   gap: 4px;

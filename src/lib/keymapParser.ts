@@ -9,6 +9,7 @@ export type KeymapLayer = {
 export type ParsedKeymap = {
   layers: KeymapLayer[];
   combos: KeymapCombo[];
+  warnings: KeymapParseWarning[];
 };
 
 export type KeymapCombo = {
@@ -27,6 +28,16 @@ export type KeymapComboInput = {
   keyPositions: number[];
   layers?: number[];
   timeoutMs: number;
+};
+
+export type KeymapParseWarning = {
+  kind: "skipped-layer";
+  id: string;
+  label: string;
+  expectedBindings: number;
+  actualBindings: number;
+  blockStart: number;
+  blockEnd: number;
 };
 
 export type LayerReferenceSite =
@@ -69,27 +80,40 @@ export function parseKeymap(source: string): ParsedKeymap {
   const keymapSource = keymapBlock.body;
   const offset = keymapBlock.bodyStart;
   const layers: KeymapLayer[] = [];
+  const warnings: KeymapParseWarning[] = [];
 
   for (const match of keymapSource.matchAll(LAYER_PATTERN)) {
     const id = match.groups?.id ?? `layer${layers.length}`;
     const body = match.groups?.body ?? "";
     const bindingsSource = match.groups?.bindings ?? "";
     const bindings = tokenizeBindings(bindingsSource);
+    const blockStart = offset + (match.index ?? 0);
+    const blockEnd = offset + (match.index ?? 0) + match[0].length;
+    const label = parseLabel(body) ?? defaultLayerLabel(id, layers.length);
 
     if (bindings.length !== KEY_COUNT) {
+      warnings.push({
+        kind: "skipped-layer",
+        id,
+        label,
+        expectedBindings: KEY_COUNT,
+        actualBindings: bindings.length,
+        blockStart,
+        blockEnd,
+      });
       continue;
     }
 
     layers.push({
       id,
-      label: parseLabel(body) ?? defaultLayerLabel(id, layers.length),
+      label,
       bindings,
-      blockStart: offset + (match.index ?? 0),
-      blockEnd: offset + (match.index ?? 0) + match[0].length,
+      blockStart,
+      blockEnd,
     });
   }
 
-  return { layers, combos: parseCombos(source) };
+  return { layers, combos: parseCombos(source), warnings };
 }
 
 function parseCombos(source: string): KeymapCombo[] {
