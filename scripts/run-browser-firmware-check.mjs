@@ -22,6 +22,8 @@ mkdirSync(env.WRANGLER_REGISTRY_PATH, { recursive: true });
 mkdirSync(env.XDG_CONFIG_HOME, { recursive: true });
 
 runNode("scripts/check-browser-firmware-release.mjs");
+runNode("scripts/check-version-sync-self-test.mjs");
+runNode("scripts/check-version-sync.mjs");
 runNode("scripts/check-browser-firmware-evidence-self-test.mjs");
 runNode("scripts/check-browser-firmware-collector-self-test.mjs");
 runNode("scripts/check-browser-firmware-merge-readiness-self-test.mjs");

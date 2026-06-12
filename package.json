@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "check:version": "node scripts/check-version-sync.mjs",
+    "check:version-self-test": "node scripts/check-version-sync-self-test.mjs",
+    "set:version": "node scripts/set-version.mjs",
     "check:browser-firmware": "node scripts/run-browser-firmware-check.mjs",
     "check:browser-firmware:ui": "node scripts/check-browser-firmware-ui-smoke.mjs",
     "check:browser-firmware:evidence-self-test": "node scripts/check-browser-firmware-evidence-self-test.mjs",

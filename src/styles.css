@@ -61,11 +61,15 @@
 
   /* signal */
   --amber-warn:   #b67d12;
+  --amber-warn-line:#d5a13b;
   --amber-warn-bg:#fbeec6;
+  --amber-warn-ink:#5d4613;
+  --amber-warn-soft:#735719;
   --danger:       #8a2918;
   --danger-line:  #a83a2b;
   --danger-wash:  #fbe8e2;
   --danger-ink:   #5a1d10;
+  --danger-soft:  #6c2b1f;
 
   /* spacing scale — 4px base */
   --sp-1: 4px;
@@ -112,6 +116,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light dark;
 }
 @supports not (font-size-adjust: from-font) {
   body { font-size-adjust: none; }
@@ -153,12 +158,16 @@
     --on-pine:      #f3f7fa;
     --on-pine-soft: #cdd8e1;
 
-    --amber-warn:   #d6a23e;
-    --amber-warn-bg:#3a2f14;
+    --amber-warn:   #f0bf52;
+    --amber-warn-line:#9d7627;
+    --amber-warn-bg:#3c2e0f;
+    --amber-warn-ink:#ffe3a1;
+    --amber-warn-soft:#e0c27a;
     --danger:       #f08a72;
-    --danger-line:  #b65442;
-    --danger-wash:  #3a1d16;
-    --danger-ink:   #f6b3a3;
+    --danger-line:  #a84e3f;
+    --danger-wash:  #3b1c17;
+    --danger-ink:   #ffd8cf;
+    --danger-soft:  #f1a99a;
     --pine-active-ink: var(--ink-strong);
 
     /* Inset white highlights look wrong on dark; soften the shadow set. */
@@ -417,11 +426,12 @@ input[type="url"] {
   background: #edf6f3;
 }
 .app-toast.error {
-  border-color: var(--amber-warn);
+  border-color: var(--amber-warn-line);
   background: var(--amber-warn-bg);
+  color: var(--amber-warn-ink);
 }
 .app-toast.error svg {
-  color: #8a5b07;
+  color: var(--amber-warn);
 }
 .app-toast button {
   display: grid;
@@ -1062,7 +1072,7 @@ select:focus-visible {
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-4);
   background: var(--amber-warn-bg);
-  color: #5a4209;
+  color: var(--amber-warn-ink);
 }
 .runtime-notice {
   border-color: var(--pine-line);
@@ -1083,7 +1093,7 @@ select:focus-visible {
   letter-spacing: -0.002em;
 }
 .runtime-warning small {
-  color: rgba(90, 66, 9, 0.78);
+  color: var(--amber-warn-soft);
   font-family: "JetBrains Mono", monospace;
   font-size: 10.5px;
   line-height: 1.5;
@@ -1098,7 +1108,7 @@ select:focus-visible {
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-4);
   background: var(--amber-warn-bg);
-  color: #5a4209;
+  color: var(--amber-warn-ink);
 }
 .keymap-parse-warning-heading {
   display: flex;
@@ -1133,7 +1143,7 @@ select:focus-visible {
 }
 .keymap-parse-warning code {
   max-width: 100%;
-  color: #4f3a07;
+  color: var(--amber-warn-ink);
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   overflow-wrap: anywhere;
@@ -1143,7 +1153,7 @@ select:focus-visible {
   gap: 4px;
   margin: 2px 0 0;
   padding-left: 18px;
-  color: #5a4209;
+  color: var(--amber-warn-ink);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -3600,7 +3610,7 @@ select:focus-visible {
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-4);
   background: var(--amber-warn-bg);
-  color: #5a4209;
+  color: var(--amber-warn-ink);
 }
 .combo-write-warning strong {
   font-size: 12.5px;
@@ -3611,18 +3621,18 @@ select:focus-visible {
   line-height: 1.5;
 }
 .combo-write-warning small {
-  color: rgba(90, 66, 9, 0.78);
+  color: var(--amber-warn-soft);
   font-size: 11px;
   line-height: 1.45;
 }
 .combo-write-warning code {
   display: block;
   overflow-wrap: anywhere;
-  border: 1px solid rgba(182, 125, 18, 0.35);
+  border: 1px solid color-mix(in srgb, var(--amber-warn-line) 45%, transparent);
   border-radius: var(--r-sm);
   padding: 6px 8px;
   background: var(--glass);
-  color: #5a4209;
+  color: var(--amber-warn-ink);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10.5px;
   line-height: 1.45;
@@ -3864,7 +3874,7 @@ select:focus-visible {
   background: var(--pine-wash);
 }
 .release-flow-steps li.current {
-  border-color: rgba(182, 125, 18, 0.38);
+  border-color: color-mix(in srgb, var(--amber-warn-line) 50%, transparent);
   background: var(--amber-warn-bg);
   box-shadow: inset 3px 0 0 var(--amber-warn);
 }
@@ -4026,7 +4036,7 @@ select:focus-visible {
   background: var(--pine-wash);
 }
 .flash-sequence-guide li.current {
-  border-color: rgba(182, 125, 18, 0.38);
+  border-color: color-mix(in srgb, var(--amber-warn-line) 50%, transparent);
   background: var(--amber-warn-bg);
 }
 .flash-sequence-guide li svg {
@@ -4117,8 +4127,8 @@ select:focus-visible {
   background: var(--pine-wash);
 }
 .flash-completion-pill.current {
-  border-color: rgba(182, 125, 18, 0.38);
-  color: var(--amber-warn);
+  border-color: color-mix(in srgb, var(--amber-warn-line) 50%, transparent);
+  color: var(--amber-warn-ink);
   background: var(--amber-warn-bg);
 }
 .flash-completion-pill svg {
@@ -4150,16 +4160,16 @@ select:focus-visible {
   grid-template-columns: 18px minmax(0, 1fr);
   gap: var(--sp-2);
   align-items: start;
-  border: 1px solid rgba(168, 58, 43, 0.42);
-  border-left: 3px solid #9f2f22;
+  border: 1px solid color-mix(in srgb, var(--danger-line) 58%, transparent);
+  border-left: 3px solid var(--danger-line);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
-  background: #fff1eb;
-  color: #5f2118;
+  background: var(--danger-wash);
+  color: var(--danger-soft);
 }
 .flash-write-error svg {
   margin-top: 1px;
-  color: #9f2f22;
+  color: var(--danger);
 }
 .flash-write-error div {
   display: grid;
@@ -4167,12 +4177,12 @@ select:focus-visible {
   min-width: 0;
 }
 .flash-write-error strong {
-  color: #4f1b14;
+  color: var(--danger-ink);
   font-size: 12px;
   line-height: 1.25;
 }
 .flash-write-error span {
-  color: #5f2118;
+  color: var(--danger-soft);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -4229,23 +4239,23 @@ select:focus-visible {
   color: var(--pine-bright);
 }
 .build-status.warning {
-  border-color: rgba(182, 125, 18, 0.32);
+  border-color: color-mix(in srgb, var(--amber-warn-line) 58%, transparent);
   border-left-color: var(--amber-warn);
   background: var(--amber-warn-bg);
-  color: #5d4613;
+  color: var(--amber-warn-ink);
 }
 .build-status.warning svg {
   color: var(--amber-warn);
 }
 .build-status.error {
-  border-color: rgba(168, 58, 43, 0.46);
-  border-left-color: #9f2f22;
-  background: #fff1eb;
-  color: #5f2118;
-  box-shadow: inset 0 0 0 1px rgba(168, 58, 43, 0.08);
+  border-color: color-mix(in srgb, var(--danger-line) 62%, transparent);
+  border-left-color: var(--danger-line);
+  background: var(--danger-wash);
+  color: var(--danger-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger-line) 18%, transparent);
 }
 .build-status.error svg {
-  color: #9f2f22;
+  color: var(--danger);
 }
 .build-status.busy {
   border-color: var(--pine-line);
@@ -4276,8 +4286,8 @@ select:focus-visible {
   font-weight: 800;
 }
 .build-note.oauth-config-note {
-  border-color: rgba(168, 58, 43, 0.24);
-  background: #fff4ef;
+  border-color: color-mix(in srgb, var(--danger-line) 45%, transparent);
+  background: var(--danger-wash);
   color: var(--ink-soft);
 }
 
@@ -4355,7 +4365,7 @@ select:focus-visible {
   border-radius: 4px;
   padding: 4px 5px;
   background: var(--amber-warn-bg);
-  color: #5d4613;
+  color: var(--amber-warn-ink);
 }
 .build-check-item.current svg,
 .build-check-item.current em {
@@ -4557,14 +4567,14 @@ select:focus-visible {
   display: none;
 }
 .flash-settings-reset-note {
-  border: 1px solid rgba(182, 125, 18, 0.28);
+  border: 1px solid color-mix(in srgb, var(--amber-warn-line) 42%, transparent);
   border-radius: var(--r-sm);
   padding: var(--sp-2) var(--sp-3);
   background: var(--amber-warn-bg);
 }
 .flash-settings-reset-note summary {
   cursor: pointer;
-  color: #5d4613;
+  color: var(--amber-warn-ink);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.4;

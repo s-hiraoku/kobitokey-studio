@@ -8,6 +8,17 @@ permalink: /release-checklist/
 
 ブラウザ版 Firmware Mode を公開するときは、この順番で確認します。GitHub Pages の成功だけではブラウザアプリ本体の公開完了とは扱いません。
 
+## 0. version metadata を揃える
+
+公開する app version を先に決め、`package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` / `src-tauri/tauri.conf.json` / `CHANGELOG.md` を同じ version にします。
+
+```sh
+npm run set:version -- 0.2.0
+npm run check:version
+```
+
+`package.json` を version の基準にし、他のファイルがズレている場合は `check:version` が失敗します。version を変えない patch でも、公開前には `CHANGELOG.md` に現在 version の entry があることを確認します。
+
 ## 1. 現在の残件を見る
 
 ```sh

@@ -2,9 +2,14 @@ import { readFileSync } from "node:fs";
 
 const files = {
   readme: read("README.md"),
+  changelog: read("CHANGELOG.md"),
   packageJson: read("package.json"),
   viteConfig: read("vite.config.ts"),
   releaseCheckRunner: read("scripts/run-browser-firmware-check.mjs"),
+  versionFiles: read("scripts/version-files.mjs"),
+  versionCheck: read("scripts/check-version-sync.mjs"),
+  versionCheckSelfTest: read("scripts/check-version-sync-self-test.mjs"),
+  setVersion: read("scripts/set-version.mjs"),
   evidenceSelfTest: read("scripts/check-browser-firmware-evidence-self-test.mjs"),
   collectorSelfTest: read("scripts/check-browser-firmware-collector-self-test.mjs"),
   evidenceCollector: read("scripts/collect-browser-firmware-e2e-evidence.mjs"),
@@ -80,6 +85,8 @@ const checks = [
         "BROWSER_FIRMWARE_WORKER_DRY_RUN_OUTDIR",
         "kobitokey-worker-dry-run",
         "scripts/check-browser-firmware-release.mjs",
+        "scripts/check-version-sync-self-test.mjs",
+        "scripts/check-version-sync.mjs",
         "scripts/check-browser-firmware-evidence-self-test.mjs",
         "scripts/check-browser-firmware-collector-self-test.mjs",
         "scripts/check-browser-firmware-merge-readiness-self-test.mjs",
@@ -98,6 +105,37 @@ const checks = [
         'runNode("node_modules/vite/bin/vite.js", "build")',
         'runNode("node_modules/wrangler/bin/wrangler.js", "deploy", "--dry-run", "--outdir", workerDryRunOutDir)',
       ]),
+  },
+  {
+    name: "app version metadata is synchronized across browser and Tauri files",
+    pass: () =>
+      scriptIncludes("check:version", "node scripts/check-version-sync.mjs") &&
+      scriptIncludes("check:version-self-test", "node scripts/check-version-sync-self-test.mjs") &&
+      scriptIncludes("set:version", "node scripts/set-version.mjs") &&
+      allIncludes(files.versionFiles, [
+        "package.json",
+        "package-lock.json",
+        "src-tauri/Cargo.toml",
+        "src-tauri/Cargo.lock",
+        "src-tauri/tauri.conf.json",
+        "CHANGELOG.md",
+        "SEMVER_PATTERN",
+        "validateVersionState",
+        "writeVersionState",
+        "writeCargoLockPackageVersion",
+      ]) &&
+      allIncludes(files.versionCheck, ["readVersionState", "validateVersionState", "OK version"]) &&
+      allIncludes(files.setVersion, ["assertValidVersion", "writeVersionState", "--skip-changelog", "--dry-run"]) &&
+      allIncludes(files.versionCheckSelfTest, [
+        "Expected synchronized project to pass",
+        "Expected mismatched Cargo version to fail",
+        "Expected mismatched Cargo.lock version to fail",
+        "Expected missing changelog entry to fail",
+        "OK version sync self-test passed",
+      ]) &&
+      allIncludes(files.changelog, ["# Changelog", "## [0.1.0]"]) &&
+      allIncludes(files.readme, ["npm run check:version", "npm run set:version -- 0.2.0"]) &&
+      allIncludes(files.docsReleaseChecklist, ["npm run set:version -- 0.2.0", "npm run check:version"]),
   },
   {
     name: "production deploy wrapper verifies deployed app commit before release",
@@ -778,10 +816,13 @@ const checks = [
       allIncludes(files.pagesCi, [
         "Browser firmware release gates",
         "npm ci",
+        "npm run check:version",
         "npm run check:browser-firmware",
         "npx playwright-core install chromium",
         "npm run check:browser-firmware:ui",
         "BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware",
+        "CHANGELOG.md",
+        "src-tauri/**",
         "needs: release-check",
         "github.event_name == 'workflow_dispatch'",
         "!inputs.deploy_browser_firmware_worker",
