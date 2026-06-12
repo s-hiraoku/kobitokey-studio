@@ -7,7 +7,8 @@ if (options.help) {
   console.log(`Usage: node scripts/set-version.mjs <version> [--date YYYY-MM-DD] [--dry-run] [--skip-changelog] [--root DIR]
 
 Updates package.json, package-lock.json, src-tauri/Cargo.toml,
-src-tauri/tauri.conf.json, and CHANGELOG.md to the same SemVer version.`);
+src-tauri/Cargo.lock, src-tauri/tauri.conf.json, and CHANGELOG.md to the same
+SemVer version.`);
   process.exit(0);
 }
 

@@ -116,17 +116,20 @@ const checks = [
         "package.json",
         "package-lock.json",
         "src-tauri/Cargo.toml",
+        "src-tauri/Cargo.lock",
         "src-tauri/tauri.conf.json",
         "CHANGELOG.md",
         "SEMVER_PATTERN",
         "validateVersionState",
         "writeVersionState",
+        "writeCargoLockPackageVersion",
       ]) &&
       allIncludes(files.versionCheck, ["readVersionState", "validateVersionState", "OK version"]) &&
       allIncludes(files.setVersion, ["assertValidVersion", "writeVersionState", "--skip-changelog", "--dry-run"]) &&
       allIncludes(files.versionCheckSelfTest, [
         "Expected synchronized project to pass",
         "Expected mismatched Cargo version to fail",
+        "Expected mismatched Cargo.lock version to fail",
         "Expected missing changelog entry to fail",
         "OK version sync self-test passed",
       ]) &&

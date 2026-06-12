@@ -10,7 +10,7 @@ permalink: /release-checklist/
 
 ## 0. version metadata を揃える
 
-公開する app version を先に決め、`package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `CHANGELOG.md` を同じ version にします。
+公開する app version を先に決め、`package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` / `src-tauri/tauri.conf.json` / `CHANGELOG.md` を同じ version にします。
 
 ```sh
 npm run set:version -- 0.2.0

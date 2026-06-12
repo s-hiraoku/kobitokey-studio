@@ -102,7 +102,8 @@ npm run check:version
 
 `package.json` is the source of truth for the app version. The version must
 stay synchronized with `package-lock.json`, `src-tauri/Cargo.toml`,
-`src-tauri/tauri.conf.json`, and `CHANGELOG.md`. To prepare a new version, use:
+`src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`. To
+prepare a new version, use:
 
 ```sh
 npm run set:version -- 0.2.0

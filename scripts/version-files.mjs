@@ -5,6 +5,7 @@ export const VERSION_FILES = {
   packageJson: "package.json",
   packageLock: "package-lock.json",
   cargoToml: "src-tauri/Cargo.toml",
+  cargoLock: "src-tauri/Cargo.lock",
   tauriConfig: "src-tauri/tauri.conf.json",
   changelog: "CHANGELOG.md",
 };
@@ -22,6 +23,7 @@ export function readVersionState(root = process.cwd()) {
   const packageJson = readJson(root, VERSION_FILES.packageJson);
   const packageLock = readJson(root, VERSION_FILES.packageLock);
   const cargoToml = readText(root, VERSION_FILES.cargoToml);
+  const cargoLock = readText(root, VERSION_FILES.cargoLock);
   const tauriConfig = readJson(root, VERSION_FILES.tauriConfig);
   const changelogPath = join(root, VERSION_FILES.changelog);
   const changelog = existsSync(changelogPath) ? readFileSync(changelogPath, "utf8") : "";
@@ -31,6 +33,7 @@ export function readVersionState(root = process.cwd()) {
     packageJson,
     packageLock,
     cargoToml,
+    cargoLock,
     tauriConfig,
     changelog,
     versions: {
@@ -38,6 +41,7 @@ export function readVersionState(root = process.cwd()) {
       packageLock: packageLock.version,
       packageLockRoot: packageLock.packages?.[""]?.version,
       cargoToml: readCargoPackageVersion(cargoToml),
+      cargoLock: readCargoLockPackageVersion(cargoLock, packageJson.name),
       tauriConfig: tauriConfig.version,
     },
   };
@@ -102,6 +106,7 @@ export function writeVersionState(root, version, { date = currentLocalDate(), sk
   writeJson(root, VERSION_FILES.packageJson, state.packageJson);
   writeJson(root, VERSION_FILES.packageLock, state.packageLock);
   writeText(root, VERSION_FILES.cargoToml, writeCargoPackageVersion(state.cargoToml, version));
+  writeText(root, VERSION_FILES.cargoLock, writeCargoLockPackageVersion(state.cargoLock, state.packageJson.name, version));
   writeJson(root, VERSION_FILES.tauriConfig, state.tauriConfig);
 
   if (!skipChangelog) {
@@ -180,6 +185,23 @@ export function writeCargoPackageVersion(content, version) {
   throw new Error(`${VERSION_FILES.cargoToml} is missing [package] version`);
 }
 
+export function readCargoLockPackageVersion(content, packageName) {
+  return readCargoLockPackage(content, packageName).version;
+}
+
+export function writeCargoLockPackageVersion(content, packageName, version) {
+  const packageBlock = findCargoLockPackageBlock(content, packageName);
+  const packageContent = content.slice(packageBlock.start, packageBlock.end);
+  const updatedPackageContent = packageContent.replace(
+    /^version\s*=\s*"[^"]+"\s*$/m,
+    `version = "${version}"`,
+  );
+  if (updatedPackageContent === packageContent) {
+    throw new Error(`${VERSION_FILES.cargoLock} package "${packageName}" is missing version`);
+  }
+  return `${content.slice(0, packageBlock.start)}${updatedPackageContent}${content.slice(packageBlock.end)}`;
+}
+
 export function currentLocalDate() {
   const now = new Date();
   const year = now.getFullYear();
@@ -211,6 +233,7 @@ function versionFileForKey(key) {
       packageLock: VERSION_FILES.packageLock,
       packageLockRoot: `${VERSION_FILES.packageLock} packages[""]`,
       cargoToml: VERSION_FILES.cargoToml,
+      cargoLock: VERSION_FILES.cargoLock,
       tauriConfig: VERSION_FILES.tauriConfig,
     }[key] ?? key
   );
@@ -218,4 +241,32 @@ function versionFileForKey(key) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function readCargoLockPackage(content, packageName) {
+  const packageBlock = findCargoLockPackageBlock(content, packageName);
+  const packageContent = content.slice(packageBlock.start, packageBlock.end);
+  const version = packageContent.match(/^version\s*=\s*"([^"]+)"\s*$/m);
+  if (!version) {
+    throw new Error(`${VERSION_FILES.cargoLock} package "${packageName}" is missing version`);
+  }
+  return { version: version[1] };
+}
+
+function findCargoLockPackageBlock(content, packageName) {
+  const packageHeading = /^\[\[package\]\]\s*$/gm;
+  let match;
+  while ((match = packageHeading.exec(content))) {
+    const start = match.index;
+    const nextPackage = /^\[\[package\]\]\s*$/gm;
+    nextPackage.lastIndex = packageHeading.lastIndex;
+    const nextMatch = nextPackage.exec(content);
+    const end = nextMatch?.index ?? content.length;
+    const packageContent = content.slice(start, end);
+    const name = packageContent.match(/^name\s*=\s*"([^"]+)"\s*$/m);
+    if (name?.[1] === packageName) {
+      return { start, end };
+    }
+  }
+  throw new Error(`${VERSION_FILES.cargoLock} is missing package "${packageName}"`);
 }
