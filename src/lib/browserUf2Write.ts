@@ -1,4 +1,5 @@
 import type { GitHubArtifactUf2 } from "./githubFirmwareClient";
+import { isUf2BootloaderDirectory } from "./uf2Bootloader";
 
 export type BrowserUf2WriteResult = {
   ambiguousEject: boolean;
@@ -8,12 +9,14 @@ export type BrowserUf2WriteResult = {
 export const BROWSER_UF2_WRITE_INITIAL_SETTLE_MS = 1200;
 export const BROWSER_UF2_WRITE_RETRY_DELAYS_MS = [750, 1500, 3000, 5000] as const;
 export const BROWSER_UF2_WRITE_MAX_ATTEMPTS = BROWSER_UF2_WRITE_RETRY_DELAYS_MS.length + 1;
+export const BROWSER_UF2_WRITE_EJECT_PROBE_DELAY_MS = 500;
 
 type BrowserUf2WritePhase = "open-file" | "open-writable" | "write" | "close";
 
 type BrowserUf2WriteOptions = {
   initialSettleMs?: number;
   retryDelaysMs?: readonly number[];
+  ejectProbeDelayMs?: number;
 };
 
 export async function writeBrowserUf2ToDirectoryHandle(
@@ -27,6 +30,7 @@ export async function writeBrowserUf2ToDirectoryHandle(
   const filename = file.name.split("/").pop() ?? file.name;
   let lastError: unknown = null;
   let lastPhase: BrowserUf2WritePhase = "open-file";
+  let dataMayHaveReachedDevice = false;
 
   await delay(options.initialSettleMs ?? BROWSER_UF2_WRITE_INITIAL_SETTLE_MS);
 
@@ -40,6 +44,7 @@ export async function writeBrowserUf2ToDirectoryHandle(
       phase = "open-writable";
       writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
       phase = "write";
+      dataMayHaveReachedDevice = true;
       await writable.write(arrayBufferFromBytes(file.bytes));
       writeCompleted = true;
       try {
@@ -58,7 +63,20 @@ export async function writeBrowserUf2ToDirectoryHandle(
       if (writable && !writeCompleted) {
         await discardWritableQuietly(writable);
       }
-      if (!isLikelyBootloaderEjectError(error) || attempt === maxAttempts) {
+      if (!isLikelyBootloaderEjectError(error)) {
+        throw uf2WriteRetryError(error, attempt, phase);
+      }
+      if (dataMayHaveReachedDevice) {
+        // A UF2 bootloader flashes blocks as they stream in and reboots the
+        // moment the final block lands, so the volume can vanish while write()
+        // is still pending. If the drive is gone after data went out, treat it
+        // as a completed flash rather than burning retries against a dead handle.
+        await delay(options.ejectProbeDelayMs ?? BROWSER_UF2_WRITE_EJECT_PROBE_DELAY_MS);
+        if (!(await isUf2BootloaderDirectory(handle))) {
+          return { ambiguousEject: true, attempts: attempt };
+        }
+      }
+      if (attempt === maxAttempts) {
         throw uf2WriteRetryError(error, attempt, phase);
       }
       await delay(retryDelays[attempt - 1] ?? retryDelays[retryDelays.length - 1] ?? 0);
