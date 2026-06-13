@@ -629,6 +629,11 @@ function App() {
 
   function redoBrowserFirmwareReset(side: FlashSide) {
     setBrowserFirmwareSideResetDone(side, false);
+    if (side === "left") {
+      setBrowserFirmwareLeftFlashed(false);
+    } else {
+      setBrowserFirmwareRightFlashed(false);
+    }
     setFirmwareFlashError("");
     setBuildStatus(`${sideLabel(side)} 側を reset からやり直します。${sideLabel(side)} 側を bootloader に入れて、reset UF2 を直接コピーしてください`);
   }
@@ -5272,7 +5277,7 @@ function BrowserFirmwareReleaseWorkbench({
               </button>
             ))}
           </div>
-          {resetDone[flashSide] ? (
+          {resetDone[flashSide] || (flashSide === "left" ? readiness.leftFlashed : readiness.rightFlashed) ? (
             <button
               type="button"
               className="flash-redo-reset"
