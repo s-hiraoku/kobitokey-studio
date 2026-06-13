@@ -13,12 +13,15 @@ import {
   FolderOpen,
   Github,
   Loader2,
+  Monitor,
   MousePointer,
+  Moon,
   Plus,
   RefreshCw,
   Save,
   SlidersHorizontal,
   Smartphone,
+  Sun,
   Trash2,
   Undo2,
   UploadCloud,
@@ -231,6 +234,7 @@ type ToastMessage = {
   kind: ToastKind;
   message: string;
 };
+type ColorSchemePreference = "system" | "dark" | "light";
 type DirectKeyDraft = {
   layerIndex: number;
   keyIndex: number;
@@ -262,11 +266,72 @@ declare global {
   }
 }
 
+declare const __KOBITOKEY_APP_VERSION__: string | undefined;
+
 const DEFAULT_PROJECT_ROOT = "";
 const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWERTY";
 const USER_GUIDE_URL = "https://s-hiraoku.github.io/kobitokey-studio/user-guide/";
 const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
+const COLOR_SCHEME_STORAGE_KEY = "kobitokey-color-scheme";
+const DARK_THEME_COLOR = "#14181d";
+const LIGHT_THEME_COLOR = "#2c4250";
 const ENABLE_LAYER_STRUCTURE_EDITING = true;
+const APP_VERSION =
+  typeof __KOBITOKEY_APP_VERSION__ === "string" && __KOBITOKEY_APP_VERSION__.trim()
+    ? __KOBITOKEY_APP_VERSION__.trim()
+    : "0.0.0";
+
+function readColorSchemePreference(): ColorSchemePreference {
+  if (typeof window === "undefined") return "system";
+  const stored = window.localStorage.getItem(COLOR_SCHEME_STORAGE_KEY);
+  return stored === "dark" || stored === "light" ? stored : "system";
+}
+
+function applyColorSchemePreference(preference: ColorSchemePreference) {
+  if (typeof document === "undefined") return;
+
+  const root = document.documentElement;
+  const colorSchemeMeta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
+  const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+
+  if (preference === "system") {
+    delete root.dataset.colorScheme;
+    if (colorSchemeMeta) colorSchemeMeta.content = "light dark";
+  } else {
+    root.dataset.colorScheme = preference;
+    if (colorSchemeMeta) colorSchemeMeta.content = preference;
+  }
+
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const effectiveScheme = preference === "system" ? (prefersDark ? "dark" : "light") : preference;
+  if (themeColorMeta) themeColorMeta.content = effectiveScheme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+}
+
+function useColorSchemePreference() {
+  const [preference, setPreferenceState] = React.useState<ColorSchemePreference>(() => readColorSchemePreference());
+
+  React.useEffect(() => {
+    applyColorSchemePreference(preference);
+  }, [preference]);
+
+  React.useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => applyColorSchemePreference(preference);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [preference]);
+
+  const setPreference = React.useCallback((nextPreference: ColorSchemePreference) => {
+    setPreferenceState(nextPreference);
+    if (nextPreference === "system") {
+      window.localStorage.removeItem(COLOR_SCHEME_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, nextPreference);
+    }
+  }, []);
+
+  return [preference, setPreference] as const;
+}
 
 function useMobileUnsupported() {
   const [isMobileUnsupported, setIsMobileUnsupported] = React.useState(() => {
@@ -305,6 +370,7 @@ function MobileUnsupportedScreen() {
 
 function App() {
   const isMobileUnsupported = useMobileUnsupported();
+  const [colorSchemePreference, setColorSchemePreference] = useColorSchemePreference();
   const isDesktopRuntime = isTauriRuntime();
   const storedBrowserFirmwareSession = React.useMemo(
     () => readBrowserFirmwareSession(typeof window === "undefined" ? null : window.localStorage),
@@ -2617,7 +2683,10 @@ function App() {
       <header className={`topbar ${isDirectMode ? "direct-active" : ""}`}>
         <div>
           <p className="eyebrow">KobitoKey Studio</p>
-          <h1>KobitoKey 設定エディタ</h1>
+          <div className="topbar-title-row">
+            <h1>KobitoKey 設定エディタ</h1>
+            <span className="app-version-chip" title="KobitoKey Studio のアプリバージョン">App v{APP_VERSION}</span>
+          </div>
         </div>
         <div className="topbar-tools">
           <div className="mode-toggle" aria-label="Editor mode">
@@ -2635,8 +2704,40 @@ function App() {
 	              className={editorMode === "direct" ? "active" : ""}
 	              onPointerDown={() => setEditorMode("direct")}
 	              onClick={() => setEditorMode("direct")}
-	            >
+            >
               Direct
+            </button>
+          </div>
+          <div className="theme-toggle" role="group" aria-label="カラーテーマ">
+            <button
+              type="button"
+              className={colorSchemePreference === "system" ? "active" : ""}
+              aria-pressed={colorSchemePreference === "system"}
+              onClick={() => setColorSchemePreference("system")}
+              title="システム設定に合わせる"
+            >
+              <Monitor size={14} />
+              <span>システム</span>
+            </button>
+            <button
+              type="button"
+              className={colorSchemePreference === "dark" ? "active" : ""}
+              aria-pressed={colorSchemePreference === "dark"}
+              onClick={() => setColorSchemePreference("dark")}
+              title="Dark テーマに固定"
+            >
+              <Moon size={14} />
+              <span>Dark</span>
+            </button>
+            <button
+              type="button"
+              className={colorSchemePreference === "light" ? "active" : ""}
+              aria-pressed={colorSchemePreference === "light"}
+              onClick={() => setColorSchemePreference("light")}
+              title="Light テーマに固定"
+            >
+              <Sun size={14} />
+              <span>Light</span>
             </button>
           </div>
           <nav className="topbar-links" aria-label="関連リンク">
@@ -2724,15 +2825,22 @@ function App() {
                 </strong>
                 <em>{studioConnectionKind.toUpperCase()} 接続中</em>
               </span>
-              <button type="button" onClick={() => readStudioDevice()} disabled={studioConnectionState === "connecting"}>
+              <button
+                type="button"
+                className="connected-reload-button"
+                onClick={() => readStudioDevice()}
+                disabled={studioConnectionState === "connecting"}
+                title="接続中のデバイスを再読み込み"
+              >
                 <RefreshCw size={17} />
-                再読み込み
+                <span>再読み込み</span>
               </button>
               <button
                 type="button"
-                className="danger"
+                className="danger connected-disconnect-button"
                 onClick={() => void disconnectStudioDevice()}
                 disabled={studioConnectionState === "connecting"}
+                title="デバイスを切断"
               >
                 切断
               </button>
@@ -2839,10 +2947,8 @@ function App() {
         <section className={`keyboard-panel ${!isDirectMode && workbenchTab === "build" ? "firmware-build-mode" : ""}`}>
           {isDirectMode ? (
             <DirectConnectionBar
-              comboSource={directComboSource}
               connectionKind={studioConnectionKind}
               connectionState={studioConnectionState}
-              isDesktopRuntime={isDesktopRuntime}
               keymap={directKeymap}
               portPath={selectedStudioPort}
             />
@@ -4040,17 +4146,13 @@ function KeymapParseWarningPanel({ warnings }: { warnings: KeymapParseWarning[] 
 }
 
 function DirectConnectionBar({
-  comboSource,
   connectionKind,
   connectionState,
-  isDesktopRuntime,
   keymap,
   portPath,
 }: {
-  comboSource: DirectComboSource;
   connectionKind: StudioConnectionKind;
   connectionState: StudioConnectionState;
-  isDesktopRuntime: boolean;
   keymap: StudioKeymap | null;
   portPath: string;
 }) {
@@ -4070,8 +4172,6 @@ function DirectConnectionBar({
       </div>
       <DirectCapabilityStrip
         compact
-        comboSource={comboSource}
-        isDesktopRuntime={isDesktopRuntime}
       />
     </div>
   );
@@ -4173,22 +4273,11 @@ function DirectPendingChangesBar({
 
 function DirectCapabilityStrip({
   compact = false,
-  comboSource,
-  isDesktopRuntime,
   keyWritable = true,
 }: {
   compact?: boolean;
-  comboSource?: DirectComboSource;
-  isDesktopRuntime: boolean;
   keyWritable?: boolean;
 }) {
-  const comboState = comboSource === undefined || comboSource === "device"
-      ? { className: "ok", label: "書込可" }
-      : comboSource === "firmware"
-        ? { className: "read", label: "参照中" }
-        : { className: "pending", label: "確認中" };
-  const trackballState = { className: "read", label: "未対応" };
-
   return (
     <ul className={`direct-capability-strip ${compact ? "compact" : ""}`} aria-label="この環境でできること">
       <li>
@@ -4199,11 +4288,11 @@ function DirectCapabilityStrip({
       </li>
       <li>
         <span className="capability-label">コンボ</span>
-        <span className={`capability-state ${comboState.className}`}>{comboState.label}</span>
+        <span className="capability-state read">読込のみ</span>
       </li>
       <li>
         <span className="capability-label">トラックボール</span>
-        <span className={`capability-state ${trackballState.className}`}>{trackballState.label}</span>
+        <span className="capability-state read">未対応</span>
       </li>
     </ul>
   );
@@ -4430,7 +4519,6 @@ function DirectWelcome({
           </div>
         </div>
         <DirectCapabilityStrip
-          isDesktopRuntime={isDesktopRuntime}
           keyWritable={selectedTransportAvailable}
         />
         {!isDesktopRuntime ? (

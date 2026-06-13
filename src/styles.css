@@ -118,6 +118,12 @@
   -moz-osx-font-smoothing: grayscale;
   color-scheme: light dark;
 }
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+}
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+}
 @supports not (font-size-adjust: from-font) {
   body { font-size-adjust: none; }
 }
@@ -128,8 +134,58 @@
    on any background); only the workbench chrome flips to a cool dark
    slate. Driven entirely by tokens so component rules need no changes.
    ------------------------------------------------------------ */
+:root[data-color-scheme="dark"] {
+  --paper:        #14181d;
+  --paper-2:      #1b2026;
+  --paper-3:      #232a31;
+  --card:         #1e242b;
+  --card-sunk:    #161b20;
+
+  --ink:          #e6ecf1;
+  --ink-strong:   #f5f8fa;
+  --ink-soft:     #c4cdd6;
+  --ink-muted:    #98a4b0;
+  --ink-faint:    #6f7c89;
+
+  --hairline:     #38424d;
+  --hairline-soft:#2c343d;
+  --hairline-fine:#242b32;
+
+  /* pine accent lightens so it reads as "active" on dark slate. --pine-deep
+     doubles as text on the dim --pine-wash, so it's kept bright enough to
+     clear WCAG AA there. */
+  --pine:         #4a7793;
+  --pine-deep:    #7ba6c2;
+  --pine-darker:  #2c4250;
+  --pine-bright:  #8fb6d0;
+  --pine-wash:    #233039;
+  --pine-line:    #41525f;
+  --on-pine:      #f3f7fa;
+  --on-pine-soft: #cdd8e1;
+
+  --amber-warn:   #f0bf52;
+  --amber-warn-line:#9d7627;
+  --amber-warn-bg:#3c2e0f;
+  --amber-warn-ink:#ffe3a1;
+  --amber-warn-soft:#e0c27a;
+  --danger:       #f08a72;
+  --danger-line:  #a84e3f;
+  --danger-wash:  #3b1c17;
+  --danger-ink:   #ffd8cf;
+  --danger-soft:  #f1a99a;
+  --pine-active-ink: var(--ink-strong);
+
+  /* Inset white highlights look wrong on dark; soften the shadow set. */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-3: 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+
+  --field-face:   #2a323a;
+  --glass:        rgba(180, 200, 220, 0.07);
+  --glass-soft:   rgba(180, 200, 220, 0.05);
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-color-scheme="light"]) {
     --paper:        #14181d;
     --paper-2:      #1b2026;
     --paper-3:      #232a31;
@@ -180,16 +236,27 @@
     --glass-soft:   rgba(180, 200, 220, 0.05);
   }
   /* The dotted plate background is tuned for light paper; calm it on dark. */
-  .keyboard-viewport {
+  :root:not([data-color-scheme="light"]) .keyboard-viewport {
     background-color: #1a2028;
     background-image:
       radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
   }
   /* The body dot grid uses a dark ink that vanishes on dark; use a light fleck. */
-  body {
+  :root:not([data-color-scheme="light"]) body {
     background-image:
       radial-gradient(circle, rgba(180, 200, 220, 0.035) 0.9px, transparent 1.3px);
   }
+}
+
+:root[data-color-scheme="dark"] .keyboard-viewport {
+  background-color: #1a2028;
+  background-image:
+    radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
+}
+
+:root[data-color-scheme="dark"] body {
+  background-image:
+    radial-gradient(circle, rgba(180, 200, 220, 0.035) 0.9px, transparent 1.3px);
 }
 
 * { box-sizing: border-box; }
@@ -575,14 +642,37 @@ input[type="url"] {
   font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 36;
 }
 
+.topbar-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.app-version-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--r-full);
+  padding: 2px 8px;
+  background: var(--glass-soft);
+  color: var(--ink-muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 .topbar-tools {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-3);
   justify-self: end;
   width: 100%;
-  max-width: 1040px;
+  max-width: none;
 }
 
 .mode-toggle {
@@ -648,6 +738,54 @@ input[type="url"] {
   background: linear-gradient(180deg, var(--pine-deep) 0%, var(--pine-darker) 100%);
 }
 
+.theme-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(32px, auto));
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--glass-soft);
+  box-shadow: var(--shadow-1);
+}
+
+.theme-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  min-width: 44px;
+  border: 0;
+  border-right: 1px solid var(--hairline-soft);
+  border-radius: 0;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.theme-toggle button:last-child {
+  border-right: 0;
+}
+
+.theme-toggle button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.theme-toggle button.active {
+  background: var(--pine-wash);
+  color: var(--pine-active-ink);
+  box-shadow: inset 0 0 0 1px var(--pine-line);
+}
+
+.theme-toggle button svg {
+  flex: 0 0 auto;
+}
+
 .topbar-links {
   display: inline-flex;
   align-items: center;
@@ -681,6 +819,70 @@ input[type="url"] {
 
 .topbar-links a svg {
   flex: 0 0 auto;
+}
+
+@media (max-width: 1320px) {
+  .topbar {
+    gap: var(--sp-5);
+  }
+
+  .topbar-tools {
+    gap: var(--sp-2);
+  }
+
+  .topbar-links a {
+    width: 36px;
+    padding: 0;
+  }
+
+  .topbar-links a span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1160px) {
+  .topbar {
+    grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
+    padding-inline: var(--sp-5);
+  }
+
+  .theme-toggle button {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+  }
+
+  .theme-toggle button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .connected-reload-button {
+    width: 36px;
+    padding-inline: 0;
+  }
+
+  .connected-reload-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .connected-chip em {
+    display: none;
+  }
 }
 
 .eyebrow {
@@ -823,8 +1025,10 @@ select:focus-visible {
   min-width: 0;
 }
 .studio-loader.connected-loader {
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
+  width: 100%;
+  overflow: hidden;
 }
 .connected-chip {
   display: inline-flex;
@@ -872,16 +1076,35 @@ select:focus-visible {
   flex: 0 0 auto;
 }
 
+.connected-loader button {
+  min-width: 0;
+  padding-inline: 10px;
+}
+
+.connected-reload-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .topbar-hint {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--sp-2);
+  min-width: 0;
   min-height: 36px;
+  overflow: hidden;
   color: var(--ink-muted);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
+  white-space: nowrap;
+}
+.topbar-hint span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .topbar-hint svg { color: var(--pine-bright); flex: 0 0 auto; }
 
