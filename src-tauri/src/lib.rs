@@ -10,31 +10,29 @@ use zmk_studio_api::{proto::zmk, Behavior, HidUsage, Keycode, StudioClient};
 const DESKTOP_BLUETOOTH_DIRECT_ENABLED: bool = true;
 
 #[tauri::command]
-fn read_text_file(path: String) -> Result<String, String> {
-    fs::read_to_string(path).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn write_text_file(path: String, contents: String) -> Result<(), String> {
-    fs::write(path, contents).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 fn read_kobitokey_project(root: String) -> Result<KobitoKeyProject, String> {
-    let root = PathBuf::from(root);
-    let keymap_path = root.join("config/KobitoKey.keymap");
-    let left_overlay_path = root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay");
-    let right_overlay_path = root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay");
+    let paths = kobitokey_project_paths(&root)?;
 
     Ok(KobitoKeyProject {
-        keymap_path: display_path(&keymap_path),
-        keymap: fs::read_to_string(&keymap_path).map_err(|error| error.to_string())?,
-        left_overlay_path: display_path(&left_overlay_path),
-        left_overlay: fs::read_to_string(&left_overlay_path).map_err(|error| error.to_string())?,
-        right_overlay_path: display_path(&right_overlay_path),
-        right_overlay: fs::read_to_string(&right_overlay_path)
+        project_root: display_path(&paths.root),
+        keymap_path: display_path(&paths.keymap),
+        keymap: fs::read_to_string(&paths.keymap).map_err(|error| error.to_string())?,
+        left_overlay_path: display_path(&paths.left_overlay),
+        left_overlay: fs::read_to_string(&paths.left_overlay).map_err(|error| error.to_string())?,
+        right_overlay_path: display_path(&paths.right_overlay),
+        right_overlay: fs::read_to_string(&paths.right_overlay)
             .map_err(|error| error.to_string())?,
     })
+}
+
+#[tauri::command]
+fn save_kobitokey_project(
+    root: String,
+    keymap: String,
+    left_overlay: String,
+    right_overlay: String,
+) -> Result<(), String> {
+    write_kobitokey_project_files(&root, &keymap, &left_overlay, &right_overlay)
 }
 
 fn write_kobitokey_project_files(
@@ -43,19 +41,27 @@ fn write_kobitokey_project_files(
     left_overlay: &str,
     right_overlay: &str,
 ) -> Result<(), String> {
-    let root = PathBuf::from(root);
-    fs::write(root.join("config/KobitoKey.keymap"), keymap).map_err(|error| error.to_string())?;
-    fs::write(
-        root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay"),
-        left_overlay,
-    )
-    .map_err(|error| error.to_string())?;
-    fs::write(
-        root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay"),
-        right_overlay,
-    )
-    .map_err(|error| error.to_string())?;
+    let paths = kobitokey_project_paths(root)?;
+    fs::write(paths.keymap, keymap).map_err(|error| error.to_string())?;
+    fs::write(paths.left_overlay, left_overlay).map_err(|error| error.to_string())?;
+    fs::write(paths.right_overlay, right_overlay).map_err(|error| error.to_string())?;
     Ok(())
+}
+
+fn kobitokey_project_paths(root: &str) -> Result<KobitoKeyProjectPaths, String> {
+    let root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    if !root.is_dir() {
+        return Err("KobitoKey project root is not a directory".to_string());
+    }
+
+    let paths = KobitoKeyProjectPaths {
+        keymap: root.join("config/KobitoKey.keymap"),
+        left_overlay: root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay"),
+        right_overlay: root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay"),
+        root,
+    };
+    paths.ensure_project_files()?;
+    Ok(paths)
 }
 
 #[tauri::command]
@@ -2274,13 +2280,43 @@ fn display_path(path: &Path) -> String {
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct KobitoKeyProject {
+    project_root: String,
     keymap_path: String,
     keymap: String,
     left_overlay_path: String,
     left_overlay: String,
     right_overlay_path: String,
     right_overlay: String,
+}
+
+struct KobitoKeyProjectPaths {
+    root: PathBuf,
+    keymap: PathBuf,
+    left_overlay: PathBuf,
+    right_overlay: PathBuf,
+}
+
+impl KobitoKeyProjectPaths {
+    fn ensure_project_files(&self) -> Result<(), String> {
+        for path in [&self.keymap, &self.left_overlay, &self.right_overlay] {
+            let canonical = fs::canonicalize(path).map_err(|error| error.to_string())?;
+            if !canonical.starts_with(&self.root) {
+                return Err(format!(
+                    "KobitoKey project file escapes project root: {}",
+                    display_path(path)
+                ));
+            }
+            if !canonical.is_file() {
+                return Err(format!(
+                    "KobitoKey project path is not a file: {}",
+                    display_path(path)
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -2431,9 +2467,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            read_text_file,
-            write_text_file,
             read_kobitokey_project,
+            save_kobitokey_project,
             trigger_github_build,
             check_firmware_build_ready,
             save_commit_push_and_trigger_build,
@@ -2462,6 +2497,98 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_project_root() -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be available")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "kobitokey-studio-test-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir_all(root.join("config/boards/shields/KobitoKey"))
+            .expect("test project directories should be created");
+        fs::write(root.join("config/KobitoKey.keymap"), "old keymap")
+            .expect("test keymap should be written");
+        fs::write(
+            root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay"),
+            "old left",
+        )
+        .expect("test left overlay should be written");
+        fs::write(
+            root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay"),
+            "old right",
+        )
+        .expect("test right overlay should be written");
+        root
+    }
+
+    #[test]
+    fn save_kobitokey_project_updates_fixed_project_files() {
+        let root = test_project_root();
+        let result = save_kobitokey_project(
+            display_path(&root),
+            "new keymap".to_string(),
+            "new left".to_string(),
+            "new right".to_string(),
+        );
+
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            fs::read_to_string(root.join("config/KobitoKey.keymap")).unwrap(),
+            "new keymap"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("config/boards/shields/KobitoKey/KobitoKey_left.overlay"))
+                .unwrap(),
+            "new left"
+        );
+        assert_eq!(
+            fs::read_to_string(
+                root.join("config/boards/shields/KobitoKey/KobitoKey_right.overlay")
+            )
+            .unwrap(),
+            "new right"
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn save_kobitokey_project_rejects_missing_project_files() {
+        let root = test_project_root();
+        fs::remove_file(root.join("config/KobitoKey.keymap")).unwrap();
+
+        let result = save_kobitokey_project(
+            display_path(&root),
+            "new keymap".to_string(),
+            "new left".to_string(),
+            "new right".to_string(),
+        );
+
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_kobitokey_project_serializes_for_frontend_project_files() {
+        let root = test_project_root();
+        let project =
+            read_kobitokey_project(display_path(&root)).expect("test project should be readable");
+        let serialized = serde_json::to_value(project).expect("project should serialize");
+
+        assert!(serialized.get("projectRoot").is_some());
+        assert!(serialized.get("keymapPath").is_some());
+        assert!(serialized.get("leftOverlayPath").is_some());
+        assert!(serialized.get("leftOverlay").is_some());
+        assert!(serialized.get("rightOverlayPath").is_some());
+        assert!(serialized.get("rightOverlay").is_some());
+        assert!(serialized.get("project_root").is_none());
+
+        let _ = fs::remove_dir_all(root);
+    }
 
     fn test_behavior_catalog() -> BehaviorCatalog {
         BehaviorCatalog {
@@ -2721,14 +2848,18 @@ mod tests {
 
         fs::write(root.join("notes.txt"), "unrelated").expect("notes change should be written");
         run_test_git(&root, &["add", "notes.txt"]);
-        assert!(!has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
-            .expect("path-limited diff should run"));
+        assert!(
+            !has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
+                .expect("path-limited diff should run")
+        );
 
         fs::write(root.join("config/KobitoKey.keymap"), "updated")
             .expect("keymap change should be written");
         run_test_git(&root, &["add", "config/KobitoKey.keymap"]);
-        assert!(has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
-            .expect("path-limited diff should run"));
+        assert!(
+            has_staged_changes_for_paths(&display_path(&root), &["config/KobitoKey.keymap"])
+                .expect("path-limited diff should run")
+        );
 
         fs::remove_dir_all(root).expect("test repo should be removed");
     }

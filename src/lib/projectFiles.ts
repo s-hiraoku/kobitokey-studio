@@ -1,4 +1,5 @@
 export type ProjectFiles = {
+  projectRoot?: string;
   keymapPath?: string;
   keymap: string;
   leftOverlayPath?: string;

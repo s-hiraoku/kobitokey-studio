@@ -1,94 +1,82 @@
-# KobitoKey Studio プロジェクト評価レポート(2026-06-10)
+# KobitoKey Studio プロジェクト評価レポート(2026-06-14 更新)
 
 内部向けドキュメント。Jekyll の `exclude:` 対象のため公開ガイドには含まれない。
 
-評価方法: テスト・型チェック・ビルドの実行検証と、4方面(フロントエンド、lib層/Worker、Tauriバックエンド、scripts/CI)のコードレビューに基づく。
+評価方法: 現 HEAD の package scripts、release gate、主要 UI/Tauri 差分、docs を確認したコードレビューに基づく。
 
-## 総合評価: ★★★★☆(良好 — 機能・品質保証は優秀、コード構造に技術的負債)
+## 総合評価: ★★★★☆(公開準備は進んでいるが、外部 release 証跡待ち)
 
-検証時の実測値:
+現状の要点:
 
-- ユニットテスト: 15ファイル・172件 全パス(468ms)
-- `tsc --noEmit`: エラーゼロ
-- 本番ビルド: 成功(JS 434KB / gzip 124KB)
-- `console.log` 残骸: 0件、`: any` 乱用: 0件
-- `src/main.tsx`: 7,210行、`useState` 71個、`useEffect` 20個
-- `src/lib/zmkStudioWeb.ts`: 1,613行
-- `src-tauri/src/lib.rs`: 2,800行(Rustテスト13件)
-- `scripts/`: 21ファイル・計10,132行
+- ESLint は導入済みで、`npm run lint` が `src/**/*.{ts,tsx}` と Vite/Vitest config を検査する。
+- Worker は OAuth device flow、artifact proxy、release metadata、security headers を持つ。
+- Browser Firmware Mode の release gate は `release-status` / `public-release` / 外部 E2E report に分かれており、secret 値は出力しない。
+- Tauri は限定配布扱いだが、今回の更新で汎用 `read_text_file` / `write_text_file` command を削除し、KobitoKey project 専用保存 command と CSP を追加した。
+- `src/main.tsx` はまだ大きいが、保存済み firmware snapshot と Browser Firmware release state は hook/reducer に分離済み。
+- LICENSE は MIT として追加済み。
+
+## 公開 release gate
+
+`npm run check:browser-firmware:release-status -- --json` は、外部依存を含む gate の状態を返す。
+
+ローカル/PR で改善済み:
+
+- branch freshness: 作業ブランチは `origin/main` 起点に更新。
+- Tauri security: 任意パス read/write IPC を削除し、project root 配下の固定 firmware files に限定。
+- accessibility: mode toggle は `aria-pressed` / `aria-controls` を持ち、SVG combo label の Space 操作は keyup 発火。
+- docs/license: MIT LICENSE と package metadata を追加。
+
+公開判定にまだ外部作業が必要:
+
+- `VITE_GITHUB_OAUTH_CLIENT_ID` と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` を同じ GitHub OAuth App client id に揃える。
+- GitHub Actions または認証済みローカル環境で現 HEAD を production Worker に deploy する。
+- production `/api/release-metadata` が現 HEAD と OAuth 設定済み状態を返すことを preflight で確認する。
+- QA 端末で left/right 実機 flash を行い、外部 E2E report を収集して `check:browser-firmware:public-release` に通す。
 
 ## 強み
 
-### 1. 検証パイプラインが非常に堅実
+### 1. Release gate が厳格
 
-CI(`pages.yml`)はユニットテスト・型チェック・ビルド・Wrangler dry-run・UIスモークを一括検証する。リリースゲート(E2E証跡バリデータ、production preflight、release-status)は個人プロジェクトとしては異例なほど厳格で、「mainマージ=リリース可能」と誤認しない設計思想は優れている。
+GitHub Actions release gate、production preflight、外部 E2E evidence、public-release gate が分離されている。GitHub Pages や PR CI の成功だけを公開完了と誤認しない設計になっている。
 
-### 2. コード衛生が良い
+### 2. Worker と scripts の検証が厚い
 
-`console.log` 残骸ゼロ、`any` 型の乱用ゼロ。lib層は `fetchImpl` 注入によるテスタブルな設計で、関心の分離も明確。
+Worker API は route method、OAuth scope、artifact id、security headers、release metadata を検査できる。release handoff / bundle writer もあり、QA 担当への引き継ぎがしやすい。
 
-### 3. セキュリティは概ね健全
+### 3. Tauri の攻撃面が縮小
 
-Worker の OAuth プロキシは `repo` 以外のスコープを拒否し、client secret を扱わないデバイスフロー設計。CSP・HSTS・X-Frame-Options 等のセキュリティヘッダーも本番/開発で適切に差別化されている。Tauri 側の `gh`/`git` 呼び出しもシェル経由でなく引数配列渡しで、コマンドインジェクションリスクは低い。
+ローカル clone を扱う必要は残るが、任意パス read/write command は exposed ではなくなった。保存は `config/KobitoKey.keymap` と左右 overlay に限定され、既存ファイルであることと canonical root 配下であることを確認する。
 
-### 4. ドキュメントの鮮度
+## 残課題
 
-docs/ は直近まで更新されており、README との整合性も取れている。バージョンも package.json / Cargo.toml / tauri.conf.json で 0.1.0 に統一。
+### 高優先度
 
-## 改善点(優先度順)
+1. **公開 release gate の外部証跡完了**
+   OAuth client id、Cloudflare deploy secret、production deploy、実機 left/right flash report は repository code だけでは完了しない。公開判定前に `release-status --json --e2e-report ...` と `check:browser-firmware:public-release` を通す。
 
-### 🔴 高優先度
+2. **`src/main.tsx` の継続分割**
+   今回は `useFirmwareProjectSnapshot` と `useBrowserFirmwareRelease` を切り出した。次は Direct connection、Firmware project loading/saving、GitHub OAuth flow、flash workflow の順で分けると安全。
 
-#### 1. `src/main.tsx` の分割(最大の技術的負債)
+### 中優先度
 
-7,210行の単一ファイルに `App` コンポーネント約2,750行・`useState` 71個が集中する god component。確認された実害:
+3. **Tauri CI**
+   `cargo test` はローカルで走るが、通常 CI の必須 gate にはまだ入っていない。Tauri を配布対象に広げるなら GitHub Actions に追加する。
 
-- 関連状態(Direct接続系で7つ等)の同期ロジックが複数箇所に重複
-- `useEffect` 依存配列の漏れ(例: `main.tsx:737` 付近で `projectDirHandle` が漏れ、stale closure の可能性)
-- 状態であるべきものが `useRef` で管理され UI 更新されないリスク(`directWriteRequestRef` 等)
-- 書き込みボタン連打時に一部キーだけ書き込まれた状態が残る競合の懸念
+4. **`src-tauri/src/lib.rs` のモジュール分割**
+   commands、firmware project IO、git/gh wrapper、Studio transport、models/tests に分ける余地がある。
 
-推奨: `useDirectConnection` / `useFirmwareEditor` / `useBrowserFirmware` / `useProjectFiles` のカスタムフック分離 + 関連状態の `useReducer` 集約。一括でなくとも、まず `eslint-plugin-react-hooks` の `exhaustive-deps` 導入だけで依存配列バグを機械的に検出できる(数時間で導入可能)。
+5. **scripts 共通化**
+   release scripts は機能豊富だが、共通 helper の重複が残る。挙動を変えずに `scripts/lib/` へ段階抽出するのがよい。
 
-#### 2. ESLint / Prettier の導入
+### 低優先度
 
-リンタが一切なく、依存配列漏れのような React 特有のバグを検出する仕組みがない。テスト・型チェックが堅実なだけに、ここだけ穴になっている。
-
-#### 3. LICENSE ファイルの追加
-
-公開デプロイ・公開ガイドがあるのにライセンスが未定義。MIT 等を選定して `LICENSE` を追加し、package.json の `license` フィールドと揃える。
-
-### 🟡 中優先度
-
-#### 4. Worker のアーティファクトプロキシ強化(`src/worker.ts:150-162`)
-
-GitHub API のリダイレクト先を HTTPS であることしか検証していない。`github.com` / `githubusercontent.com` 系へのオリジン制限と、Content-Length によるサイズ上限(例: 50MB)を追加すると、SSRF 耐性と Worker タイムアウト対策になる。
-
-#### 5. 巨大ファイルのモジュール分割(main.tsx 以外)
-
-- `src/lib/zmkStudioWeb.ts`(1,613行): Transport / RPC / Protobuf codec / Keymap / HID マッピングの5モジュールに分割可能
-- `src-tauri/src/lib.rs`(2,800行): commands/ device/ git/ models へのモジュール分割。Rust 側はエラーハンドリングが堅牢でテストも13件あり、品質自体は良好
-
-#### 6. scripts/ の共通化
-
-21ファイル・計10,132行のうち `run()`, `git()`, `assert()`, URL検証系などが複数ファイルに重複定義されている。`scripts/lib/helpers.mjs` への抽出で2,000行以上削減できる見込み。self-test パターン自体は健全なので維持で良い。
-
-#### 7. keymapParser のサイレント失敗(`src/lib/keymapParser.ts:79`)
-
-キー数が合わないレイヤーを警告なしでスキップするため、ユーザーがレイヤー消失に気づけない。スキップ情報を戻り値で返して UI に表示すべき。
-
-### 🟢 低優先度
-
-8. **Dependabot / Renovate の導入** — 依存更新が手動管理。
-9. **Tauri ビルドの CI 化** — 現状 CI は src-tauri に一切触れておらず、`cargo test` も自動実行されない。
-10. **リポジトリルートの整理** — 開発中のスクリーンショット PNG が20枚・計3.7MB ルート直下にコミットされている。`docs/images/` への移動か削除を推奨。
-11. **Tauri の CSP 未設定**(tauri.conf.json に `security.csp` なし)と updater 未設定 — ローカル限定配布の現状ではリスク低だが、配布拡大時には必須。
-12. **i18n とアクセシビリティ** — 日本語文字列100箇所以上がハードコード、モード切替ボタン等に `aria-pressed` 不足。対象ユーザーが日本語圏である現状では急がないが、構造化だけ先にしておくと後が楽。
+6. Dependabot / Renovate の導入。
+7. i18n 方針の整理。
+8. Tauri updater / signing / notarization 方針の文書化。
 
 ## 推奨着手順
 
-効果対コストの観点で:
-
-1. ESLint + react-hooks ルール導入(数時間)— main.tsx 分割で見つかる潜在バグの検出器としても機能する
-2. LICENSE 追加(数分)
-3. main.tsx のフック分離(3〜5日)
+1. 現 PR の CI と reviewer feedback を処理する。
+2. OAuth / Cloudflare secret を設定し、現 HEAD の production Worker deploy を実施する。
+3. 外部 E2E report を QA 端末で作成し、`check:browser-firmware:public-release` を通す。
+4. release 後に `src/main.tsx` の残り workflow 分割を継続する。

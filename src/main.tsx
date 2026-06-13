@@ -29,7 +29,11 @@ import {
 } from "lucide-react";
 import { BindingForm, BindingKind, buildBindingFromForm, parseBindingForm } from "./lib/bindingForm";
 import { bindingDisplay, formatBindingForDisplay } from "./lib/bindingDisplay";
-import { summarizeChangedLines } from "./lib/diff";
+import {
+  useBrowserFirmwareRelease,
+  type BrowserFirmwareOperation,
+} from "./hooks/useBrowserFirmwareRelease";
+import { useFirmwareProjectSnapshot, type FileDiff } from "./hooks/useFirmwareProjectSnapshot";
 import {
   applyDirectFirmwareComboDiffsToSource,
   applyDirectFirmwareKeyDiffsToSource,
@@ -133,11 +137,6 @@ import {
 } from "./lib/zmkStudioWeb";
 import "./styles.css";
 
-type FileDiff = {
-  filename: string;
-  lines: string[];
-};
-
 type FirmwareBuildStart = {
   committed: boolean;
   commitOutput?: string;
@@ -197,17 +196,6 @@ type DirectCombo = KeymapCombo & {
 type DirectComboSource = "none" | "device" | "firmware";
 
 type EditorMode = "firmware" | "direct";
-type BrowserFirmwareOperation =
-  | "idle"
-  | "oauth"
-  | "load"
-  | "commit-build"
-  | "build"
-  | "refresh-run"
-  | "download-artifact"
-  | "import-artifact"
-  | "flash";
-type BrowserFirmwareArtifactSource = "github" | "folder" | null;
 type FlashConfirmationKind = "write";
 type FlashConfirmationRequest = {
   id: number;
@@ -413,9 +401,6 @@ function App() {
   const browserFirmwareArtifactFolderHandleRef = React.useRef<FileSystemDirectoryHandle | null>(null);
   const browserFirmwareResetDoneRef = React.useRef<Record<FlashSide, boolean>>({ left: false, right: false });
   const flashConfirmationResolverRef = React.useRef<((confirmed: boolean) => void) | null>(null);
-  const [savedKeymap, setSavedKeymap] = React.useState("");
-  const [savedLeftOverlay, setSavedLeftOverlay] = React.useState("");
-  const [savedRightOverlay, setSavedRightOverlay] = React.useState("");
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
@@ -436,24 +421,44 @@ function App() {
   const [selectedVolume, setSelectedVolume] = React.useState("");
   const [flashSide, setFlashSide] = React.useState<FlashSide>("left");
   const [firmwareUf2Targets, setFirmwareUf2Targets] = React.useState<FirmwareUf2Targets>({ unknown: [] });
-  const [browserGithubToken, setBrowserGithubToken] = React.useState("");
-  const [browserGithubUserCode, setBrowserGithubUserCode] = React.useState("");
-  const [browserGithubVerificationUri, setBrowserGithubVerificationUri] = React.useState("");
-  const [browserFirmwareBranch, setBrowserFirmwareBranch] = React.useState(storedBrowserFirmwareSession?.branch ?? "main");
-  const [browserFirmwareCommitSha, setBrowserFirmwareCommitSha] = React.useState<string | null>(storedBrowserFirmwareSession?.commitSha ?? null);
-  const [browserFirmwareCommitUrl, setBrowserFirmwareCommitUrl] = React.useState(storedBrowserFirmwareSession?.commitUrl ?? "");
-  const [browserFirmwareRunId, setBrowserFirmwareRunId] = React.useState<number | null>(storedBrowserFirmwareSession?.runId ?? null);
-  const [browserFirmwareRunUrl, setBrowserFirmwareRunUrl] = React.useState(storedBrowserFirmwareSession?.runUrl ?? "");
-  const [browserFirmwareLoadedHeadSha, setBrowserFirmwareLoadedHeadSha] = React.useState<string | null>(null);
-  const [browserFirmwareBuildStatus, setBrowserFirmwareBuildStatus] = React.useState<FirmwareBuildStatus>(storedBrowserFirmwareSession?.buildStatus ?? "idle");
-  const [browserFirmwareDiffReviewed, setBrowserFirmwareDiffReviewed] = React.useState(false);
-  const [browserFirmwareFilesLoadedFromGitHub, setBrowserFirmwareFilesLoadedFromGitHub] = React.useState(false);
-  const [browserFirmwareArtifacts, setBrowserFirmwareArtifacts] = React.useState<GitHubFirmwareArtifacts | null>(null);
-  const [browserFirmwareArtifactSource, setBrowserFirmwareArtifactSource] = React.useState<BrowserFirmwareArtifactSource>(null);
-  const [browserFirmwareResetDone, setBrowserFirmwareResetDone] = React.useState<Record<FlashSide, boolean>>({ left: false, right: false });
-  const [browserFirmwareLeftFlashed, setBrowserFirmwareLeftFlashed] = React.useState(storedBrowserFirmwareSession?.leftFlashed ?? false);
-  const [browserFirmwareRightFlashed, setBrowserFirmwareRightFlashed] = React.useState(storedBrowserFirmwareSession?.rightFlashed ?? false);
-  const [browserFirmwareOperation, setBrowserFirmwareOperation] = React.useState<BrowserFirmwareOperation>("idle");
+  const {
+    browserGithubToken,
+    browserGithubUserCode,
+    browserGithubVerificationUri,
+    browserFirmwareBranch,
+    browserFirmwareCommitSha,
+    browserFirmwareCommitUrl,
+    browserFirmwareRunId,
+    browserFirmwareRunUrl,
+    browserFirmwareLoadedHeadSha,
+    browserFirmwareBuildStatus,
+    browserFirmwareDiffReviewed,
+    browserFirmwareFilesLoadedFromGitHub,
+    browserFirmwareArtifacts,
+    browserFirmwareArtifactSource,
+    browserFirmwareResetDone,
+    browserFirmwareLeftFlashed,
+    browserFirmwareRightFlashed,
+    browserFirmwareOperation,
+    setBrowserGithubToken,
+    setBrowserGithubUserCode,
+    setBrowserGithubVerificationUri,
+    setBrowserFirmwareBranch,
+    setBrowserFirmwareCommitSha,
+    setBrowserFirmwareCommitUrl,
+    setBrowserFirmwareRunId,
+    setBrowserFirmwareRunUrl,
+    setBrowserFirmwareLoadedHeadSha,
+    setBrowserFirmwareBuildStatus,
+    setBrowserFirmwareDiffReviewed,
+    setBrowserFirmwareFilesLoadedFromGitHub,
+    setBrowserFirmwareArtifacts,
+    setBrowserFirmwareArtifactSource,
+    setBrowserFirmwareResetDone,
+    setBrowserFirmwareLeftFlashed,
+    setBrowserFirmwareRightFlashed,
+    setBrowserFirmwareOperation,
+  } = useBrowserFirmwareRelease(storedBrowserFirmwareSession);
   const [flashConfirmation, setFlashConfirmation] = React.useState<FlashConfirmationRequest | null>(null);
   const canUseWebUsb = supportsWebStudioConnection("usb");
   const canUseWebBluetooth = supportsWebStudioConnection("bluetooth");
@@ -466,17 +471,6 @@ function App() {
     ? `https://github.com/${browserFirmwareRepoRef.owner}/${browserFirmwareRepoRef.repo}`
     : DEFAULT_FIRMWARE_REPO_URL;
   const browserFirmwareBranchRef = browserFirmwareBranch.trim();
-
-  React.useEffect(() => {
-    const requestId = fixtureLoadRequestRef.current + 1;
-    fixtureLoadRequestRef.current = requestId;
-    void loadFixture(requestId);
-    return () => {
-      if (fixtureLoadRequestRef.current === requestId) {
-        fixtureLoadRequestRef.current += 1;
-      }
-    };
-  }, []);
 
   const isDirectMode = editorMode === "direct";
   const activeKeymapSource = React.useMemo(
@@ -578,15 +572,7 @@ function App() {
     () => parseTrackballSettings(files?.leftOverlay ?? "", files?.rightOverlay ?? ""),
     [files?.leftOverlay, files?.rightOverlay],
   );
-  const keymapDiff = React.useMemo(
-    () =>
-      [
-        fileDiff("KobitoKey.keymap", savedKeymap, files?.keymap ?? ""),
-        fileDiff("KobitoKey_left.overlay", savedLeftOverlay, files?.leftOverlay ?? ""),
-        fileDiff("KobitoKey_right.overlay", savedRightOverlay, files?.rightOverlay ?? ""),
-      ].filter((diff) => diff.lines.length > 0),
-    [files?.keymap, files?.leftOverlay, files?.rightOverlay, savedKeymap, savedLeftOverlay, savedRightOverlay],
-  );
+  const { captureSavedProject, clearSavedProject, keymapDiff, savedProject } = useFirmwareProjectSnapshot(files);
   const browserFirmwareReadiness = React.useMemo(
     () =>
       deriveFirmwareReleaseReadiness({
@@ -637,7 +623,22 @@ function App() {
 
   React.useEffect(() => {
     setBrowserFirmwareDiffReviewed(false);
-  }, [files?.keymap, files?.leftOverlay, files?.rightOverlay]);
+  }, [files?.keymap, files?.leftOverlay, files?.rightOverlay, setBrowserFirmwareDiffReviewed]);
+
+  const setBrowserFirmwareSideResetDone = React.useCallback(
+    (side: FlashSide, done: boolean) => {
+      const next = { ...browserFirmwareResetDoneRef.current, [side]: done };
+      browserFirmwareResetDoneRef.current = next;
+      setBrowserFirmwareResetDone(next);
+    },
+    [setBrowserFirmwareResetDone],
+  );
+
+  const clearBrowserFirmwareResetDone = React.useCallback(() => {
+    const next = { left: false, right: false };
+    browserFirmwareResetDoneRef.current = next;
+    setBrowserFirmwareResetDone(next);
+  }, [setBrowserFirmwareResetDone]);
 
   React.useEffect(() => {
     if (!browserFirmwareRepoBranchInitializedRef.current) {
@@ -658,7 +659,23 @@ function App() {
     clearBrowserFirmwareResetDone();
     setBrowserFirmwareLeftFlashed(false);
     setBrowserFirmwareRightFlashed(false);
-  }, [browserFirmwareBranch, firmwareRepoUrl]);
+  }, [
+    browserFirmwareBranch,
+    clearBrowserFirmwareResetDone,
+    firmwareRepoUrl,
+    setBrowserFirmwareArtifactSource,
+    setBrowserFirmwareArtifacts,
+    setBrowserFirmwareBuildStatus,
+    setBrowserFirmwareCommitSha,
+    setBrowserFirmwareCommitUrl,
+    setBrowserFirmwareDiffReviewed,
+    setBrowserFirmwareFilesLoadedFromGitHub,
+    setBrowserFirmwareLeftFlashed,
+    setBrowserFirmwareLoadedHeadSha,
+    setBrowserFirmwareRightFlashed,
+    setBrowserFirmwareRunId,
+    setBrowserFirmwareRunUrl,
+  ]);
 
   React.useEffect(() => {
     setDirectKeyWriteFeedback((current) => (current.kind === "writing" ? current : { kind: "idle", message: "" }));
@@ -680,18 +697,6 @@ function App() {
       flashConfirmationResolverRef.current = null;
     };
   }, []);
-
-  function setBrowserFirmwareSideResetDone(side: FlashSide, done: boolean) {
-    const next = { ...browserFirmwareResetDoneRef.current, [side]: done };
-    browserFirmwareResetDoneRef.current = next;
-    setBrowserFirmwareResetDone(next);
-  }
-
-  function clearBrowserFirmwareResetDone() {
-    const next = { left: false, right: false };
-    browserFirmwareResetDoneRef.current = next;
-    setBrowserFirmwareResetDone(next);
-  }
 
   function redoBrowserFirmwareReset(side: FlashSide) {
     setBrowserFirmwareSideResetDone(side, false);
@@ -794,6 +799,9 @@ function App() {
     browserFirmwareRepoRef,
     browserGithubToken,
     isDesktopRuntime,
+    setBrowserFirmwareBuildStatus,
+    setBrowserFirmwareRunId,
+    setBrowserFirmwareRunUrl,
   ]);
 
   const saveProjectFiles = React.useCallback(async () => {
@@ -808,9 +816,7 @@ function App() {
       if (projectDirHandle) {
         try {
           await writeProjectToDirectoryHandle(projectDirHandle, files);
-          setSavedKeymap(files.keymap);
-          setSavedLeftOverlay(files.leftOverlay);
-          setSavedRightOverlay(files.rightOverlay);
+          captureSavedProject(files);
           setStatus(`フォルダ "${projectDirHandle.name}" に保存しました`);
           return;
         } catch (error) {
@@ -821,30 +827,29 @@ function App() {
       downloadText("KobitoKey.keymap", files.keymap);
       downloadText("KobitoKey_left.overlay", files.leftOverlay);
       downloadText("KobitoKey_right.overlay", files.rightOverlay);
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
+      captureSavedProject(files);
       setStatus("ブラウザ表示のため firmware ファイル一式をダウンロードしました");
       return;
     }
 
-    if (!files.leftOverlayPath || !files.rightOverlayPath) {
-      setStatus("overlay の保存先パスが不足しています");
+    if (!files.projectRoot) {
+      setStatus("ローカルプロジェクトの保存先 root が不足しています");
       return;
     }
 
     try {
-      await invoke("write_text_file", { path: files.keymapPath, contents: files.keymap });
-      await invoke("write_text_file", { path: files.leftOverlayPath, contents: files.leftOverlay });
-      await invoke("write_text_file", { path: files.rightOverlayPath, contents: files.rightOverlay });
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
+      await invoke("save_kobitokey_project", {
+        root: files.projectRoot,
+        keymap: files.keymap,
+        leftOverlay: files.leftOverlay,
+        rightOverlay: files.rightOverlay,
+      });
+      captureSavedProject(files);
       setStatus("変更ファイルを保存しました");
     } catch (error) {
       setStatus(`保存失敗: ${formatError(error)}`);
     }
-  }, [files, projectDirHandle]);
+  }, [captureSavedProject, files, projectDirHandle]);
 
   // Ctrl/Cmd+S saves the firmware project, matching desktop-app expectations.
   // Only active in Firmware mode with a loaded project; otherwise the browser's
@@ -869,7 +874,7 @@ function App() {
     setToast({ id: Date.now(), kind, message });
   }
 
-  async function loadFixture(requestId = fixtureLoadRequestRef.current + 1) {
+  const loadFixture = React.useCallback(async (requestId = fixtureLoadRequestRef.current + 1) => {
     fixtureLoadRequestRef.current = requestId;
     setFixtureLoading(true);
     setFixtureError("");
@@ -880,9 +885,7 @@ function App() {
         return;
       }
       setFiles(project);
-      setSavedKeymap(project.keymap);
-      setSavedLeftOverlay(project.leftOverlay);
-      setSavedRightOverlay(project.rightOverlay);
+      captureSavedProject(project);
       setStatus("fixture を表示中");
     } catch (error) {
       if (fixtureLoadRequestRef.current !== requestId) {
@@ -890,9 +893,7 @@ function App() {
       }
       const message = `fixture 読み込み失敗: ${formatError(error)}`;
       setFiles(null);
-      setSavedKeymap("");
-      setSavedLeftOverlay("");
-      setSavedRightOverlay("");
+      clearSavedProject();
       setFixtureError(message);
       setStatus(message);
     } finally {
@@ -900,7 +901,18 @@ function App() {
         setFixtureLoading(false);
       }
     }
-  }
+  }, [captureSavedProject, clearSavedProject]);
+
+  React.useEffect(() => {
+    const requestId = fixtureLoadRequestRef.current + 1;
+    fixtureLoadRequestRef.current = requestId;
+    void loadFixture(requestId);
+    return () => {
+      if (fixtureLoadRequestRef.current === requestId) {
+        fixtureLoadRequestRef.current += 1;
+      }
+    };
+  }, [loadFixture]);
 
   async function loadProject() {
     const validationError = validateProjectRoot(projectRoot);
@@ -912,9 +924,7 @@ function App() {
     try {
       const project = await invoke<ProjectFiles>("read_kobitokey_project", { root: projectRoot });
       setFiles(project);
-      setSavedKeymap(project.keymap);
-      setSavedLeftOverlay(project.leftOverlay);
-      setSavedRightOverlay(project.rightOverlay);
+      captureSavedProject(project);
       setFixtureError("");
       setStatus("ローカルプロジェクトを読み込みました");
     } catch (error) {
@@ -965,9 +975,7 @@ function App() {
       setProjectRoot(handle.name);
       setProjectDirHandle(handle);
       setFiles(project);
-      setSavedKeymap(project.keymap);
-      setSavedLeftOverlay(project.leftOverlay);
-      setSavedRightOverlay(project.rightOverlay);
+      captureSavedProject(project);
       setFixtureError("");
       setStatus(`フォルダ "${handle.name}" を読み込みました`);
     } catch (error) {
@@ -981,9 +989,7 @@ function App() {
       setProjectRoot(project.rootLabel);
       setProjectDirHandle(null);
       setFiles(project.files);
-      setSavedKeymap(project.files.keymap);
-      setSavedLeftOverlay(project.files.leftOverlay);
-      setSavedRightOverlay(project.files.rightOverlay);
+      captureSavedProject(project.files);
       setFixtureError("");
       setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
     } catch (error) {
@@ -999,9 +1005,9 @@ function App() {
 
     setFiles({
       ...files,
-      keymap: savedKeymap,
-      leftOverlay: savedLeftOverlay,
-      rightOverlay: savedRightOverlay,
+      keymap: savedProject.keymap,
+      leftOverlay: savedProject.leftOverlay,
+      rightOverlay: savedProject.rightOverlay,
     });
     setActiveLayerIndex(0);
     setSelectedKeyIndex(0);
@@ -1039,6 +1045,11 @@ function App() {
   function closeFirmwareBuildFlash() {
     setWorkbenchTab(lastEditWorkbenchTab === "build" ? "combos" : lastEditWorkbenchTab);
   }
+
+  const updateFirmwareBindingDraft = React.useCallback((binding: string) => {
+    pendingFirmwareBindingRef.current = binding;
+    setBindingDraft(binding);
+  }, []);
 
   function toggleFirmwareBuildFlash() {
     if (workbenchTab === "build") {
@@ -2057,9 +2068,7 @@ function App() {
         leftOverlay: files.leftOverlay,
         rightOverlay: files.rightOverlay,
       });
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
+      captureSavedProject(files);
       setBuildStatus(
         result.committed
           ? `保存、commit、push、build 起動が完了しました: ${firmwareRepoLabel}`
@@ -2232,9 +2241,7 @@ function App() {
       setProjectRoot(formatGitHubRepositoryRef(ref));
       setProjectDirHandle(null);
       setFiles(project);
-      setSavedKeymap(project.keymap);
-      setSavedLeftOverlay(project.leftOverlay);
-      setSavedRightOverlay(project.rightOverlay);
+      captureSavedProject(project);
       setFixtureError("");
       setBrowserFirmwareFilesLoadedFromGitHub(true);
       setBrowserFirmwareCommitSha(null);
@@ -2293,9 +2300,7 @@ function App() {
       clearBrowserFirmwareResetDone();
       setBrowserFirmwareLeftFlashed(false);
       setBrowserFirmwareRightFlashed(false);
-      setSavedKeymap(files.keymap);
-      setSavedLeftOverlay(files.leftOverlay);
-      setSavedRightOverlay(files.rightOverlay);
+      captureSavedProject(files);
     } catch (error) {
       setBrowserFirmwareBuildStatus("failure");
       setBuildStatus(`GitHub commit 失敗: ${formatError(error)}`);
@@ -2700,21 +2705,23 @@ function App() {
           </div>
         </div>
         <div className="topbar-tools">
-          <div className="mode-toggle" aria-label="Editor mode">
-		            <button
-		              type="button"
-		              className={editorMode === "firmware" ? "active" : ""}
-		              onPointerDown={() => setEditorMode("firmware")}
-		              onClick={() => setEditorMode("firmware")}
-		            >
-	              Firmware
-	              {!isDesktopRuntime ? <em className="mode-toggle-badge">GitHub連携</em> : null}
-	            </button>
-	            <button
-	              type="button"
-	              className={editorMode === "direct" ? "active" : ""}
-	              onPointerDown={() => setEditorMode("direct")}
-	              onClick={() => setEditorMode("direct")}
+          <div className="mode-toggle" role="group" aria-label="Editor mode">
+            <button
+              type="button"
+              className={editorMode === "firmware" ? "active" : ""}
+              aria-pressed={editorMode === "firmware"}
+              aria-controls="editor-workspace"
+              onClick={() => setEditorMode("firmware")}
+            >
+              Firmware
+              {!isDesktopRuntime ? <em className="mode-toggle-badge">GitHub連携</em> : null}
+            </button>
+            <button
+              type="button"
+              className={editorMode === "direct" ? "active" : ""}
+              aria-pressed={editorMode === "direct"}
+              aria-controls="editor-workspace"
+              onClick={() => setEditorMode("direct")}
             >
               Direct
             </button>
@@ -2871,33 +2878,34 @@ function App() {
 
       <ToastViewport toast={toast} onDismiss={() => setToast(null)} />
 
-      {showDirectEmptyState ? (
-        <DirectWelcome
-          canUseWebBluetooth={canUseWebBluetooth}
-          canUseWebUsb={canUseWebUsb}
-          connectionError={studioConnectionError}
-          connectionKind={studioConnectionKind}
-          connectionState={studioConnectionState}
-          isDesktopRuntime={isDesktopRuntime}
-          ports={studioPorts}
-          bluetoothDevices={studioBluetoothDevices}
-          selectedBluetoothDevice={selectedBluetoothDevice}
-          selectedPort={selectedStudioPort}
-          onBluetoothDeviceChange={setSelectedBluetoothDevice}
-          onConnect={connectStudioDevice}
-          onPortChange={setSelectedStudioPort}
-          onRefresh={refreshStudioPorts}
-          onTransportChange={setStudioConnectionKind}
-        />
-      ) : showFirmwareLoadingState ? (
-        <FirmwareProjectLoadingState status={status} />
-      ) : showFirmwareEmptyState ? (
-        <FirmwareProjectEmptyState status={status} onBuildFlash={openFirmwareBuildFlash} />
-      ) : (
-      <section
-        className={`workspace ${isDirectMode ? "direct-workspace" : ""} ${
-          !isDirectMode && workbenchTab === "build" ? "firmware-build-workspace" : ""
-        }`}
+      <div id="editor-workspace">
+        {showDirectEmptyState ? (
+          <DirectWelcome
+            canUseWebBluetooth={canUseWebBluetooth}
+            canUseWebUsb={canUseWebUsb}
+            connectionError={studioConnectionError}
+            connectionKind={studioConnectionKind}
+            connectionState={studioConnectionState}
+            isDesktopRuntime={isDesktopRuntime}
+            ports={studioPorts}
+            bluetoothDevices={studioBluetoothDevices}
+            selectedBluetoothDevice={selectedBluetoothDevice}
+            selectedPort={selectedStudioPort}
+            onBluetoothDeviceChange={setSelectedBluetoothDevice}
+            onConnect={connectStudioDevice}
+            onPortChange={setSelectedStudioPort}
+            onRefresh={refreshStudioPorts}
+            onTransportChange={setStudioConnectionKind}
+          />
+        ) : showFirmwareLoadingState ? (
+          <FirmwareProjectLoadingState status={status} />
+        ) : showFirmwareEmptyState ? (
+          <FirmwareProjectEmptyState status={status} onBuildFlash={openFirmwareBuildFlash} />
+        ) : (
+	      <section
+	        className={`workspace ${isDirectMode ? "direct-workspace" : ""} ${
+	          !isDirectMode && workbenchTab === "build" ? "firmware-build-workspace" : ""
+	        }`}
       >
         <nav className="sidebar" aria-label="Layers">
           {ENABLE_LAYER_STRUCTURE_EDITING ? (
@@ -3150,22 +3158,20 @@ function App() {
               keyWriteFeedback={directKeyWriteFeedback}
             />
           ) : (
-            <FirmwareKeyInspector
-              binding={bindingDraft}
-              canApplyBinding={hasPendingFirmwareKeyDraft}
-              keyIndex={selectedKeyIndex}
-              onDraftChange={(binding) => {
-                pendingFirmwareBindingRef.current = binding;
-                setBindingDraft(binding);
-              }}
-              onApplyBinding={applyBinding}
-              selectedBinding={selectedBinding}
-	            />
+	            <FirmwareKeyInspector
+	              binding={bindingDraft}
+	              canApplyBinding={hasPendingFirmwareKeyDraft}
+	              keyIndex={selectedKeyIndex}
+	              onDraftChange={updateFirmwareBindingDraft}
+	              onApplyBinding={applyBinding}
+	              selectedBinding={selectedBinding}
+		            />
           )}
         </aside>
         )}
-      </section>
-      )}
+	      </section>
+	      )}
+      </div>
 
       <FlashConfirmationDialog request={flashConfirmation} onResolve={resolveFlashConfirmation} />
 
@@ -3681,11 +3687,20 @@ function ComboOverlay({
               className="combo-label"
               role="button"
               tabIndex={0}
-              aria-label={`コンボ ${combo.label.text}${isSelected ? "（選択中）" : ""}`}
+              aria-label={`コンボ ${combo.label.text}`}
               aria-pressed={isSelected}
               onClick={() => onSelect(combo.id)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onSelect(combo.id);
+                }
+                if (event.key === " ") {
+                  event.preventDefault();
+                }
+              }}
+              onKeyUp={(event) => {
+                if (event.key === " ") {
                   event.preventDefault();
                   onSelect(combo.id);
                 }
@@ -6953,13 +6968,6 @@ function mapGitHubRunStatus(status: string, conclusion: string | null): Firmware
 function githubOAuthClientId(): string {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
   return env?.VITE_GITHUB_OAUTH_CLIENT_ID?.trim() ?? "";
-}
-
-function fileDiff(filename: string, before: string, after: string): FileDiff {
-  return {
-    filename,
-    lines: summarizeChangedLines(before, after),
-  };
 }
 
 function TrackballPanel({ settings }: { settings: TrackballSettings }) {
