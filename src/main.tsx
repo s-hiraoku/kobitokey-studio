@@ -627,6 +627,12 @@ function App() {
     setBrowserFirmwareResetDone(next);
   }
 
+  function redoBrowserFirmwareReset(side: FlashSide) {
+    setBrowserFirmwareSideResetDone(side, false);
+    setFirmwareFlashError("");
+    setBuildStatus(`${sideLabel(side)} 側を reset からやり直します。${sideLabel(side)} 側を bootloader に入れて、reset UF2 を直接コピーしてください`);
+  }
+
   React.useEffect(() => {
     if (isDesktopRuntime) {
       return;
@@ -2427,12 +2433,12 @@ function App() {
       setBuildStatus(`${phaseLabel} UF2 を ${handle.name} にコピーしています`);
       const writeResult = await writeBrowserUf2ToDirectoryHandle(handle, target);
       const retrySuffix = writeResult.attempts > 1 ? `（${writeResult.attempts} 回目で成功）` : "";
-      const writeSuffix = `${retrySuffix}${writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えた可能性があります" : ""}`;
+      const writeSuffix = `${retrySuffix}${writeResult.ambiguousEject ? "。bootloader が再起動してドライブが消えたため書き込み完了とみなしました。動作しない場合は reset からやり直してください" : ""}`;
       setFirmwareFlashError("");
       if (!isFirmwarePhase) {
         setBrowserFirmwareSideResetDone(side, true);
         setBuildStatus(
-          `reset UF2 を ${handle.name} に直接コピーしました${writeSuffix}。もう一度 ${sideLabel(side)} 側を bootloader に入れて、同じボタンで firmware UF2 をコピーしてください`,
+          `reset UF2 を ${handle.name} に直接コピーしました${writeSuffix}。5 秒ほど待って設定の消去が終わってから、もう一度 ${sideLabel(side)} 側を bootloader に入れて、同じボタンで firmware UF2 をコピーしてください`,
         );
         return;
       }
@@ -2937,6 +2943,7 @@ function App() {
                   onCopyUf2={copyBrowserFirmwareUf2}
                   onDiffReviewed={() => setBrowserFirmwareDiffReviewed(true)}
                   onDownloadArtifacts={downloadBrowserFirmwareArtifacts}
+                  onRedoReset={redoBrowserFirmwareReset}
                   onImportArtifactFolder={importBrowserFirmwareArtifactFolder}
                   onLoadProject={loadBrowserFirmwareProject}
                   onRefreshRun={refreshBrowserFirmwareBuildRun}
@@ -5014,6 +5021,7 @@ function BrowserFirmwareReleaseWorkbench({
   onDownloadArtifacts,
   onImportArtifactFolder,
   onLoadProject,
+  onRedoReset,
   onRefreshRun,
   onRepoUrlChange,
   onTokenChange,
@@ -5049,6 +5057,7 @@ function BrowserFirmwareReleaseWorkbench({
   onDownloadArtifacts: () => void;
   onImportArtifactFolder: () => void;
   onLoadProject: () => void;
+  onRedoReset: (side: FlashSide) => void;
   onRefreshRun: () => void;
   onRepoUrlChange: (value: string) => void;
   onTokenChange: (value: string) => void;
@@ -5263,6 +5272,16 @@ function BrowserFirmwareReleaseWorkbench({
               </button>
             ))}
           </div>
+          {resetDone[flashSide] ? (
+            <button
+              type="button"
+              className="flash-redo-reset"
+              disabled={isBusy}
+              onClick={() => onRedoReset(flashSide)}
+            >
+              {sideLabel(flashSide)} を reset からやり直す
+            </button>
+          ) : null}
           <div className="flash-folder-guidance" aria-label="Bootloader コピー先の見分け方">
             <strong>コピー先の見分け方</strong>
             <span>
@@ -5274,7 +5293,8 @@ function BrowserFirmwareReleaseWorkbench({
             <summary>reset UF2 を先に書き込みます</summary>
             <p>
               artifact 内の reset UF2 で Direct Mode / ZMK Studio の保存設定を消してから、同じ側の firmware UF2 を書き込みます。
-              reset 後はもう一度 bootloader に入れて同じボタンを押してください。
+              reset コピー後は 5 秒ほど待って設定の消去を終わらせてから、もう一度 bootloader に入れて同じボタンを押してください。
+              書き込み後にキーボードが動かない場合は「reset からやり直す」で reset から書き直してください。
             </p>
           </details>
           <small>

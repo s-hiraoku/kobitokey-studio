@@ -170,11 +170,13 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
     expect(writable.write).toHaveBeenCalledTimes(1);
   });
 
-  it("treats bootloader eject during close as successful ambiguous completion", async () => {
+  it("treats bootloader eject during close with a vanished drive as successful ambiguous completion", async () => {
     const writable = fakeWritable({
       closeError: new DOMException("The device was disconnected", "NetworkError"),
     });
-    const handle = fakeDirectoryHandle(vi.fn(async () => fakeFileHandle(writable)));
+    const handle = fakeDirectoryHandle(vi.fn(async () => fakeFileHandle(writable)), {
+      driveStillMounted: () => false,
+    });
 
     await expect(
       writeBrowserUf2ToDirectoryHandle(handle, {
@@ -186,6 +188,119 @@ describe("writeBrowserUf2ToDirectoryHandle", () => {
         ejectProbeDelayMs: 0,
       }),
     ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
+  });
+
+  it("retries a close rejection while the drive is still mounted instead of assuming success", async () => {
+    const firstWritable = fakeWritable({
+      closeError: new DOMException("The device was disconnected", "NetworkError"),
+    });
+    const secondWritable = fakeWritable();
+    const getFileHandle = vi
+      .fn()
+      .mockResolvedValueOnce(fakeFileHandle(firstWritable))
+      .mockResolvedValueOnce(fakeFileHandle(secondWritable));
+    const handle = fakeDirectoryHandle(getFileHandle);
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array([7, 8, 9]),
+        name: "KobitoKey_right.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0],
+        ejectProbeDelayMs: 0,
+      }),
+    ).resolves.toEqual({ ambiguousEject: false, attempts: 2 });
+    expect(getFileHandle).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an incomplete flash when the drive vanishes before the final chunk is written", async () => {
+    let writes = 0;
+    const writable: FakeWritable = {
+      close: vi.fn(async () => {}),
+      write: vi.fn(async () => {
+        writes += 1;
+        if (writes >= 2) {
+          throw new DOMException("The device was disconnected", "NetworkError");
+        }
+      }),
+    };
+    const getFileHandle = vi.fn().mockResolvedValue(fakeFileHandle(writable));
+    const handle = fakeDirectoryHandle(getFileHandle, { driveStillMounted: () => false });
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array(10),
+        name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
+        chunkBytes: 2,
+      }),
+    ).rejects.toThrow("UF2 の書き込みが途中で中断されました（2/10 bytes 送信後にドライブが消失）");
+    expect(getFileHandle).toHaveBeenCalledTimes(1);
+    expect(writable.write).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats an eject during the final chunk with a vanished drive as a completed flash", async () => {
+    let writes = 0;
+    const writable: FakeWritable = {
+      close: vi.fn(async () => {}),
+      write: vi.fn(async () => {
+        writes += 1;
+        if (writes >= 5) {
+          throw new DOMException("The device was disconnected", "NetworkError");
+        }
+      }),
+    };
+    const getFileHandle = vi.fn().mockResolvedValue(fakeFileHandle(writable));
+    const handle = fakeDirectoryHandle(getFileHandle, { driveStillMounted: () => false });
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array(10),
+        name: "KobitoKey_right.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0, 0],
+        ejectProbeDelayMs: 0,
+        chunkBytes: 2,
+      }),
+    ).resolves.toEqual({ ambiguousEject: true, attempts: 1 });
+    expect(writable.write).toHaveBeenCalledTimes(5);
+  });
+
+  it("retries a partial write while the drive is still mounted and can finish cleanly", async () => {
+    let writes = 0;
+    const firstWritable: FakeWritable = {
+      close: vi.fn(async () => {}),
+      write: vi.fn(async () => {
+        writes += 1;
+        if (writes >= 2) {
+          throw new DOMException("The device was disconnected", "NetworkError");
+        }
+      }),
+    };
+    const secondWritable = fakeWritable();
+    const getFileHandle = vi
+      .fn()
+      .mockResolvedValueOnce(fakeFileHandle(firstWritable))
+      .mockResolvedValueOnce(fakeFileHandle(secondWritable));
+    const handle = fakeDirectoryHandle(getFileHandle);
+
+    await expect(
+      writeBrowserUf2ToDirectoryHandle(handle, {
+        bytes: new Uint8Array(10),
+        name: "firmware/settings_reset.uf2",
+      }, {
+        initialSettleMs: 0,
+        retryDelaysMs: [0],
+        ejectProbeDelayMs: 0,
+        chunkBytes: 2,
+      }),
+    ).resolves.toEqual({ ambiguousEject: false, attempts: 2 });
+    expect(getFileHandle).toHaveBeenCalledTimes(2);
   });
 
   it("fails after retries when the bootloader handle is stale before writing", async () => {
