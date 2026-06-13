@@ -2280,6 +2280,7 @@ fn display_path(path: &Path) -> String {
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct KobitoKeyProject {
     project_root: String,
     keymap_path: String,
@@ -2568,6 +2569,24 @@ mod tests {
         );
 
         assert!(result.is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_kobitokey_project_serializes_for_frontend_project_files() {
+        let root = test_project_root();
+        let project =
+            read_kobitokey_project(display_path(&root)).expect("test project should be readable");
+        let serialized = serde_json::to_value(project).expect("project should serialize");
+
+        assert!(serialized.get("projectRoot").is_some());
+        assert!(serialized.get("keymapPath").is_some());
+        assert!(serialized.get("leftOverlayPath").is_some());
+        assert!(serialized.get("leftOverlay").is_some());
+        assert!(serialized.get("rightOverlayPath").is_some());
+        assert!(serialized.get("rightOverlay").is_some());
+        assert!(serialized.get("project_root").is_none());
+
         let _ = fs::remove_dir_all(root);
     }
 
