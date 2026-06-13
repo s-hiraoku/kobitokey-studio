@@ -4494,6 +4494,16 @@ select:focus-visible {
   background: var(--pine-wash);
   color: var(--pine-deep);
 }
+.flash-redo-reset {
+  justify-self: start;
+  min-height: 30px;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--amber-warn-line) 42%, transparent);
+  background: var(--amber-warn-bg);
+  color: var(--amber-warn-ink);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
 .flash-download-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

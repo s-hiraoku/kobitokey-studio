@@ -10,6 +10,7 @@ export const BROWSER_UF2_WRITE_INITIAL_SETTLE_MS = 1200;
 export const BROWSER_UF2_WRITE_RETRY_DELAYS_MS = [750, 1500, 3000, 5000] as const;
 export const BROWSER_UF2_WRITE_MAX_ATTEMPTS = BROWSER_UF2_WRITE_RETRY_DELAYS_MS.length + 1;
 export const BROWSER_UF2_WRITE_EJECT_PROBE_DELAY_MS = 500;
+export const BROWSER_UF2_WRITE_CHUNK_BYTES = 64 * 1024;
 
 type BrowserUf2WritePhase = "open-file" | "open-writable" | "write" | "close";
 
@@ -17,6 +18,7 @@ type BrowserUf2WriteOptions = {
   initialSettleMs?: number;
   retryDelaysMs?: readonly number[];
   ejectProbeDelayMs?: number;
+  chunkBytes?: number;
 };
 
 export async function writeBrowserUf2ToDirectoryHandle(
@@ -27,10 +29,13 @@ export async function writeBrowserUf2ToDirectoryHandle(
   await ensureWritablePermission(handle);
   const retryDelays = options.retryDelaysMs ?? BROWSER_UF2_WRITE_RETRY_DELAYS_MS;
   const maxAttempts = retryDelays.length + 1;
+  const chunkBytes = Math.max(1, options.chunkBytes ?? BROWSER_UF2_WRITE_CHUNK_BYTES);
+  const totalBytes = file.bytes.byteLength;
   const filename = file.name.split("/").pop() ?? file.name;
   let lastError: unknown = null;
   let lastPhase: BrowserUf2WritePhase = "open-file";
   let dataMayHaveReachedDevice = false;
+  let allDataMayHaveReachedDevice = false;
 
   await delay(options.initialSettleMs ?? BROWSER_UF2_WRITE_INITIAL_SETTLE_MS);
 
@@ -38,25 +43,30 @@ export async function writeBrowserUf2ToDirectoryHandle(
     let writable: FileSystemWritableFileStream | null = null;
     let phase: BrowserUf2WritePhase = "open-file";
     let writeCompleted = false;
+    let bytesAccepted = 0;
     try {
       phase = "open-file";
       const fileHandle = await handle.getFileHandle(filename, { create: true });
       phase = "open-writable";
       writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
       phase = "write";
-      dataMayHaveReachedDevice = true;
-      await writable.write(arrayBufferFromBytes(file.bytes));
-      writeCompleted = true;
-      try {
-        phase = "close";
-        await writable.close();
-        return { ambiguousEject: false, attempts: attempt };
-      } catch (error) {
-        if (isLikelyBootloaderEjectError(error)) {
-          return { ambiguousEject: true, attempts: attempt };
+      // Stream the UF2 in chunks so an eject mid-write tells us how far the
+      // data got. The OS may buffer ahead of the device but never behind it,
+      // so a genuine "final block landed, bootloader rebooted" eject can only
+      // surface once the final chunk has been handed to write().
+      for (let offset = 0; offset < totalBytes; offset += chunkBytes) {
+        const end = Math.min(offset + chunkBytes, totalBytes);
+        dataMayHaveReachedDevice = true;
+        if (end >= totalBytes) {
+          allDataMayHaveReachedDevice = true;
         }
-        throw error;
+        await writable.write(arrayBufferFromBytes(file.bytes.subarray(offset, end)));
+        bytesAccepted = end;
       }
+      writeCompleted = true;
+      phase = "close";
+      await writable.close();
+      return { ambiguousEject: false, attempts: attempt };
     } catch (error) {
       lastError = error;
       lastPhase = phase;
@@ -67,13 +77,22 @@ export async function writeBrowserUf2ToDirectoryHandle(
         throw uf2WriteRetryError(error, attempt, phase);
       }
       if (dataMayHaveReachedDevice) {
-        // A UF2 bootloader flashes blocks as they stream in and reboots the
-        // moment the final block lands, so the volume can vanish while write()
-        // is still pending. If the drive is gone after data went out, treat it
-        // as a completed flash rather than burning retries against a dead handle.
         await delay(options.ejectProbeDelayMs ?? BROWSER_UF2_WRITE_EJECT_PROBE_DELAY_MS);
         if (!(await isUf2BootloaderDirectory(handle))) {
-          return { ambiguousEject: true, attempts: attempt };
+          if (allDataMayHaveReachedDevice) {
+            // A UF2 bootloader flashes blocks as they stream in and reboots the
+            // moment the final block lands, so the volume can vanish while the
+            // final write() or close() is still pending. The drive is gone and
+            // every byte went out: treat it as a completed flash.
+            return { ambiguousEject: true, attempts: attempt };
+          }
+          // The drive vanished before the final chunk was handed off — the
+          // bootloader cannot have received the whole image, so this is an
+          // incomplete flash, not a completed one. Fail loudly instead of
+          // reporting success or burning retries against a dead handle.
+          throw new Error(
+            `UF2 の書き込みが途中で中断されました（${bytesAccepted}/${totalBytes} bytes 送信後にドライブが消失）。書き込みは不完全の可能性が高いため、もう一度 bootloader に入れて同じ UF2 を書き込み直してください`,
+          );
         }
       }
       if (attempt === maxAttempts) {
