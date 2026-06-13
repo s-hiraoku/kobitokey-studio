@@ -66,6 +66,10 @@ from localhost or HTTPS.
 - Vite
 - `zmk-studio-api` / `@zmkfirmware/zmk-studio-ts-client`
 
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Development
 
 Install dependencies:
