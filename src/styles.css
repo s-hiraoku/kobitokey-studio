@@ -4096,6 +4096,7 @@ select:focus-visible {
   display: grid;
   grid-template-columns: 24px 16px minmax(0, 1fr);
   align-items: start;
+  justify-items: start;
   gap: 7px;
   min-width: 0;
   border: 1px solid var(--hairline-soft);
@@ -4137,6 +4138,7 @@ select:focus-visible {
   color: #fff7df;
 }
 .release-flow-steps li svg {
+  justify-self: center;
   margin-top: 3px;
   color: var(--ink-faint);
 }
@@ -4148,6 +4150,7 @@ select:focus-visible {
 }
 .release-flow-steps li strong {
   display: block;
+  text-align: start;
   overflow-wrap: anywhere;
   color: var(--ink);
   font-size: 12px;
@@ -4156,6 +4159,7 @@ select:focus-visible {
 .release-flow-steps li small {
   display: block;
   margin-top: 2px;
+  text-align: start;
   color: var(--ink-muted);
   font-size: 11px;
   line-height: 1.4;
@@ -4180,8 +4184,9 @@ select:focus-visible {
 }
 
 .keyboard-panel.firmware-build-mode .release-flow-steps li {
-  flex: 0 0 clamp(172px, 18vw, 260px);
+  flex: 1 0 172px;
   min-block-size: 76px;
+  min-inline-size: 172px;
 }
 
 .flash-guide {
