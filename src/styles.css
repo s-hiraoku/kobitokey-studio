@@ -450,6 +450,17 @@ input[type="url"] {
   overflow: hidden;
 }
 
+#editor-workspace {
+  display: grid;
+  block-size: 100%;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+#editor-workspace > * {
+  min-block-size: 0;
+}
+
 .toast-viewport {
   position: fixed;
   z-index: 80;
@@ -4152,6 +4163,25 @@ select:focus-visible {
 .release-flow-steps li.pending strong,
 .release-flow-steps li.pending small {
   color: var(--ink-faint);
+}
+
+.keyboard-panel.firmware-build-mode .release-flow-guide {
+  overflow: visible;
+}
+
+.keyboard-panel.firmware-build-mode .release-flow-steps {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  min-block-size: 84px;
+  padding-bottom: 2px;
+  scrollbar-gutter: stable;
+}
+
+.keyboard-panel.firmware-build-mode .release-flow-steps li {
+  flex: 0 0 clamp(172px, 18vw, 260px);
+  min-block-size: 76px;
 }
 
 .flash-guide {
