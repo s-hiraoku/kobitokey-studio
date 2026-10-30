@@ -49,6 +49,9 @@ export type StudioKeymap = {
   serialNumber: string;
   lockState: string;
   hasUnsavedChanges: boolean;
+  /** Free layer slots the firmware can add at runtime (absent on older desktop builds). */
+  availableLayers?: number;
+  maxLayerNameLength?: number;
   layers: StudioLayer[];
 };
 

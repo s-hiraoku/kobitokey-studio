@@ -1,9 +1,15 @@
-import { call_rpc, Request, Response, RpcConnection } from "@zmkfirmware/zmk-studio-ts-client";
+import { call_rpc, Notification, Request, Response, RpcConnection } from "@zmkfirmware/zmk-studio-ts-client";
 import { get_decoder, get_encoder } from "@zmkfirmware/zmk-studio-ts-client/framing";
 import type { RpcTransport } from "@zmkfirmware/zmk-studio-ts-client/transport/index";
 import { connect as connectWebSerial } from "@zmkfirmware/zmk-studio-ts-client/transport/serial";
 import { LockState } from "@zmkfirmware/zmk-studio-ts-client/core";
-import { BehaviorBinding, Keymap, SetLayerBindingResponse } from "@zmkfirmware/zmk-studio-ts-client/keymap";
+import {
+  AddLayerErrorCode,
+  BehaviorBinding,
+  Keymap,
+  SetLayerBindingResponse,
+  SetLayerPropsResponse,
+} from "@zmkfirmware/zmk-studio-ts-client/keymap";
 import type { StudioComboSet } from "./directKeymap";
 import { formatHidUsage, parseHidUsage } from "./hidUsage";
 
@@ -16,12 +22,25 @@ export type WebStudioKeymap = {
   serialNumber: string;
   lockState: string;
   hasUnsavedChanges: boolean;
+  /** How many more layers the firmware can add at runtime. */
+  availableLayers: number;
+  maxLayerNameLength: number;
   layers: Array<{
     id: number;
     name: string;
     bindings: string[];
   }>;
 };
+
+export type WebStudioKeyWrite = {
+  layerId: number;
+  keyPosition: number;
+  binding: string;
+};
+
+export type WebStudioNotification =
+  | { kind: "lock-state"; lockState: string }
+  | { kind: "unsaved-changes"; hasUnsavedChanges: boolean };
 
 export type WebStudioSession = {
   kind: StudioConnectionKind;
@@ -75,6 +94,7 @@ let rawSubsystemRpcQueue: Promise<void> = Promise.resolve();
 let rawFramePumpGeneration = 0;
 let rawFrameQueue: Uint8Array[] = [];
 let rawFrameWaiters: Array<(frame: Uint8Array | null) => void> = [];
+const notificationListeners = new Set<(notification: WebStudioNotification) => void>();
 
 const RAW_SUBSYSTEM_RPC_TIMEOUT_MS = 6_000;
 const RAW_SUBSYSTEM_STALE_DRAIN_TIMEOUT_MS = 250;
@@ -124,6 +144,7 @@ export async function connectWebStudioDevice(kind: StudioConnectionKind = "usb")
   const transport = kind === "usb" ? await connectWebSerial() : await connectWebGattWithFallback();
   const { connection, rawResponseReadable } = createWebRpcConnection(transport, { signal: transport.abortController.signal });
   startRawResponsePump(rawResponseReadable, transport.abortController.signal);
+  startNotificationPump(connection.notification_readable, transport.abortController.signal);
   try {
     await call_rpc(connection, { core: { getDeviceInfo: true } });
     const catalog = await loadBehaviorCatalog(connection).catch((error) => {
@@ -165,6 +186,17 @@ export async function readWebStudioKeymap(): Promise<WebStudioKeymap> {
     hasUnsavedChanges: Boolean(unsavedResponse.keymap?.checkUnsavedChanges),
     keymap,
   });
+}
+
+/**
+ * Listen for lock-state and unsaved-changes notifications the device pushes
+ * while connected. Returns a function that removes the listener.
+ */
+export function subscribeWebStudioNotifications(listener: (notification: WebStudioNotification) => void): () => void {
+  notificationListeners.add(listener);
+  return () => {
+    notificationListeners.delete(listener);
+  };
 }
 
 async function connectWebGattWithFallback() {
@@ -286,27 +318,110 @@ function formatWebError(error: unknown): string {
 }
 
 export async function writeWebStudioKey(layerId: number, keyPosition: number, binding: string): Promise<WebStudioKeymap> {
+  return writeWebStudioKeys([{ layerId, keyPosition, binding }]);
+}
+
+/**
+ * Stage every binding on the device, then save once. If any binding fails,
+ * the staged changes are discarded so the device keeps its saved keymap.
+ */
+export async function writeWebStudioKeys(writes: WebStudioKeyWrite[]): Promise<WebStudioKeymap> {
   const conn = requireConnection();
-  const behaviorBinding = parseWebBinding(binding);
-  const setResponse = await call_rpc(conn, {
-    keymap: {
-      setLayerBinding: {
-        layerId,
-        keyPosition,
-        binding: behaviorBinding,
-      },
-    },
-  });
-  const setResult = setResponse.keymap?.setLayerBinding;
-  if (setResult !== SetLayerBindingResponse.SET_LAYER_BINDING_RESP_OK) {
-    throw new Error(`Set layer binding failed: ${String(setResult)}`);
+  // Parse everything first so a typo never leaves half the batch staged.
+  const bindings = writes.map((write) => ({ ...write, behaviorBinding: parseWebBinding(write.binding) }));
+  try {
+    for (const write of bindings) {
+      const setResponse = await call_rpc(conn, {
+        keymap: {
+          setLayerBinding: {
+            layerId: write.layerId,
+            keyPosition: write.keyPosition,
+            binding: write.behaviorBinding,
+          },
+        },
+      });
+      const setResult = setResponse.keymap?.setLayerBinding;
+      if (setResult !== SetLayerBindingResponse.SET_LAYER_BINDING_RESP_OK) {
+        throw new Error(`Set layer binding failed at layer ${write.layerId} / key ${write.keyPosition + 1}: ${String(setResult)}`);
+      }
+    }
+  } catch (error) {
+    await discardWebStudioChanges().catch(() => undefined);
+    throw error;
   }
 
-  const saveResponse = await call_rpc(conn, { keymap: { saveChanges: true } });
-  if (saveResponse.keymap?.saveChanges?.err) {
-    throw new Error(`Save changes failed: ${String(saveResponse.keymap.saveChanges.err)}`);
-  }
+  await saveWebStudioChanges();
+  return readWebStudioKeymap();
+}
 
+/** Save changes the device is holding in RAM (for example from another Studio client). */
+export async function saveWebStudioDeviceChanges(): Promise<WebStudioKeymap> {
+  await saveWebStudioChanges();
+  return readWebStudioKeymap();
+}
+
+/** Drop changes the device is holding in RAM and go back to its saved keymap. */
+export async function discardWebStudioDeviceChanges(): Promise<WebStudioKeymap> {
+  await discardWebStudioChanges();
+  return readWebStudioKeymap();
+}
+
+export async function renameWebStudioLayer(layerId: number, name: string): Promise<WebStudioKeymap> {
+  const response = await call_rpc(requireConnection(), { keymap: { setLayerProps: { layerId, name } } });
+  const result = response.keymap?.setLayerProps;
+  if (result !== SetLayerPropsResponse.SET_LAYER_PROPS_RESP_OK) {
+    throw new Error(`Rename layer failed: ${String(result)}`);
+  }
+  return saveAndReadWebStudioKeymap();
+}
+
+export async function addWebStudioLayer(): Promise<WebStudioKeymap> {
+  const response = await call_rpc(requireConnection(), { keymap: { addLayer: {} } });
+  const result = response.keymap?.addLayer;
+  if (!result?.ok) {
+    throw new Error(
+      result?.err === AddLayerErrorCode.ADD_LAYER_ERR_NO_SPACE
+        ? "No free layer slot is left on the device"
+        : `Add layer failed: ${String(result?.err)}`,
+    );
+  }
+  return saveAndReadWebStudioKeymap();
+}
+
+export async function removeWebStudioLayer(layerIndex: number): Promise<WebStudioKeymap> {
+  const response = await call_rpc(requireConnection(), { keymap: { removeLayer: { layerIndex } } });
+  const result = response.keymap?.removeLayer;
+  if (!result?.ok) {
+    throw new Error(`Remove layer failed: ${String(result?.err)}`);
+  }
+  return saveAndReadWebStudioKeymap();
+}
+
+export async function moveWebStudioLayer(startIndex: number, destIndex: number): Promise<WebStudioKeymap> {
+  const response = await call_rpc(requireConnection(), { keymap: { moveLayer: { startIndex, destIndex } } });
+  const result = response.keymap?.moveLayer;
+  if (!result?.ok) {
+    throw new Error(`Move layer failed: ${String(result?.err)}`);
+  }
+  return saveAndReadWebStudioKeymap();
+}
+
+/** Erase every Studio change stored on the device and return to the firmware keymap. */
+export async function resetWebStudioSettings(): Promise<WebStudioKeymap> {
+  const response = await call_rpc(requireConnection(), { core: { resetSettings: true } });
+  if (!response.core?.resetSettings) {
+    throw new Error("Device refused to reset its settings");
+  }
+  return readWebStudioKeymap();
+}
+
+export async function lockWebStudioDevice(): Promise<WebStudioKeymap> {
+  await call_rpc(requireConnection(), { core: { lock: true } });
+  return readWebStudioKeymap();
+}
+
+async function saveAndReadWebStudioKeymap(): Promise<WebStudioKeymap> {
+  await saveWebStudioChanges();
   return readWebStudioKeymap();
 }
 
@@ -467,6 +582,43 @@ function startRawResponsePump(rawResponseReadable: ReadableStream<Uint8Array>, s
       closeRawResponseQueue(generation);
     }
   })();
+}
+
+function startNotificationPump(notificationReadable: ReadableStream<Notification>, signal?: AbortSignal): void {
+  const reader = notificationReadable.getReader();
+  const cancelReader = () => {
+    reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", cancelReader, { once: true });
+
+  void (async () => {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        const notification = value ? toWebStudioNotification(value) : null;
+        if (notification) {
+          notificationListeners.forEach((listener) => listener(notification));
+        }
+      }
+    } catch {
+      // The stream errors when the transport is aborted.
+    } finally {
+      signal?.removeEventListener("abort", cancelReader);
+    }
+  })();
+}
+
+export function toWebStudioNotification(notification: Notification): WebStudioNotification | null {
+  if (notification.core?.lockStateChanged !== undefined) {
+    return { kind: "lock-state", lockState: formatLockState(notification.core.lockStateChanged) };
+  }
+  if (notification.keymap?.unsavedChangesStatusChanged !== undefined) {
+    return { kind: "unsaved-changes", hasUnsavedChanges: notification.keymap.unsavedChangesStatusChanged };
+  }
+  return null;
 }
 
 function enqueueRawResponseFrame(frame: Uint8Array, generation: number): void {
@@ -733,6 +885,10 @@ async function saveWebStudioChanges(): Promise<void> {
   if (response.keymap?.saveChanges?.err) {
     throw new Error(`Save changes failed: ${String(response.keymap.saveChanges.err)}`);
   }
+}
+
+async function discardWebStudioChanges(): Promise<void> {
+  await call_rpc(requireConnection(), { keymap: { discardChanges: true } });
 }
 
 function encodeGetCombosRequest(): Uint8Array {
@@ -1217,6 +1373,8 @@ function formatWebStudioKeymap({
     serialNumber,
     lockState,
     hasUnsavedChanges,
+    availableLayers: keymap.availableLayers,
+    maxLayerNameLength: keymap.maxLayerNameLength,
     layers: keymap.layers.map((layer, index) => ({
       id: layer.id,
       name: layer.name || `Layer ${index}`,
@@ -1351,8 +1509,45 @@ function parseWebBinding(binding: string): BehaviorBinding {
     case "&none":
       return behaviorBinding("none");
     default:
-      throw new Error(`${behavior || binding} is not supported by Web Serial Direct Mode yet`);
+      return parseCustomWebBinding(parts, activeBehaviorCatalog) ?? unsupportedWebBinding(behavior || binding);
   }
+}
+
+function unsupportedWebBinding(behavior: string): never {
+  throw new Error(`${behavior} is not supported by Web Serial Direct Mode yet`);
+}
+
+/**
+ * Resolve a firmware-specific behavior (macros, custom hold-taps, ...) by the
+ * display name the device reports, so its id never has to be hard-coded.
+ * `&unknown <id> <p1> <p2>` writes a raw binding back unchanged.
+ */
+export function parseCustomWebBinding(parts: string[], catalog: Map<number, string>): BehaviorBinding | null {
+  const [behavior = "", ...params] = parts;
+  if (params.length > 2 && behavior !== "&unknown") {
+    throw new Error(`${behavior} takes at most two parameters`);
+  }
+  if (behavior === "&unknown") {
+    const behaviorId = parseInteger(requiredPart(parts, 1, "behavior id"));
+    if (!catalog.has(behaviorId)) {
+      throw new Error(`Device firmware does not expose behavior id ${behaviorId}`);
+    }
+    return { behaviorId, param1: parseCustomParam(parts[2]), param2: parseCustomParam(parts[3]) };
+  }
+  const name = behavior.replace(/^&/, "");
+  for (const [behaviorId, displayName] of catalog) {
+    if (customBehaviorNameFromDisplayName(displayName) === name) {
+      return { behaviorId, param1: parseCustomParam(params[0]), param2: parseCustomParam(params[1]) };
+    }
+  }
+  return null;
+}
+
+function parseCustomParam(value: string | undefined): number {
+  if (value === undefined) {
+    return 0;
+  }
+  return /^-?\d+$/.test(value) ? parseInteger(value) : parseHidUsage(value);
 }
 
 function behaviorBinding(role: string, param1 = 0, param2 = 0): BehaviorBinding {
