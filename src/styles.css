@@ -1682,7 +1682,8 @@ select:focus-visible {
 
 .keyboard-panel > .workbench-tabs,
 .keyboard-panel > .direct-summary {
-  flex: 0 0 clamp(220px, 38dvh, 400px);
+  /* --dock-height is set by dragging the resizer above the dock. */
+  flex: 0 0 var(--dock-height, clamp(220px, 38dvh, 400px));
   min-height: 0;
   margin-inline: calc(-1 * var(--sp-5));
   border-top: 1px solid var(--hairline);
@@ -1692,6 +1693,40 @@ select:focus-visible {
 .keyboard-panel > .browser-release-workbench {
   flex: 1 1 0;
   min-height: 0;
+}
+
+/* Drag handle on the dock's top edge. It sits flush on the dock border. */
+.dock-resizer {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  height: 12px;
+  margin-inline: calc(-1 * var(--sp-5));
+  margin-bottom: calc(-1 * var(--sp-3) - 6px);
+  cursor: row-resize;
+  touch-action: none;
+}
+.dock-resizer span {
+  width: 40px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--hairline);
+  transition: background 140ms var(--ease-out), width 140ms var(--ease-out);
+}
+.dock-resizer:hover span,
+.dock-resizer.dragging span {
+  width: 64px;
+  background: var(--pine);
+}
+.dock-resizer:focus-visible {
+  outline: none;
+}
+.dock-resizer:focus-visible span {
+  width: 64px;
+  background: var(--pine);
+  box-shadow: var(--focus-ring);
 }
 
 .keyboard-panel.firmware-build-mode {
@@ -2223,6 +2258,13 @@ select:focus-visible {
   color: var(--ink-soft);
   font-size: 12.5px;
   line-height: 1.55;
+}
+.direct-firmware-note.sample-source {
+  border: 1px solid var(--amber-warn-line);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--amber-warn-bg);
+  color: var(--amber-warn-ink);
 }
 .direct-firmware-diff-list {
   display: grid;
