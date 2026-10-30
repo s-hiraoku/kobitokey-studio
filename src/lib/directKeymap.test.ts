@@ -149,6 +149,19 @@ function mapComparableBindingKeys(binding: string, keycodeMap: Record<string, st
   }
 }
 
+function singleLayerKeymap(bindings: string[]) {
+  const keymap = parseKeymap(`/ {
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <${completeStudioBindings(bindings).join(" ")}>;
+        };
+    };
+};`);
+  expect(keymap.layers).toHaveLength(1);
+  return keymap;
+}
+
 describe("direct keymap conversion", () => {
   it("emits unique, letter-leading node names for duplicate or numeric layer names", () => {
     const bindings = Array.from({ length: 40 }, () => "&trans");
@@ -393,6 +406,55 @@ describe("direct keymap conversion", () => {
     };
 
     expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("does not diff modifier functions and JIS keys that the device reports numerically", () => {
+    const firmwareKeymap = singleLayerKeymap([
+      "&kp LS(N1)",
+      "&kp LG(SPACE)",
+      "&lt 1 LC(C)",
+      "&mt LSHFT INT_YEN",
+      "&kp EXCL",
+      "&kp K_CMENU",
+    ]);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: [
+        {
+          id: 0,
+          name: "default_layer",
+          bindings: [
+            "&kp 0x0207001e",
+            "&kp 0x0807002c",
+            "&lt 1 0x01070006",
+            "&mt LSFT 0x00070089",
+            "&kp 0x0207001e",
+            "&kp 0x00070065",
+            ...completeStudioBindings([]).slice(6),
+          ],
+        },
+      ],
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("still diffs keys that differ only by a modifier", () => {
+    const firmwareKeymap = singleLayerKeymap(["&kp LS(N1)"]);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: [{ id: 0, name: "default_layer", bindings: ["&kp N1", ...completeStudioBindings([]).slice(1)] }],
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toMatchObject([
+      { keyIndex: 0, firmwareBinding: "&kp LS(N1)", directBinding: "&kp N1" },
+    ]);
   });
 
   it("does not diff custom layer-tap aliases returned with Studio behavior names", () => {
