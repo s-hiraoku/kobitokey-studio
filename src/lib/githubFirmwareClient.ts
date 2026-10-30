@@ -610,17 +610,21 @@ function resolveManifestFile(baseDir: string, file: string, uf2Files: string[]):
   const normalizedFile = normalizePath(file);
   const relativePath = baseDir ? `${baseDir}/${normalizedFile}` : normalizedFile;
   const filename = basename(normalizedFile);
-  return (
-    uf2Files.find((candidate) => {
-      const normalizedCandidate = normalizePath(candidate);
-      return (
-        normalizedCandidate === normalizedFile ||
-        normalizedCandidate === relativePath ||
-        normalizedCandidate.endsWith(`/${normalizedFile}`) ||
-        basename(normalizedCandidate) === filename
-      );
-    }) ?? null
-  );
+  // Try the most specific match first so a same-named UF2 in another folder
+  // never shadows the file the manifest actually points at.
+  const matchers: Array<(candidate: string) => boolean> = [
+    (candidate) => candidate === relativePath,
+    (candidate) => candidate === normalizedFile,
+    (candidate) => candidate.endsWith(`/${normalizedFile}`),
+    (candidate) => basename(candidate) === filename,
+  ];
+  for (const matches of matchers) {
+    const found = uf2Files.find((candidate) => matches(normalizePath(candidate)));
+    if (found) {
+      return found;
+    }
+  }
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

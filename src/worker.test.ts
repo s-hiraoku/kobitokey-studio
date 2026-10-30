@@ -414,6 +414,9 @@ describe("worker GitHub API proxy", () => {
   });
 
   it("allows Vite dev preamble under local development hosts", async () => {
+    const ipv6Response = await worker.fetch(new Request("http://[::1]:1420/"), env);
+    expect(ipv6Response.headers.get("Content-Security-Policy")).toContain("'unsafe-eval'");
+
     const response = await worker.fetch(new Request("http://127.0.0.1:1420/"), env);
 
     expect(response.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");

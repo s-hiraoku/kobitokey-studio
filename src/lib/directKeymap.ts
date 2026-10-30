@@ -125,9 +125,11 @@ export function studioKeymapToParsedKeymap(keymap: StudioKeymap, combos: KeymapC
 }
 
 export function studioKeymapToKeymapSource(keymap: StudioKeymap): string {
+  const usedIds: string[] = [];
   const layers = keymap.layers
     .map((layer, index) => {
-      const id = sanitizeLayerId(layer.name || `layer_${index}`, index);
+      const id = uniqueNodeId(sanitizeLayerId(layer.name || `layer_${index}`, index), usedIds);
+      usedIds.push(id);
       return [
         `        ${id} {`,
         `            display-name = "${escapeDtsString(layer.name || `Layer ${index}`)}";`,
@@ -248,7 +250,7 @@ export function applyDirectFirmwareComboDiffsToSource(source: string, diffs: Dir
         return nextSource;
       }
       return addCombo(nextSource, {
-        id: uniqueComboId(sanitizeLayerId(directCombo.id, diff.comboIndex), existingIds),
+        id: uniqueNodeId(sanitizeLayerId(directCombo.id, diff.comboIndex), existingIds),
         binding: directCombo.binding,
         keyPositions: directCombo.keyPositions,
         layers: directCombo.layers,
@@ -320,7 +322,7 @@ function uniqueSortedNumbers(values: number[]): number[] {
   return [...new Set(values.filter((value) => Number.isInteger(value) && value >= 0))].sort((left, right) => left - right);
 }
 
-function uniqueComboId(baseId: string, existingIds: string[]): string {
+function uniqueNodeId(baseId: string, existingIds: string[]): string {
   const id = baseId || "direct_combo";
   if (!existingIds.includes(id)) {
     return id;
@@ -474,7 +476,11 @@ function sanitizeLayerId(name: string, index: number): string {
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  return id || `layer_${index}`;
+  if (!id) {
+    return `layer_${index}`;
+  }
+  // Devicetree node names must start with a letter.
+  return /^[a-z]/.test(id) ? id : `layer_${id}`;
 }
 
 function escapeDtsString(value: string): string {

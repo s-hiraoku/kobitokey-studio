@@ -150,6 +150,24 @@ function mapComparableBindingKeys(binding: string, keycodeMap: Record<string, st
 }
 
 describe("direct keymap conversion", () => {
+  it("emits unique, letter-leading node names for duplicate or numeric layer names", () => {
+    const bindings = Array.from({ length: 40 }, () => "&trans");
+    const source = studioKeymapToKeymapSource({
+      deviceName: "KobitoKey",
+      serialNumber: "",
+      lockState: "UNLOCKED",
+      hasUnsavedChanges: false,
+      layers: [
+        { id: 0, name: "Nav", bindings },
+        { id: 1, name: "Nav", bindings },
+        { id: 2, name: "1", bindings },
+      ],
+    });
+
+    expect(parseKeymap(source).layers.map((layer) => layer.id)).toEqual(["nav", "nav_2", "layer_1"]);
+    expect(parseKeymap(source).layers.map((layer) => layer.label)).toEqual(["Nav", "Nav", "1"]);
+  });
+
   it("normalizes compact Studio bindings for display", () => {
     expect(normalizeDirectBindingForDisplay("&bt 3 1")).toBe("&bt BT_SEL 1");
     expect(normalizeDirectBindingForDisplay("&bt 4")).toBe("&bt BT_CLR_ALL 0");

@@ -272,7 +272,7 @@ function methodNotAllowed(): Response {
 
 function withSecurityHeaders(response: Response, request: Request): Response {
   const url = new URL(request.url);
-  const isLocalDev = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
+  const isLocalDev = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
   const secured = new Response(response.body, response);
   secured.headers.set(
     "Content-Security-Policy",

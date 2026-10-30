@@ -49,6 +49,38 @@ ${formatBindings(fortyBindings.map((binding) => binding.replace("&kp", "&mt LCTR
 }
 
 describe("parseKeymap", () => {
+  it("ignores line comments inside bindings", () => {
+    const source = sampleKeymap().replace(
+      "&kp K1 ",
+      "&kp K1 // left pinky\n",
+    );
+    const parsed = parseKeymap(source);
+
+    expect(parsed.warnings).toEqual([]);
+    expect(parsed.layers[0].bindings[0]).toBe("&kp K1");
+    expect(parsed.layers[0].bindings).toHaveLength(40);
+  });
+
+  it("does not mistake sensor-bindings for layer bindings", () => {
+    const source = sampleKeymap().replace(
+      'label = "Base";',
+      'label = "Base";\n            sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;',
+    );
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+
+    expect(layer.bindings).toEqual(fortyBindings);
+    const updated = updateLayerBinding(source, layer, 0, "&kp ESC");
+    expect(updated).toContain("sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;");
+    expect(parseKeymap(updated).layers[0].bindings[0]).toBe("&kp ESC");
+  });
+
+  it("reads display-name as the layer label", () => {
+    const source = sampleKeymap().replace('label = "Base";', 'display-name = "Base";');
+
+    expect(parseKeymap(source).layers[0].label).toBe("Base");
+  });
+
   it("parses complete layers and combos with source ranges", () => {
     const parsed = parseKeymap(sampleKeymap());
 

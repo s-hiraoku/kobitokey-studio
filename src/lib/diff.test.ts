@@ -15,3 +15,14 @@ describe("summarizeChangedLines", () => {
     expect(changes[changes.length - 1]).toBe("...");
   });
 });
+
+describe("summarizeChangedLines alignment", () => {
+  it("reports an inserted line without marking the following lines as changed", () => {
+    expect(summarizeChangedLines("a\nb\nc\nd", "a\nNEW\nb\nc\nd")).toEqual(["+NEW"]);
+  });
+
+  it("reports a deleted line without a phantom empty addition", () => {
+    expect(summarizeChangedLines("a\nb\nc", "a\nc")).toEqual(["-b"]);
+    expect(summarizeChangedLines("a", "a\nb")).toEqual(["+b"]);
+  });
+});

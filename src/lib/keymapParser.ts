@@ -72,7 +72,8 @@ export type KeymapLayerInput = {
 
 const KEY_COUNT = 40;
 const LAYER_PATTERN =
-  /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
+  /(?<id>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?(?<![\w-])bindings\s*=\s*<(?<bindings>[\s\S]*?)>\s*;[\s\S]*?)\};/g;
+const LAYER_BINDINGS_PROPERTY = /(?<![\w-])bindings\s*=\s*<[\s\S]*?>\s*;/;
 const COMBO_PATTERN = /(?<id>[A-Za-z_][A-Za-z0-9_-]*)\s*\{(?<body>[\s\S]*?)\};/g;
 
 export function parseKeymap(source: string): ParsedKeymap {
@@ -219,7 +220,7 @@ export function updateLayerBinding(
 
   const block = source.slice(layer.blockStart, layer.blockEnd);
   const nextBlock = block.replace(
-    /bindings\s*=\s*<[\s\S]*?>\s*;/,
+    LAYER_BINDINGS_PROPERTY,
     `bindings = <\n${formatBindings(nextBindings)}\n            >;`,
   );
 
@@ -414,6 +415,7 @@ export function formatBindings(bindings: string[]): string {
 export function tokenizeBindings(source: string): string[] {
   const tokens = source
     .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\/\/[^\n]*/g, " ")
     .split(/\s+/)
     .map((token) => token.trim())
     .filter(Boolean);
@@ -440,7 +442,7 @@ export function tokenizeBindings(source: string): string[] {
 }
 
 function parseLabel(layerBody: string): string | undefined {
-  return layerBody.match(/label\s*=\s*"([^"]+)"/)?.[1];
+  return layerBody.match(/(?<![\w-])(?:display-name|label)\s*=\s*"([^"]+)"/)?.[1];
 }
 
 function defaultLayerLabel(id: string, index: number): string {
