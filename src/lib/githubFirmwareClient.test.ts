@@ -471,6 +471,15 @@ describe("GitHub artifact helpers", () => {
 
   it("uses firmware manifests before filename classification when assigning sides", () => {
     expect(
+      classifyUf2ArtifactsFromManifests(["other/KobitoKey_left.uf2", "firmware/KobitoKey_left.uf2"], [
+        {
+          name: "firmware/manifest.json",
+          contents: JSON.stringify({ left: "KobitoKey_left.uf2" }),
+        },
+      ]).targets.left,
+    ).toBe("firmware/KobitoKey_left.uf2");
+
+    expect(
       classifyUf2ArtifactsFromManifests(["firmware/KobitoKey_A.uf2", "firmware/KobitoKey_B.uf2"], [
         {
           name: "firmware/manifest.json",

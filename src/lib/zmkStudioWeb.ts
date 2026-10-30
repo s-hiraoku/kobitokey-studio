@@ -5,6 +5,7 @@ import { connect as connectWebSerial } from "@zmkfirmware/zmk-studio-ts-client/t
 import { LockState } from "@zmkfirmware/zmk-studio-ts-client/core";
 import { BehaviorBinding, Keymap, SetLayerBindingResponse } from "@zmkfirmware/zmk-studio-ts-client/keymap";
 import type { StudioComboSet } from "./directKeymap";
+import { KEYCODE_ALIASES, normalizeKeycodeName } from "./keycodeAliases";
 
 export type StudioConnectionKind = "usb" | "bluetooth";
 
@@ -1536,8 +1537,19 @@ const HID_USAGE_BY_NAME: Record<string, number> = {
 
 const NAME_BY_HID_USAGE = Object.fromEntries(Object.entries(HID_USAGE_BY_NAME).map(([name, value]) => [value, name]));
 
-function parseHidUsage(value: string): number {
-  const direct = HID_USAGE_BY_NAME[value.toUpperCase()];
+// Shifted symbols such as EXCL only exist as implicit-modifier usages
+// ("0X0207001E" → "EXCL") in the alias table, so invert those entries.
+const HID_USAGE_BY_ALIAS_NAME: Record<string, number> = Object.fromEntries(
+  Object.entries(KEYCODE_ALIASES)
+    .filter(([usage]) => /^0X[0-9A-F]+$/.test(usage))
+    .map(([usage, name]) => [name, Number.parseInt(usage, 16)]),
+);
+
+export function parseHidUsage(value: string): number {
+  const upperValue = value.toUpperCase();
+  const normalizedValue = normalizeKeycodeName(upperValue);
+  const direct =
+    HID_USAGE_BY_NAME[upperValue] ?? HID_USAGE_BY_NAME[normalizedValue] ?? HID_USAGE_BY_ALIAS_NAME[normalizedValue];
   if (direct !== undefined) {
     return direct;
   }
@@ -1557,9 +1569,11 @@ function normalizeHidUsage(value: number): number {
   if (page !== 0) {
     return value;
   }
+  // Bitwise operators yield signed 32-bit ints; keep the result unsigned so
+  // right-hand modifiers (e.g. RGUI = 0x80) do not turn negative.
   const modifiers = value & 0xff000000;
   const usage = value & 0x0000ffff;
-  return modifiers | 0x00070000 | usage;
+  return (modifiers | 0x00070000 | usage) >>> 0;
 }
 
 function requiredPart(parts: string[], index: number, label: string): string {

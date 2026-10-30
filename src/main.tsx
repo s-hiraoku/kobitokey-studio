@@ -269,9 +269,25 @@ const APP_VERSION =
     ? __KOBITOKEY_APP_VERSION__.trim()
     : "0.0.0";
 
+// Accessing window.localStorage throws a SecurityError when site data is
+// blocked (e.g. Safari private browsing, disabled cookies), so every use goes
+// through this guard instead of crashing the whole app.
+function browserLocalStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function readColorSchemePreference(): ColorSchemePreference {
-  if (typeof window === "undefined") return "system";
-  const stored = window.localStorage.getItem(COLOR_SCHEME_STORAGE_KEY);
+  let stored: string | null = null;
+  try {
+    stored = browserLocalStorage()?.getItem(COLOR_SCHEME_STORAGE_KEY) ?? null;
+  } catch {
+    // Fall back to the system preference when storage is unavailable.
+  }
   return stored === "dark" || stored === "light" ? stored : "system";
 }
 
@@ -311,10 +327,15 @@ function useColorSchemePreference() {
 
   const setPreference = React.useCallback((nextPreference: ColorSchemePreference) => {
     setPreferenceState(nextPreference);
-    if (nextPreference === "system") {
-      window.localStorage.removeItem(COLOR_SCHEME_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, nextPreference);
+    try {
+      const storage = browserLocalStorage();
+      if (nextPreference === "system") {
+        storage?.removeItem(COLOR_SCHEME_STORAGE_KEY);
+      } else {
+        storage?.setItem(COLOR_SCHEME_STORAGE_KEY, nextPreference);
+      }
+    } catch {
+      // The preference still applies for this tab when storage is unavailable.
     }
   }, []);
 
@@ -361,7 +382,7 @@ function App() {
   const [colorSchemePreference, setColorSchemePreference] = useColorSchemePreference();
   const isDesktopRuntime = isTauriRuntime();
   const storedBrowserFirmwareSession = React.useMemo(
-    () => readBrowserFirmwareSession(typeof window === "undefined" ? null : window.localStorage),
+    () => readBrowserFirmwareSession(browserLocalStorage()),
     [],
   );
   const [editorMode, setEditorMode] = React.useState<EditorMode>(() => initialEditorMode());
@@ -725,7 +746,7 @@ function App() {
         runId: browserFirmwareRunId,
         runUrl: browserFirmwareRunUrl,
       },
-      window.localStorage,
+      browserLocalStorage(),
     );
   }, [
       browserFirmwareBranch,
@@ -7129,7 +7150,13 @@ function downloadText(filename: string, contents: string) {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  revokeObjectUrlLater(url);
+}
+
+// Revoking synchronously after click() can cancel the download in Firefox and
+// Safari before the browser has started reading the blob.
+function revokeObjectUrlLater(url: string) {
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function isTauriRuntime(): boolean {
@@ -7277,9 +7304,13 @@ async function writeProjectToDirectoryHandle(
     const writable = await (fileHandle as unknown as { createWritable: () => Promise<FileSystemWritableFileStream> }).createWritable();
     try {
       await writable.write(contents);
-    } finally {
-      await writable.close();
+    } catch (error) {
+      // close() would commit the partially written swap file over the
+      // original, so discard it and keep the existing file intact.
+      await writable.abort().catch(() => undefined);
+      throw error;
     }
+    await writable.close();
   }
 }
 
@@ -7289,7 +7320,7 @@ function downloadBytes(filename: string, bytes: Uint8Array) {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  revokeObjectUrlLater(url);
 }
 
 function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
