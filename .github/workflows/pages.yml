@@ -111,7 +111,7 @@ jobs:
     needs: release-check
     environment:
       name: browser-firmware-production
-      url: https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware
+      url: https://kobito-key-studio.hiraoku.dev/?mode=firmware
     runs-on: ubuntu-latest
     env:
       BROWSER_FIRMWARE_TMP_DIR: /tmp/kobitokey-browser-firmware

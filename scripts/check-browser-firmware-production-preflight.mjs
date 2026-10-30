@@ -1,4 +1,4 @@
-const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+const DEFAULT_PRODUCTION_URL = "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
 
 const args = process.argv.slice(2);
 const requireOAuth =

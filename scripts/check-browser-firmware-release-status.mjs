@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
-const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+const DEFAULT_PRODUCTION_URL = "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
 const RELEASE_GATE_JOB_NAME = "Browser firmware release gates";
 const DEPLOY_WORKER_JOB_NAME = "deploy-browser-firmware-worker";
 const GITHUB_WORKFLOW_URL = "https://github.com/s-hiraoku/kobitokey-studio/actions/workflows/pages.yml";

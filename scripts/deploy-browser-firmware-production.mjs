@@ -3,8 +3,8 @@ import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const DEFAULT_PRODUCTION_URL = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
-const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
+const DEFAULT_PRODUCTION_URL = "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
+const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobito-key-studio.hiraoku.dev";
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const requireOAuth = !dryRun || args.includes("--require-oauth") || process.env.BROWSER_FIRMWARE_PREFLIGHT_REQUIRE_OAUTH === "true";

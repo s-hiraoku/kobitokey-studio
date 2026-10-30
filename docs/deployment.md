@@ -10,7 +10,7 @@ permalink: /deployment/
 
 | 対象 | 公開先 | 更新元 |
 | --- | --- | --- |
-| ブラウザアプリ | <https://kobitokey-studio.s-hiraoku.workers.dev/> | Cloudflare Workers + static assets を `npm run deploy:browser-firmware` で更新し、production preflight で current git HEAD と照合 |
+| ブラウザアプリ | <https://kobito-key-studio.hiraoku.dev/> | Cloudflare Workers + static assets を `npm run deploy:browser-firmware` で更新し、production preflight で current git HEAD と照合 |
 | 使い方ガイド | <https://s-hiraoku.github.io/kobitokey-studio/> | GitHub Pages が `docs/` から Jekyll build |
 
 ## ブラウザアプリの公開
@@ -19,7 +19,7 @@ KobitoKey Studio のブラウザ版は Cloudflare Workers + static assets で公
 
 公開 URL:
 
-- <https://kobitokey-studio.s-hiraoku.workers.dev/>
+- <https://kobito-key-studio.hiraoku.dev/>
 
 ### Cloudflare の build settings
 
@@ -113,7 +113,7 @@ VITE_GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth client id> BROWSER_FIRMWARE_PREFLIGHT_
 ### Environment variables
 
 ブラウザ版 Firmware Mode の `GitHub で接続` ボタンを使うには、GitHub OAuth App の client id を Cloudflare 側に設定します。
-GitHub OAuth App は GitHub の `Settings` → `Developer settings` → `OAuth apps` で作成します。詳細は GitHub Docs の [Creating an OAuth app](https://docs.github.com/en/developers/apps/creating-an-oauth-app) と [Device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を確認してください。`Homepage URL` は `https://kobitokey-studio.s-hiraoku.workers.dev/`、`Authorization callback URL` は同じ production origin 配下の URL にします。Device flow を使うため、OAuth App 設定で `Enable Device Flow` を有効にしてください。device flow では client secret は使わず、公開 client id だけを frontend bundle と production preflight へ渡します。
+GitHub OAuth App は GitHub の `Settings` → `Developer settings` → `OAuth apps` で作成します。詳細は GitHub Docs の [Creating an OAuth app](https://docs.github.com/en/developers/apps/creating-an-oauth-app) と [Device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を確認してください。`Homepage URL` は `https://kobito-key-studio.hiraoku.dev/`、`Authorization callback URL` は同じ production origin 配下の URL にします。Device flow を使うため、OAuth App 設定で `Enable Device Flow` を有効にしてください。device flow では client secret は使わず、公開 client id だけを frontend bundle と production preflight へ渡します。
 
 | 変数 | 用途 |
 | --- | --- |
@@ -127,23 +127,24 @@ OAuth flow は `repo` scope を要求します。この値が未設定でも、�
 
 1. Cloudflare dashboard で `Workers & Pages` → `kobitokey-studio` を開く。
 2. `Deployments` で最新 commit が `Production` に出ていることを確認する。
-3. Status が成功になったら <https://kobitokey-studio.s-hiraoku.workers.dev/> を開く。
+3. Status が成功になったら <https://kobito-key-studio.hiraoku.dev/> を開く。
 4. PC 幅では通常 UI が表示されることを確認する。
 5. スマホ幅では「PC ブラウザでご利用ください」画面が表示されることを確認する。
 6. Browser Firmware Mode を公開する場合は、まず `npm run check:browser-firmware` を通す。このコマンドは `scripts/run-browser-firmware-check.mjs` から release audit、external evidence validator self-test、unit tests、production build、Wrangler dry-run deploy packaging を順に確認する。runner は local `node_modules` の test/build/Wrangler tools を直接呼び、`BROWSER_FIRMWARE_TMP_DIR`、`RUNNER_TEMP`、または OS の一時ディレクトリ配下に Wrangler log / registry / config / dry-run output を置くため、ローカル sandbox と GitHub Actions のどちらでもユーザー設定ディレクトリや global `npm` / `npx` の PATH に依存しない。PR / feature branch の Workers preview を先に確認する場合は `BROWSER_FIRMWARE_PRODUCTION_URL=<Workers preview URL with ?mode=firmware> npm run check:browser-firmware:production-preflight` を使う。ただし preview preflight の成功は production 公開の証跡にしない。production deploy は `npm run deploy:browser-firmware`、または GitHub Actions の `Deploy GitHub Pages` workflow を `deploy_browser_firmware_worker` 有効で手動実行して行い、deploy 前に `VITE_GITHUB_OAUTH_CLIENT_ID` と `BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID` が同じ GitHub OAuth client id であることを確認する。deploy 後の preflight が current git HEAD と production の `/api/release-metadata` を照合できることを確認する。production URL で release security headers missing、release metadata missing、Worker API の 405 が出る場合は、本番 Worker がまだ対象 commit に更新されていないため公開不可と扱う。公開直前の最終 preflight では `VITE_GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth client id> BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run check:browser-firmware:production-release-preflight` を実行し、`repo` scope の device code が本番 Worker route から発行され、同じ client id が GitHub 接続ボタン用の frontend bundle に含まれ、デプロイ済み app commit が `/api/release-metadata` で取得できることも確認する。続けて QA 端末で `npm run check:browser-firmware:ui` を実行し、[Browser Firmware Release Plan](../browser-firmware-release-plan/) の公開判定チェックリストを実 repository と実機で通す。外部 E2E 証跡は `BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run collect:browser-firmware:e2e-report -- --out <report.json>` で生成し、QA 端末で本番 URL の rendered UI smoke も同時に走らせる場合は `--run-ui-smoke` を付ける。production URL、KobitoKey Studio の Actions run URL / head SHA / status / conclusion、`Browser firmware release gates` job の success、`production.appCommitSha`、API route の security headers、Worker OAuth device-code 発行 / artifact routes、unsupported OAuth scope rejection、Actions run の head SHA / head branch、Actions artifact の name / id / size / expiry、Actions artifact zip 内 UF2 / manifest entry の SHA-256、manifest が指す UF2 と同じ GitHub artifact 内の UF2 entry、left/right の flash method (`direct-copy` または `download-copy`)、ISO UTC の flash 完了時刻 (right は left と同時刻または後)、bootloader marker、書き込み直前確認 / keyboard half 確認、token 非保存/消去、キー動作 / Combo / Trackball 編集、release wizard precondition、artifact 由来表示と表示 artifact 名 / id の build artifact 一致確認、目的別公開リンク URL 一覧、layer 追加・複製・参照中 layer 削除ブロック・安全な削除の UI smoke 結果を含めて `npm run check:browser-firmware:e2e-report -- <report.json>` で検証する。最後に作業ツリーが clean な状態で `VITE_GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth client id> BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID=<GitHub OAuth client id> npm run check:browser-firmware:public-release -- --e2e-report <report.json>` を実行し、外部 E2E 証跡 validator、merge readiness、OAuth production preflight、同じ E2E report を渡した `release-status` の `ready: true` を一括で通してから公開判定にする。この最終 gate の preflight 対象 URL は E2E report の `production.url` と一致し、`production.url` は expected public production origin と一致し、`production.fetchUrl` は `production.url` と一致し、E2E report の `ci.runUrl` は `s-hiraoku/kobitokey-studio` の Actions run を指し、`ci.runHeadSha` は `ci.appCommitSha` と一致し、CI run と `Browser firmware release gates` job は completed/success であり、E2E report の `production.appCommitSha` は `ci.appCommitSha` と一致し、`ci.appCommitSha` は現在の git `HEAD` と一致している必要がある。独自ドメインへ移行する場合だけ `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` で expected origin を明示する。
 
 ### 独自ドメイン
 
-独自ドメインを使う場合は Cloudflare dashboard で設定します。
+本番 URL は `https://kobito-key-studio.hiraoku.dev/` です。`wrangler.jsonc` の `routes` に `custom_domain: true` で登録しているため、`npm run deploy:browser-firmware` の Wrangler deploy が Cloudflare 側の Custom Domain、DNS record、証明書をまとめて作成・更新します。DNS record を手で追加する必要はありません。
 
-1. `Workers & Pages` → `kobitokey-studio` を開く。
-2. `Custom domains` を開く。
-3. `Set up a custom domain` を押す。
-4. 使いたいドメインまたはサブドメインを入力する。
-5. Cloudflare が出す DNS 設定を追加する。
-6. SSL/TLS が有効になり、Custom domains の status が active になるまで待つ。
+前提:
 
-ドメイン名が決まるまでは `kobitokey-studio.s-hiraoku.workers.dev` を本番 URL として使います。
+- `hiraoku.dev` の zone が、deploy に使う Cloudflare account (`CLOUDFLARE_ACCOUNT_ID`) に追加され、ネームサーバーが Cloudflare に向いて Active になっていること。
+- `kobito-key-studio.hiraoku.dev` に既存の DNS record (CNAME / A / AAAA) がないこと。あると Custom Domain の作成に失敗します。
+- GitHub Actions から deploy する場合、`CLOUDFLARE_API_TOKEN` に `Workers Scripts:Edit` に加えて `hiraoku.dev` zone の `Workers Routes:Edit` と `DNS:Edit` 権限があること。
+
+初回 deploy 直後は証明書の発行に数分かかることがあり、その間は post-deploy preflight が TLS エラーで失敗することがあります。Cloudflare dashboard の `Workers & Pages` → `kobitokey-studio` → `Settings` → `Domains & Routes` で status が active になってから、`npm run check:browser-firmware:production-preflight` を再実行してください。
+
+`workers_dev: true` にしているため、旧 URL の `https://kobitokey-studio.s-hiraoku.workers.dev/` も引き続き同じ Worker を返します。旧 URL を止める場合は `workers_dev` を `false` にして deploy します。
 
 ### 対応環境
 

@@ -8,7 +8,7 @@ be a general ZMK editor yet.
 
 ## Public Links
 
-- Browser app: <https://kobitokey-studio.s-hiraoku.workers.dev/>
+- Browser app: <https://kobito-key-studio.hiraoku.dev/>
 - User guide: <https://s-hiraoku.github.io/kobitokey-studio/>
 - Supported browser target: desktop Chrome / Edge
 - Mobile browser target: unsupported screen in the initial release
@@ -283,7 +283,7 @@ unless merge readiness, the OAuth production preflight, and `release-status`
 `ready: true` with the same E2E report also pass. The
 production URL used for preflight must match `production.url` in the E2E report,
 and the report URL must use the expected public production origin
-(`https://kobitokey-studio.s-hiraoku.workers.dev` by default, or
+(`https://kobito-key-studio.hiraoku.dev` by default, or
 `BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN` for a future custom domain). The
 report `production.fetchUrl` must match `production.url`, so a test fetch
 override cannot be used as public evidence. The report `ci.runUrl` must point to

@@ -248,7 +248,7 @@ Boolean release confirmations:
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE=true
   BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS=true
   BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED=true
-  BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct'
+  BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobito-key-studio.hiraoku.dev/?mode=firmware,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=combos,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=trackball,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=diff,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build,https://kobito-key-studio.hiraoku.dev/?mode=direct'
 
 Optional:
   GITHUB_TOKEN or BROWSER_FIRMWARE_E2E_GITHUB_TOKEN for private repositories
@@ -256,7 +256,7 @@ Optional:
   BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL for collector tests
   BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN for a future custom domain
   BROWSER_FIRMWARE_E2E_RUN_UI_SMOKE=true
-  BROWSER_FIRMWARE_SMOKE_URL=https://kobitokey-studio.s-hiraoku.workers.dev
+  BROWSER_FIRMWARE_SMOKE_URL=https://kobito-key-studio.hiraoku.dev
   BROWSER_FIRMWARE_E2E_CLASSIFICATION_SOURCE=manifest|filename
   BROWSER_FIRMWARE_E2E_UI_SMOKE_COMMAND="${UI_SMOKE_COMMAND}" or "npm run check:browser-firmware:ui"
   BROWSER_FIRMWARE_E2E_SMOKE_VIEWPORT_COUNT=2
@@ -269,7 +269,7 @@ Optional:
 function printEnvTemplate() {
   const productionUrl =
     process.env.BROWSER_FIRMWARE_E2E_PRODUCTION_URL?.trim() ||
-    "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+    "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
   const ciRunUrl =
     process.env.BROWSER_FIRMWARE_E2E_CI_RUN_URL?.trim() ||
     "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>";
@@ -338,7 +338,7 @@ function printEnvTemplate() {
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_VISIBLE='true'",
     "export BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS='true'",
     "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED='true'",
-    "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct'",
+    "export BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS='https://kobito-key-studio.hiraoku.dev/?mode=firmware,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=combos,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=trackball,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=diff,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build,https://kobito-key-studio.hiraoku.dev/?mode=direct'",
     "export BROWSER_FIRMWARE_E2E_NOTES='<optional QA notes without tokens or UF2 bytes>'",
     "",
     "# After filling placeholders, source this file and run:",

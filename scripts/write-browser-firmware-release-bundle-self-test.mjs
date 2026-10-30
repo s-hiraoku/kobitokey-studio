@@ -43,7 +43,7 @@ try {
 
   for (const expected of [
     "# Browser Firmware Mode external E2E evidence environment.",
-    "export BROWSER_FIRMWARE_E2E_PRODUCTION_URL='https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware'",
+    "export BROWSER_FIRMWARE_E2E_PRODUCTION_URL='https://kobito-key-studio.hiraoku.dev/?mode=firmware'",
     "export BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID='bundle-oauth-client'",
     "export BROWSER_FIRMWARE_E2E_CI_RUN_URL='https://github.com/s-hiraoku/kobitokey-studio/actions/runs/123'",
     "export BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA='abc123456789abcdef0123456789abcdef012345'",
@@ -135,7 +135,7 @@ function createStatusFixture() {
     headSha: "abc123456789abcdef0123456789abcdef012345",
     shortHead: "abc1234",
     branch: "feature/firmware-mode",
-    productionUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+    productionUrl: "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
     blockerCount: 3,
     warningCount: 2,
     nextActions: [
@@ -151,7 +151,7 @@ function createStatusFixture() {
           "VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' BROWSER_FIRMWARE_PREFLIGHT_OAUTH_CLIENT_ID='<GitHub OAuth App client id>' npm run check:browser-firmware:public-release -- --e2e-report path/to/report.json",
         ],
         links: [
-          { label: "Production URL", url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware" },
+          { label: "Production URL", url: "https://kobito-key-studio.hiraoku.dev/?mode=firmware" },
           {
             label: "Release Plan",
             url: "https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md",

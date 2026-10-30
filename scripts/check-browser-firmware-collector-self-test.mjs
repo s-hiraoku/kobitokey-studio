@@ -508,7 +508,7 @@ try {
   );
   assert(report.ui.publicEntryLinksPassed === true, "public entry links UI smoke state was not collected");
   assert(
-    report.ui.publicEntryUrls.includes("https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build"),
+    report.ui.publicEntryUrls.includes("https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build"),
     "public entry link URLs were not collected",
   );
 
@@ -540,7 +540,7 @@ try {
   );
   assert(autoReport.ui.publicEntryLinksPassed === true, "automatic public entry links UI smoke state was not collected");
   assert(
-    autoReport.ui.publicEntryUrls.includes("https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct"),
+    autoReport.ui.publicEntryUrls.includes("https://kobito-key-studio.hiraoku.dev/?mode=direct"),
     "automatic public entry link URLs were not collected",
   );
 
@@ -617,7 +617,7 @@ function runCollector(baseUrl, reportPath, options) {
       env: {
         ...process.env,
         BROWSER_FIRMWARE_E2E_UI_SMOKE_SCRIPT: fakeUiSmokePath,
-        BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+        BROWSER_FIRMWARE_E2E_PRODUCTION_URL: "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
         BROWSER_FIRMWARE_E2E_PRODUCTION_FETCH_URL: `${baseUrl}/`,
         BROWSER_FIRMWARE_E2E_OAUTH_CLIENT_ID: options.oauthClientId || "collector-oauth-client",
         BROWSER_FIRMWARE_E2E_GITHUB_API_BASE_URL: baseUrl,
@@ -666,7 +666,7 @@ function runCollector(baseUrl, reportPath, options) {
               BROWSER_FIRMWARE_E2E_ARTIFACT_PROVENANCE_MATCHES_BUILD_ARTIFACTS: "true",
               BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_LINKS_PASSED: "true",
               BROWSER_FIRMWARE_E2E_PUBLIC_ENTRY_URLS:
-                "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build,https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
+                "https://kobito-key-studio.hiraoku.dev/?mode=firmware,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=combos,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=trackball,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=diff,https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build,https://kobito-key-studio.hiraoku.dev/?mode=direct",
             }
           : {}),
       },

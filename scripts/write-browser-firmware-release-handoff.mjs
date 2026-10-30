@@ -118,7 +118,7 @@ function renderHandoff(status) {
     "Use this to print the external E2E env template with the current app commit and release-gate run prefilled:",
     "",
     "```sh",
-    `BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(status.productionUrl || "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware")} \\`,
+    `BROWSER_FIRMWARE_E2E_PRODUCTION_URL=${shellQuote(status.productionUrl || "https://kobito-key-studio.hiraoku.dev/?mode=firmware")} \\`,
     `BROWSER_FIRMWARE_E2E_CI_RUN_URL=${shellQuote(releaseGateRunUrl || "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>")} \\`,
     `BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA=${shellQuote(status.headSha || "<kobitokey-studio-app-commit-sha>")} \\`,
     "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
@@ -208,7 +208,7 @@ function evidenceLinksFor(checks, nextActions) {
 }
 
 function publicEntryUrlsFor(productionUrl) {
-  const fallbackOrigin = "https://kobitokey-studio.s-hiraoku.workers.dev";
+  const fallbackOrigin = "https://kobito-key-studio.hiraoku.dev";
   let origin = fallbackOrigin;
   try {
     if (productionUrl) {
