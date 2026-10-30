@@ -7,7 +7,7 @@ import {
   type KeymapCombo,
   type ParsedKeymap,
 } from "./keymapParser";
-import { parseHidUsage } from "./hidUsage";
+import { formatHidUsage, parseHidUsage } from "./hidUsage";
 import { normalizeKeycodeName } from "./keycodeAliases";
 
 const STUDIO_KEY_COUNT = 40;
@@ -395,8 +395,20 @@ function normalizeComparableBinding(binding: string): string {
     case "&to":
       return parts[1] === "0" ? "&trans" : parts.join(" ");
     default:
+      if (parts[0] !== "&unknown" && isCustomComparableBinding(parts[0])) {
+        // Compare keycode params of custom behaviors by usage, so the keymap's
+        // `&my_tap 5 Y` matches the device's `&my_tap 5 458780`.
+        return [parts[0], ...parts.slice(1).map(normalizeCustomComparableParam)].join(" ");
+      }
       return parts.join(" ");
   }
+}
+
+function normalizeCustomComparableParam(value: string): string {
+  if (/^\d+$/.test(value) && formatNumericHidUsageParam(value) === value) {
+    return value;
+  }
+  return normalizeComparableKeycode(value);
 }
 
 function normalizeComparableParts(parts: string[], keycodeIndexes: number[]): string {
@@ -442,7 +454,24 @@ export function normalizeDirectBindingForDisplay(binding: string): string {
   if (parts[0] === "&mkp") {
     return `&mkp ${formatMouseButton(parts[1])}`;
   }
+  // Custom behaviors come back from the device with raw numeric params, so a
+  // keycode such as Y arrives as 458780 (0x0007001c). Show it by name.
+  if (parts[0] !== "&unknown" && isCustomComparableBinding(parts[0]) && parts.length > 1) {
+    return [parts[0], ...parts.slice(1).map(formatNumericHidUsageParam)].join(" ");
+  }
   return binding;
+}
+
+/** Decimal params with a HID usage page set are keycodes; small numbers (layers, counts) stay as-is. */
+function formatNumericHidUsageParam(value: string): string {
+  if (!/^\d+$/.test(value)) {
+    return value;
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number > 0xffffffff || (number & 0x00ff0000) === 0) {
+    return value;
+  }
+  return formatHidUsage(number);
 }
 
 function formatBtCommand(value?: string): string {

@@ -186,6 +186,9 @@ describe("direct keymap conversion", () => {
     expect(normalizeDirectBindingForDisplay("&bt 4")).toBe("&bt BT_CLR_ALL 0");
     expect(normalizeDirectBindingForDisplay("&mkp 16")).toBe("&mkp MB5");
     expect(normalizeDirectBindingForDisplay("&kp A")).toBe("&kp A");
+    expect(normalizeDirectBindingForDisplay("&scroll_menu_layer_tap 5 458780")).toBe("&scroll_menu_layer_tap 5 Y");
+    expect(normalizeDirectBindingForDisplay("&zoom_hold 3")).toBe("&zoom_hold 3");
+    expect(normalizeDirectBindingForDisplay("&unknown 22 458780 0")).toBe("&unknown 22 458780 0");
   });
 
   it("fills missing Studio key bindings to the full KobitoKey matrix", () => {
@@ -440,6 +443,50 @@ describe("direct keymap conversion", () => {
     };
 
     expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("does not diff custom behavior keycodes that the device reports as decimal HID usages", () => {
+    const firmwareKeymap = singleLayerKeymap(["&scroll_menu_layer_tap 5 Y", "&scroll_menu_layer_tap 6 P"]);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: [
+        {
+          id: 0,
+          name: "default_layer",
+          bindings: [
+            "&scroll_menu_layer_tap 5 458780",
+            "&scroll_menu_layer_tap 6 458771",
+            ...completeStudioBindings([]).slice(2),
+          ],
+        },
+      ],
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toEqual([]);
+  });
+
+  it("still diffs a plain key against a custom layer-tap, showing the device keycode by name", () => {
+    const firmwareKeymap = singleLayerKeymap(["&kp Y"]);
+    const directKeymap = {
+      deviceName: "KobitoKey",
+      serialNumber: "123",
+      lockState: "unlocked",
+      hasUnsavedChanges: false,
+      layers: [
+        {
+          id: 0,
+          name: "default_layer",
+          bindings: ["&scroll_menu_layer_tap 5 458780", ...completeStudioBindings([]).slice(1)],
+        },
+      ],
+    };
+
+    expect(diffDirectKeymapAgainstFirmware(directKeymap, firmwareKeymap)).toMatchObject([
+      { keyIndex: 0, firmwareBinding: "&kp Y", directBinding: "&scroll_menu_layer_tap 5 Y" },
+    ]);
   });
 
   it("still diffs keys that differ only by a modifier", () => {

@@ -268,6 +268,10 @@ const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWER
 const USER_GUIDE_URL = "https://s-hiraoku.github.io/kobitokey-studio/user-guide/";
 const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
 const COLOR_SCHEME_STORAGE_KEY = "kobitokey-color-scheme";
+const DOCK_HEIGHT_STORAGE_KEY = "kobitokey-dock-height";
+const DOCK_MIN_HEIGHT = 160;
+/** Space the keyboard keeps above the dock while it is resized. */
+const DOCK_KEYBOARD_RESERVE = 140;
 const DARK_THEME_COLOR = "#1a1d22";
 const LIGHT_THEME_COLOR = "#f7f8fa";
 const ENABLE_LAYER_STRUCTURE_EDITING = true;
@@ -388,6 +392,119 @@ function ColorSchemeButton({
   );
 }
 
+function readDockHeightPreference(): number | null {
+  try {
+    const stored = Number(browserLocalStorage()?.getItem(DOCK_HEIGHT_STORAGE_KEY));
+    return Number.isFinite(stored) && stored >= DOCK_MIN_HEIGHT ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Height of the bottom dock in px, or null for the default size. Remembered per browser. */
+function useDockHeight() {
+  const [height, setHeightState] = React.useState<number | null>(() => readDockHeightPreference());
+
+  const setHeight = React.useCallback((nextHeight: number | null) => {
+    setHeightState(nextHeight);
+    try {
+      const storage = browserLocalStorage();
+      if (nextHeight === null) {
+        storage?.removeItem(DOCK_HEIGHT_STORAGE_KEY);
+      } else {
+        storage?.setItem(DOCK_HEIGHT_STORAGE_KEY, String(Math.round(nextHeight)));
+      }
+    } catch {
+      // The size still applies for this tab when storage is unavailable.
+    }
+  }, []);
+
+  return [height, setHeight] as const;
+}
+
+/**
+ * Drag handle between the keyboard and the bottom dock. Drag or use the arrow
+ * keys to resize; double-click (or Enter) returns to the default size.
+ */
+function DockResizer({
+  height,
+  onChange,
+  panelRef,
+}: {
+  height: number | null;
+  onChange: (height: number | null) => void;
+  panelRef: React.RefObject<HTMLElement | null>;
+}) {
+  const handleRef = React.useRef<HTMLDivElement>(null);
+
+  const clampHeight = React.useCallback(
+    (value: number) => {
+      const panelHeight = panelRef.current?.clientHeight ?? 0;
+      const maxHeight = Math.max(DOCK_MIN_HEIGHT, panelHeight - DOCK_KEYBOARD_RESERVE);
+      return Math.min(maxHeight, Math.max(DOCK_MIN_HEIGHT, value));
+    },
+    [panelRef],
+  );
+
+  const currentHeight = () => handleRef.current?.nextElementSibling?.getBoundingClientRect().height ?? DOCK_MIN_HEIGHT;
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = currentHeight();
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    target.classList.add("dragging");
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      onChange(clampHeight(startHeight + startY - moveEvent.clientY));
+    };
+    const handleUp = () => {
+      target.classList.remove("dragging");
+      target.removeEventListener("pointermove", handleMove);
+      target.removeEventListener("pointerup", handleUp);
+      target.removeEventListener("pointercancel", handleUp);
+    };
+    target.addEventListener("pointermove", handleMove);
+    target.addEventListener("pointerup", handleUp);
+    target.addEventListener("pointercancel", handleUp);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 96 : 32;
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      onChange(clampHeight(currentHeight() + step));
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      onChange(clampHeight(currentHeight() - step));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      onChange(null);
+    }
+  }
+
+  return (
+    <div
+      ref={handleRef}
+      className="dock-resizer"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="下のパネルの高さ"
+      aria-valuenow={height === null ? undefined : Math.round(height)}
+      aria-valuemin={DOCK_MIN_HEIGHT}
+      tabIndex={0}
+      title="ドラッグで高さを変更（ダブルクリックで元のサイズ）"
+      onDoubleClick={() => onChange(null)}
+      onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
+    >
+      <span aria-hidden="true" />
+    </div>
+  );
+}
+
 function useMobileUnsupported() {
   const [isMobileUnsupported, setIsMobileUnsupported] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -479,6 +596,10 @@ function App() {
   });
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [fixtureLoading, setFixtureLoading] = React.useState(true);
+  const [dockHeight, setDockHeight] = useDockHeight();
+  const keyboardPanelRef = React.useRef<HTMLElement>(null);
+  // True while the firmware side is the bundled sample keymap rather than the user's own project.
+  const [firmwareIsSample, setFirmwareIsSample] = React.useState(true);
   const [fixtureError, setFixtureError] = React.useState("");
   const [buildStatus, setBuildStatus] = React.useState("GitHub Actions 未確認");
   const [firmwareFlashError, setFirmwareFlashError] = React.useState("");
@@ -1053,6 +1174,7 @@ function App() {
       setFiles(project);
       resetFirmwareEditHistory(project);
       captureSavedProject(project);
+      setFirmwareIsSample(true);
       setStatus("fixture を表示中");
     } catch (error) {
       if (fixtureLoadRequestRef.current !== requestId) {
@@ -1095,6 +1217,7 @@ function App() {
       resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
+      setFirmwareIsSample(false);
       setStatus("ローカルプロジェクトを読み込みました");
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -1147,6 +1270,7 @@ function App() {
       resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
+      setFirmwareIsSample(false);
       setStatus(`フォルダ "${handle.name}" を読み込みました`);
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -1162,6 +1286,7 @@ function App() {
       resetFirmwareEditHistory(project.files);
       captureSavedProject(project.files);
       setFixtureError("");
+      setFirmwareIsSample(false);
       setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
     } catch (error) {
       setStatus(`読み込み失敗: ${String(error)}`);
@@ -2419,6 +2544,7 @@ function App() {
       resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
+      setFirmwareIsSample(false);
       setBrowserFirmwareFilesLoadedFromGitHub(true);
       setBrowserFirmwareCommitSha(null);
       setBrowserFirmwareCommitUrl("");
@@ -3126,7 +3252,11 @@ function App() {
           </div>
         </nav>
 
-        <section className={`keyboard-panel ${!isDirectMode && workbenchTab === "build" ? "firmware-build-mode" : ""}`}>
+        <section
+          ref={keyboardPanelRef}
+          className={`keyboard-panel ${!isDirectMode && workbenchTab === "build" ? "firmware-build-mode" : ""}`}
+          style={dockHeight === null ? undefined : ({ "--dock-height": `${dockHeight}px` } as React.CSSProperties)}
+        >
           {isDirectMode ? (
             <DirectConnectionBar
               connectionKind={studioConnectionKind}
@@ -3177,11 +3307,15 @@ function App() {
             />
           ) : null}
 
+          {isDirectMode || workbenchTab !== "build" ? (
+            <DockResizer height={dockHeight} onChange={setDockHeight} panelRef={keyboardPanelRef} />
+          ) : null}
           {isDirectMode ? (
             <DirectSummaryPanel
               connectionKind={studioConnectionKind}
               firmwareComboDiffs={directFirmwareComboDiffs}
               firmwareDiffs={directFirmwareDiffs}
+              firmwareIsSample={firmwareIsSample}
               keymap={directKeymap}
               onApplyFirmwareComboDiffs={applyDirectFirmwareComboDiffs}
               onApplyFirmwareDiffs={applyDirectFirmwareDiffs}
@@ -4001,6 +4135,7 @@ function DirectSummaryPanel({
   connectionKind,
   firmwareComboDiffs,
   firmwareDiffs,
+  firmwareIsSample,
   keymap,
   onApplyFirmwareComboDiffs,
   onApplyFirmwareDiffs,
@@ -4009,6 +4144,7 @@ function DirectSummaryPanel({
   connectionKind: StudioConnectionKind;
   firmwareComboDiffs: DirectFirmwareComboDiff[];
   firmwareDiffs: DirectFirmwareKeyDiff[];
+  firmwareIsSample: boolean;
   keymap: StudioKeymap | null;
   onApplyFirmwareComboDiffs: (diffs?: DirectFirmwareComboDiff[]) => void;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
@@ -4083,7 +4219,11 @@ function DirectSummaryPanel({
         </dl>
       ) : null}
       {syncTab === "key" ? (
-        <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} />
+        <DirectFirmwareDiffPanel
+          diffs={firmwareDiffs}
+          firmwareIsSample={firmwareIsSample}
+          onApplyFirmwareDiffs={onApplyFirmwareDiffs}
+        />
       ) : null}
       {syncTab === "combo" ? (
         <DirectFirmwareComboDiffPanel diffs={firmwareComboDiffs} onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs} />
@@ -4094,9 +4234,11 @@ function DirectSummaryPanel({
 
 function DirectFirmwareDiffPanel({
   diffs,
+  firmwareIsSample,
   onApplyFirmwareDiffs,
 }: {
   diffs: DirectFirmwareKeyDiff[];
+  firmwareIsSample: boolean;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
 }) {
   return (
@@ -4116,6 +4258,12 @@ function DirectFirmwareDiffPanel({
           キー差分を Firmware に取り込む
         </button>
       </div>
+      {firmwareIsSample ? (
+        <p className="direct-firmware-note sample-source">
+          比較している Firmware 側は、アプリに同梱されているサンプルの keymap です。自分の keymap と比べるには、Firmware
+          モードで GitHub かフォルダから読み込んでください。
+        </p>
+      ) : null}
       {diffs.length === 0 ? (
         <p className="diff-empty compact-empty">Direct keymap と firmware keymap のキー動作は一致しています。</p>
       ) : (
