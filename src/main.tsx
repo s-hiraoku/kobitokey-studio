@@ -17,7 +17,9 @@ import {
   MousePointer,
   Moon,
   Plus,
+  Redo2,
   RefreshCw,
+  RotateCcw,
   Save,
   SlidersHorizontal,
   Smartphone,
@@ -34,6 +36,7 @@ import {
   type BrowserFirmwareOperation,
 } from "./hooks/useBrowserFirmwareRelease";
 import { useFirmwareProjectSnapshot, type FileDiff } from "./hooks/useFirmwareProjectSnapshot";
+import { useUndoHistory } from "./hooks/useUndoHistory";
 import {
   applyDirectFirmwareComboDiffsToSource,
   applyDirectFirmwareKeyDiffsToSource,
@@ -109,6 +112,8 @@ import {
   LAYOUT_HEIGHT,
   LAYOUT_WIDTH,
   kobitoKeyPhysicalLayout,
+  neighborKeyIndex,
+  type KeyDirection,
   matrixBasePath,
   rightMirrorTransform,
   thumbBasePath,
@@ -281,6 +286,16 @@ function browserLocalStorage(): Storage | null {
   }
 }
 
+const AUTO_ADVANCE_STORAGE_KEY = "kobitokey-studio.auto-advance-key";
+
+function readAutoAdvancePreference(): boolean {
+  try {
+    return browserLocalStorage()?.getItem(AUTO_ADVANCE_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
 function readColorSchemePreference(): ColorSchemePreference {
   let stored: string | null = null;
   try {
@@ -425,6 +440,7 @@ function App() {
   const [activeLayerIndex, setActiveLayerIndex] = React.useState(0);
   const [selectedKeyIndex, setSelectedKeyIndex] = React.useState(0);
   const [selectedComboId, setSelectedComboId] = React.useState<string | null>(null);
+  const [autoAdvanceKey, setAutoAdvanceKey] = React.useState(() => readAutoAdvancePreference());
   const [workbenchTab, setWorkbenchTab] = React.useState<WorkbenchTabId>(() => initialWorkbenchTab());
   const [lastEditWorkbenchTab, setLastEditWorkbenchTab] = React.useState<WorkbenchTabId>(() => {
     const initial = initialWorkbenchTab();
@@ -542,8 +558,6 @@ function App() {
   );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
-  const hasPendingFirmwareKeyDraft =
-    !isDirectMode && bindingDraft.trim().length > 0 && bindingDraft.trim() !== selectedBinding.trim();
   const selectedDeviceBinding =
     isDirectMode ? directKeymap?.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? selectedBinding : selectedBinding;
   const selectedDirectKeyDraft = directKeyDrafts[directKeyDraftKey(activeLayerIndex, selectedKeyIndex)];
@@ -594,6 +608,13 @@ function App() {
     [files?.leftOverlay, files?.rightOverlay],
   );
   const { captureSavedProject, clearSavedProject, keymapDiff, savedProject } = useFirmwareProjectSnapshot(files);
+  const {
+    canRedo: canRedoFirmwareEdit,
+    canUndo: canUndoFirmwareEdit,
+    redo: redoFirmwareEdit,
+    reset: resetFirmwareEditHistory,
+    undo: undoFirmwareEdit,
+  } = useUndoHistory(files, setFiles, sameFirmwareFiles);
   const browserFirmwareReadiness = React.useMemo(
     () =>
       deriveFirmwareReleaseReadiness({
@@ -891,6 +912,94 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editorMode, files, saveProjectFiles]);
 
+  // Editor shortcuts: undo/redo, arrow keys to move between keys, and number
+  // keys to switch layers. Form fields keep their native keyboard behavior.
+  React.useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || isEditableTarget(event.target) || flashConfirmation) {
+        return;
+      }
+      const isMod = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (isMod && !event.altKey && (key === "z" || key === "y")) {
+        if (isDirectMode || workbenchTab === "build") {
+          return;
+        }
+        event.preventDefault();
+        const isRedo = key === "y" || event.shiftKey;
+        const moved = isRedo ? redoFirmwareEdit() : undoFirmwareEdit();
+        if (moved) {
+          setStatus(isRedo ? "編集をやり直しました" : "編集を元に戻しました");
+        }
+        return;
+      }
+      if (isMod || event.altKey || !activeLayer || workbenchTab === "build") {
+        return;
+      }
+      const direction = ARROW_KEY_DIRECTIONS[event.key];
+      if (direction) {
+        if (!isKeyboardNavigationTarget(event.target)) {
+          return;
+        }
+        event.preventDefault();
+        const nextIndex = neighborKeyIndex(selectedKeyIndex, direction);
+        setSelectedKeyIndex(nextIndex);
+        focusPhysicalKey(nextIndex, event.target);
+        return;
+      }
+      if (/^[0-9]$/.test(event.key) && !event.shiftKey) {
+        const layerIndex = Number(event.key);
+        if (layerIndex < layers.length) {
+          event.preventDefault();
+          setActiveLayerIndex(layerIndex);
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    activeLayer,
+    flashConfirmation,
+    isDirectMode,
+    layers.length,
+    redoFirmwareEdit,
+    selectedKeyIndex,
+    undoFirmwareEdit,
+    workbenchTab,
+  ]);
+
+  const hasUnsavedEdits = isDirectMode ? directKeyDraftList.length > 0 : keymapDiff.length > 0;
+  React.useEffect(() => {
+    if (!hasUnsavedEdits) {
+      return;
+    }
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedEdits]);
+
+  function updateAutoAdvanceKey(value: boolean) {
+    setAutoAdvanceKey(value);
+    try {
+      browserLocalStorage()?.setItem(AUTO_ADVANCE_STORAGE_KEY, value ? "on" : "off");
+    } catch {
+      // The preference simply won't persist when storage is unavailable.
+    }
+  }
+
+  function advanceAfterKeyPick(binding: string) {
+    if (!autoAdvanceKey || parseBindingForm(binding).kind !== "key") {
+      return;
+    }
+    const keyCount = activeLayer?.bindings.length ?? 0;
+    if (selectedKeyIndex + 1 < keyCount) {
+      setSelectedKeyIndex(selectedKeyIndex + 1);
+    }
+  }
+
   function showToast(kind: ToastKind, message: string) {
     setToast({ id: Date.now(), kind, message });
   }
@@ -906,6 +1015,7 @@ function App() {
         return;
       }
       setFiles(project);
+      resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setStatus("fixture を表示中");
     } catch (error) {
@@ -914,6 +1024,7 @@ function App() {
       }
       const message = `fixture 読み込み失敗: ${formatError(error)}`;
       setFiles(null);
+      resetFirmwareEditHistory(null);
       clearSavedProject();
       setFixtureError(message);
       setStatus(message);
@@ -922,7 +1033,7 @@ function App() {
         setFixtureLoading(false);
       }
     }
-  }, [captureSavedProject, clearSavedProject]);
+  }, [captureSavedProject, clearSavedProject, resetFirmwareEditHistory]);
 
   React.useEffect(() => {
     const requestId = fixtureLoadRequestRef.current + 1;
@@ -945,6 +1056,7 @@ function App() {
     try {
       const project = await invoke<ProjectFiles>("read_kobitokey_project", { root: projectRoot });
       setFiles(project);
+      resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
       setStatus("ローカルプロジェクトを読み込みました");
@@ -996,6 +1108,7 @@ function App() {
       setProjectRoot(handle.name);
       setProjectDirHandle(handle);
       setFiles(project);
+      resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
       setStatus(`フォルダ "${handle.name}" を読み込みました`);
@@ -1010,6 +1123,7 @@ function App() {
       setProjectRoot(project.rootLabel);
       setProjectDirHandle(null);
       setFiles(project.files);
+      resetFirmwareEditHistory(project.files);
       captureSavedProject(project.files);
       setFixtureError("");
       setStatus(`フォルダ "${project.rootLabel}" を読み込みました(直接書き戻し不可・保存時はダウンロードになります)`);
@@ -1104,7 +1218,7 @@ function App() {
       };
     });
     setBindingDraft(nextBinding);
-    setStatus(`Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の未適用キー編集を Build & Flash 前に保存しました`);
+    setStatus(`Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の未反映のキー編集を Build & Flash 前に反映しました`);
   }
 
   async function applyBinding(nextBinding: string) {
@@ -1137,7 +1251,8 @@ function App() {
       };
     });
     setBindingDraft(trimmedBinding);
-    setStatus(`Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の編集を保存しました`);
+    setStatus(`Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を ${formatBindingForDisplay(trimmedBinding)} に変更しました（未保存）`);
+    advanceAfterKeyPick(trimmedBinding);
   }
 
   function stageDirectBinding(nextBinding: string) {
@@ -1173,6 +1288,9 @@ function App() {
     setDirectKeyWriteFeedback({ kind: "idle", message });
     showToast(trimmedBinding === from ? "info" : "success", message);
     setStatus(message);
+    if (trimmedBinding !== from) {
+      advanceAfterKeyPick(trimmedBinding);
+    }
   }
 
   function applyDirectFirmwareDiffs(targetDiffs: DirectFirmwareKeyDiff[] = directFirmwareDiffs) {
@@ -2262,6 +2380,7 @@ function App() {
       setProjectRoot(formatGitHubRepositoryRef(ref));
       setProjectDirHandle(null);
       setFiles(project);
+      resetFirmwareEditHistory(project);
       captureSavedProject(project);
       setFixtureError("");
       setBrowserFirmwareFilesLoadedFromGitHub(true);
@@ -2853,7 +2972,7 @@ function App() {
 	          ) : editorMode === "firmware" ? (
 	            <div className="topbar-hint">
 	              <UploadCloud size={17} />
-	              <span>Build & Flash ボタンから GitHub repository を読み込みます</span>
+	              <span title="Build & Flash ボタンから GitHub repository を読み込みます">Build & Flash ボタンから GitHub repository を読み込みます</span>
 	            </div>
 	          ) : directKeymap ? (
             <div className="studio-loader connected-loader" role="group" aria-label="接続状態">
@@ -2972,10 +3091,8 @@ function App() {
                 type="button"
                 key={layer.id}
                 className={index === activeLayerIndex ? "active" : ""}
-                onClick={() => {
-                  setActiveLayerIndex(index);
-                  setSelectedKeyIndex(0);
-                }}
+                onClick={() => setActiveLayerIndex(index)}
+                title={index < 10 ? `${layer.label}（数字キー ${index}）` : layer.label}
               >
                 <span>{index}</span>
                 {layer.label}
@@ -3047,11 +3164,15 @@ function App() {
             <>
               <FirmwareWorkbenchActions
                 activeTab={workbenchTab}
+                canRedo={canRedoFirmwareEdit}
                 canReset={keymapDiff.length > 0}
                 canSaveProject={Boolean(files)}
+                canUndo={canUndoFirmwareEdit}
                 diffCount={keymapDiff.length}
                 onBuildFlash={toggleFirmwareBuildFlash}
+                onRedo={() => redoFirmwareEdit() && setStatus("編集をやり直しました")}
                 onReset={resetFirmwareEdits}
+                onUndo={() => undoFirmwareEdit() && setStatus("編集を元に戻しました")}
                 onSaveProject={saveProjectFiles}
                 projectSaveMode={files?.keymapPath || projectDirHandle ? "save" : "export"}
               />
@@ -3154,7 +3275,9 @@ function App() {
         <aside className="inspector">
           {isDirectMode ? (
             <DirectInspectorTabs
+              autoAdvance={autoAdvanceKey}
               binding={bindingDraft}
+              onAutoAdvanceChange={updateAutoAdvanceKey}
               combos={activeCombos}
               comboSource={displayedDirectComboSource}
               comboError={directComboError}
@@ -3180,9 +3303,11 @@ function App() {
             />
           ) : (
 	            <FirmwareKeyInspector
+	              autoAdvance={autoAdvanceKey}
 	              binding={bindingDraft}
-	              canApplyBinding={hasPendingFirmwareKeyDraft}
+	              canEdit={files !== null}
 	              keyIndex={selectedKeyIndex}
+	              onAutoAdvanceChange={updateAutoAdvanceKey}
 	              onDraftChange={updateFirmwareBindingDraft}
 	              onApplyBinding={applyBinding}
 	              selectedBinding={selectedBinding}
@@ -3355,6 +3480,50 @@ function gcd(a: number, b: number): number {
     right = next;
   }
   return left || 1;
+}
+
+const ARROW_KEY_DIRECTIONS: Record<string, KeyDirection | undefined> = {
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+};
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
+}
+
+function isKeyboardNavigationTarget(target: EventTarget | null): boolean {
+  return (
+    target === document.body ||
+    (target instanceof HTMLElement && Boolean(target.closest(".keyboard-viewport")))
+  );
+}
+
+function focusPhysicalKey(index: number, previousTarget: EventTarget | null) {
+  if (!(previousTarget instanceof HTMLElement) || !previousTarget.classList.contains("physical-key")) {
+    return;
+  }
+  document.querySelector<HTMLButtonElement>(`.physical-key[data-key-index="${index}"]`)?.focus();
+}
+
+function sameFirmwareFiles(left: ProjectFiles | null, right: ProjectFiles | null): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+  return (
+    left.keymap === right.keymap &&
+    left.leftOverlay === right.leftOverlay &&
+    left.rightOverlay === right.rightOverlay
+  );
 }
 
 function formatError(error: unknown): string {
@@ -3642,7 +3811,7 @@ function PhysicalKeyButton({
     <button
       type="button"
       key={`${side}-${index}`}
-      className={`physical-key ${side} ${kind} ${isDraft ? "draft" : ""} ${isSelected ? "selected" : ""}`}
+      className={`physical-key ${side} ${kind} ${display.label.length > 3 ? "long-label" : ""} ${isDraft ? "draft" : ""} ${isSelected ? "selected" : ""}`}
       style={{
         left,
         top,
@@ -3654,6 +3823,7 @@ function PhysicalKeyButton({
       aria-label={ariaLabel}
       aria-pressed={isSelected}
       data-draft={isDraft ? "true" : undefined}
+      data-key-index={index}
       onClick={() => onSelect(index)}
     >
       <span className="key-index">{index + 1}</span>
@@ -3702,7 +3872,7 @@ function ComboOverlay({
               <path key={index} d={segment} />
             ))}
             {combo.points.map((point, index) => (
-              <circle key={index} cx={point.x} cy={point.y} r="4.2" />
+              <circle key={index} cx={point.x} cy={point.y} r="3.4" />
             ))}
             <g
               className="combo-label"
@@ -3729,11 +3899,11 @@ function ComboOverlay({
             >
               <rect
                 x={combo.label.x - combo.label.width / 2}
-                y={combo.label.y - 13}
+                y={combo.label.y - 8}
                 width={combo.label.width}
-                height="26"
-                rx="7"
-                ry="7"
+                height="16"
+                rx="5"
+                ry="5"
               />
               <text x={combo.label.x} y={combo.label.y}>
                 {combo.label.text}
@@ -3761,6 +3931,8 @@ type ComboViz = {
 
 const physicalKeyByIndex = new Map(kobitoKeyPhysicalLayout.map((key) => [key.index, key]));
 
+// Combos are drawn along the bottom edge of their keys, with the label in the
+// gap below, so the overlay never covers the key legends.
 function makeComboViz(combo: KeymapCombo): ComboViz | undefined {
   const points = combo.keyPositions
     .flatMap((position) => {
@@ -3769,7 +3941,7 @@ function makeComboViz(combo: KeymapCombo): ComboViz | undefined {
         ? [
             {
               x: key.x + key.width / 2,
-              y: key.y + key.height / 2,
+              y: key.y + key.height,
             },
           ]
         : [];
@@ -3796,9 +3968,9 @@ function makeComboViz(combo: KeymapCombo): ComboViz | undefined {
     keyPositions: combo.keyPositions,
     label: {
       text,
-      width: Math.max(34, Math.min(86, text.length * 7 + 16)),
+      width: Math.max(28, Math.min(76, text.length * 6 + 12)),
       x: center.x,
-      y: center.y,
+      y: Math.max(...orderedPoints.map((point) => point.y)) + 8,
     },
     points: orderedPoints,
     segments,
@@ -4580,16 +4752,20 @@ function DirectWelcome({
 }
 
 function FirmwareKeyInspector({
+  autoAdvance,
   binding,
-  canApplyBinding,
+  canEdit,
   keyIndex,
+  onAutoAdvanceChange,
   onDraftChange,
   onApplyBinding,
   selectedBinding,
 }: {
+  autoAdvance: boolean;
   binding: string;
-  canApplyBinding: boolean;
+  canEdit: boolean;
   keyIndex: number;
+  onAutoAdvanceChange: (value: boolean) => void;
   onDraftChange: (binding: string) => void;
   onApplyBinding: (binding: string) => void;
   selectedBinding: string;
@@ -4597,12 +4773,18 @@ function FirmwareKeyInspector({
   return (
     <section className="firmware-inspector firmware-key-inspector">
       <section>
-        <p className="eyebrow">Key {keyIndex + 1}</p>
-        <h2>{selectedBinding}</h2>
+        <KeyInspectorHeading
+          autoAdvance={autoAdvance}
+          binding={selectedBinding}
+          keyIndex={keyIndex}
+          onAutoAdvanceChange={onAutoAdvanceChange}
+        />
         <BindingEditor
           actionLabel="選択キーに反映"
+          applyOnPick
           binding={binding}
-          disabled={!canApplyBinding}
+          committedBinding={selectedBinding}
+          disabled={!canEdit}
           onApply={onApplyBinding}
           onDraftChange={onDraftChange}
         />
@@ -4611,7 +4793,37 @@ function FirmwareKeyInspector({
   );
 }
 
+function KeyInspectorHeading({
+  autoAdvance,
+  binding,
+  keyIndex,
+  onAutoAdvanceChange,
+}: {
+  autoAdvance: boolean;
+  binding: string;
+  keyIndex: number;
+  onAutoAdvanceChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="key-inspector-heading">
+      <div>
+        <p className="eyebrow">Key {keyIndex + 1}</p>
+        <h2>{binding}</h2>
+      </div>
+      <label className="auto-advance-toggle" title="通常キーを選んだら、右隣のキーへ自動で移動します">
+        <input
+          type="checkbox"
+          checked={autoAdvance}
+          onChange={(event) => onAutoAdvanceChange(event.target.checked)}
+        />
+        次のキーへ自動移動
+      </label>
+    </div>
+  );
+}
+
 function DirectInspectorTabs({
+  autoAdvance,
   binding,
   canOpenFirmwareMode,
   canWriteCombos,
@@ -4624,6 +4836,7 @@ function DirectInspectorTabs({
   keyWriteFeedback,
   maxCombos,
   onApply,
+  onAutoAdvanceChange,
   onCreateCombo,
   onDeleteCombo,
   onFirmwareMode,
@@ -4636,6 +4849,7 @@ function DirectInspectorTabs({
   selectedBinding,
   firmwareTrackball,
 }: {
+  autoAdvance: boolean;
   binding: string;
   canOpenFirmwareMode: boolean;
   canWriteCombos: boolean;
@@ -4648,6 +4862,7 @@ function DirectInspectorTabs({
   keyWriteFeedback: DirectKeyWriteFeedback;
   maxCombos: number;
   onApply: (binding: string) => void;
+  onAutoAdvanceChange: (value: boolean) => void;
   onCreateCombo: () => void;
   onDeleteCombo: (combo: KeymapCombo) => void;
   onFirmwareMode: () => void;
@@ -4688,14 +4903,15 @@ function DirectInspectorTabs({
       </div>
       {activeTab === "key" ? (
         <div className="direct-key-editor">
-          <div className="direct-key-editor-heading">
-            <div>
-              <p className="eyebrow">Key {keyIndex + 1}</p>
-              <h2>{selectedBinding}</h2>
-            </div>
-          </div>
+          <KeyInspectorHeading
+            autoAdvance={autoAdvance}
+            binding={selectedBinding}
+            keyIndex={keyIndex}
+            onAutoAdvanceChange={onAutoAdvanceChange}
+          />
           <BindingEditor
             actionLabel={keyWriteFeedback.kind === "writing" ? "書き込み中..." : "書き込み予定に追加"}
+            applyOnPick
             binding={binding}
             currentBinding={selectedBinding}
             disabled={!canEditKey || keyWriteFeedback.kind === "writing"}
@@ -4955,27 +5171,36 @@ const WORKBENCH_TABS: Array<{ id: WorkbenchTabId; label: string }> = [
 
 function FirmwareWorkbenchActions({
   activeTab,
+  canRedo,
   canReset,
   canSaveProject,
+  canUndo,
   diffCount,
   onBuildFlash,
+  onRedo,
   onReset,
   onSaveProject,
+  onUndo,
   projectSaveMode,
 }: {
   activeTab: WorkbenchTabId;
+  canRedo: boolean;
   canReset: boolean;
   canSaveProject: boolean;
+  canUndo: boolean;
   diffCount: number;
   onBuildFlash: () => void;
+  onRedo: () => void;
   onReset: () => void;
   onSaveProject: () => void;
+  onUndo: () => void;
   projectSaveMode: "save" | "export";
 }) {
   const isBuildPanelOpen = activeTab === "build";
   const firmwareState = diffCount > 0 ? "Firmware 未保存" : "Firmware 保存済み";
   const diffState = diffCount > 0 ? `Diff ${diffCount}` : "Diff なし";
   const projectSaveLabel = projectSaveMode === "save" ? "Firmwareファイルを保存" : "Firmwareファイルをダウンロード";
+  const modKey = isApplePlatform() ? "⌘" : "Ctrl+";
 
   return (
     <div
@@ -4987,14 +5212,48 @@ function FirmwareWorkbenchActions({
         <span className={diffCount > 0 ? "changed" : "clean"}>{firmwareState}</span>
         <span>{diffState}</span>
       </div>
+      {!isBuildPanelOpen ? (
+        <div className="firmware-history-actions" role="group" aria-label="編集履歴">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label="元に戻す"
+            title={`元に戻す（${modKey}Z）`}
+          >
+            <Undo2 size={16} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label="やり直す"
+            title={`やり直す（${modKey}Shift+Z）`}
+          >
+            <Redo2 size={16} />
+          </button>
+        </div>
+      ) : null}
       <div className="firmware-main-actions">
+        <button
+          type="button"
+          className="danger-ghost reset-action"
+          onClick={onReset}
+          disabled={!canReset}
+          title="保存済みの状態まですべての編集を破棄します"
+        >
+          <RotateCcw size={15} />
+          <span className="button-label">編集をリセット</span>
+        </button>
         {!isBuildPanelOpen ? (
           <button
             type="button"
             className="project-save-action"
             onClick={onSaveProject}
             disabled={!canSaveProject}
-            title={projectSaveMode === "save" ? "読み込んだ firmware ファイルへ保存" : "firmware ファイル一式をダウンロード"}
+            title={`${projectSaveMode === "save" ? "読み込んだ firmware ファイルへ保存" : "firmware ファイル一式をダウンロード"}（${modKey}S）`}
           >
             {projectSaveMode === "save" ? <Save size={16} /> : <Download size={16} />}
             <span className="button-label">{projectSaveLabel}</span>
@@ -5005,14 +5264,12 @@ function FirmwareWorkbenchActions({
           <span className="button-label">{isBuildPanelOpen ? "編集に戻る" : "Build & Flash"}</span>
         </button>
       </div>
-      <div className="firmware-danger-actions">
-        <button type="button" className="danger reset-action" onClick={onReset} disabled={!canReset}>
-          <Undo2 size={16} />
-          <span className="button-label">編集をリセット</span>
-        </button>
-      </div>
     </div>
   );
+}
+
+function isApplePlatform(): boolean {
+  return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 }
 
 function WorkbenchTabs({
@@ -6387,7 +6644,9 @@ function ComboKeyPicker({
 function BindingEditor({
   actionLabel,
   applyOnChange = false,
+  applyOnPick = false,
   binding,
+  committedBinding,
   currentBinding,
   disabled = false,
   disabledReason,
@@ -6397,7 +6656,11 @@ function BindingEditor({
 }: {
   actionLabel: string;
   applyOnChange?: boolean;
+  /** Apply as soon as a value is picked from the palette; the apply button only appears for pending edits. */
+  applyOnPick?: boolean;
   binding: string;
+  /** The binding already applied to the key, used with applyOnPick to detect pending edits. */
+  committedBinding?: string;
   currentBinding?: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -6417,17 +6680,28 @@ function BindingEditor({
     setForm(parseBindingForm(binding));
   }, [binding]);
 
+  // Drafts are reported from updateForm only; reporting them here would echo a
+  // stale form back to the parent before it syncs to a newly loaded binding.
   React.useEffect(() => {
-    onDraftChange?.(builtBinding);
     if (applyOnChange) {
       void onApplyRef.current(builtBinding);
     }
-  }, [applyOnChange, builtBinding, onDraftChange]);
+  }, [applyOnChange, builtBinding]);
 
   function updateForm(nextForm: BindingForm) {
     setForm(nextForm);
     onDraftChange?.(buildBindingFromForm(nextForm));
   }
+
+  function pickValue(nextForm: BindingForm) {
+    updateForm(nextForm);
+    if (applyOnPick && !disabled) {
+      void onApply(buildBindingFromForm(nextForm));
+    }
+  }
+
+  const hasPendingEdit = builtBinding.trim() !== (committedBinding ?? binding).trim();
+  const showApply = showApplyButton && !applyOnChange && (!applyOnPick || hasPendingEdit);
 
   return (
     <div className="binding-editor">
@@ -6456,7 +6730,7 @@ function BindingEditor({
         onSelect={(kind) => updateForm(withBindingKindDefaults(form, kind as BindingKind))}
       />
 
-      <BindingValuePicker form={form} onChange={updateForm} />
+      <BindingValuePicker form={form} onChange={pickValue} />
 
       <details className="advanced-binding">
         <summary>ZMK 詳細編集</summary>
@@ -6471,7 +6745,7 @@ function BindingEditor({
       </details>
 
       {disabledReason ? <p className="empty-note">{disabledReason}</p> : null}
-      {showApplyButton && !applyOnChange ? (
+      {showApply ? (
         <button type="button" className="primary wide-action" disabled={disabled} onClick={() => onApply(builtBinding)}>
           {actionLabel}
         </button>
