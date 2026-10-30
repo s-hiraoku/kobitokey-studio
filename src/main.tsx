@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Bluetooth,
   BookOpen,
   CheckCircle2,
@@ -13,9 +15,11 @@ import {
   FolderOpen,
   Github,
   Loader2,
+  Lock,
   Monitor,
   MousePointer,
   Moon,
+  Pencil,
   Plus,
   Redo2,
   RefreshCw,
@@ -26,6 +30,7 @@ import {
   Sun,
   Trash2,
   Undo2,
+  Upload,
   UploadCloud,
   Usb,
 } from "lucide-react";
@@ -133,15 +138,31 @@ import {
   disconnectWebStudioDevice,
   DirectTrackballSettings,
   addWebStudioCombo,
+  addWebStudioLayer,
+  discardWebStudioDeviceChanges,
+  lockWebStudioDevice,
+  moveWebStudioLayer,
   readWebTrackballSettings,
   readWebStudioCombos,
   removeWebStudioCombo,
+  removeWebStudioLayer,
+  renameWebStudioLayer,
+  resetWebStudioSettings,
+  saveWebStudioDeviceChanges,
   setWebStudioCombo,
   StudioConnectionKind,
+  subscribeWebStudioNotifications,
   supportsWebStudioConnection,
-  writeWebStudioKey,
+  writeWebStudioKeys,
   writeWebTrackballSettings,
+  type WebStudioKeyWrite,
 } from "./lib/zmkStudioWeb";
+import {
+  createDirectKeymapBackup,
+  directKeymapBackupFileName,
+  parseDirectKeymapBackup,
+  planDirectKeymapRestore,
+} from "./lib/directKeymapBackup";
 import "./styles.css";
 
 type FirmwareBuildStart = {
@@ -454,6 +475,9 @@ function App() {
   const [directComboSource, setDirectComboSource] = React.useState<DirectComboSource>("none");
   const [directComboError, setDirectComboError] = React.useState("");
   const [directMaxCombos, setDirectMaxCombos] = React.useState(0);
+  // Label of the device operation (layer edit, restore, reset, ...) running now, if any.
+  const [directDeviceOperation, setDirectDeviceOperation] = React.useState("");
+  const [isRenamingDirectLayer, setIsRenamingDirectLayer] = React.useState(false);
   const [bindingDraft, setBindingDraft] = React.useState("");
   const pendingFirmwareBindingRef = React.useRef("");
   const [directKeyWriteFeedback, setDirectKeyWriteFeedback] = React.useState<DirectKeyWriteFeedback>({
@@ -462,6 +486,20 @@ function App() {
   });
   const [toast, setToast] = React.useState<ToastMessage | null>(null);
   const directWriteRequestRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (isDesktopRuntime || studioConnectionState !== "connected") {
+      return undefined;
+    }
+    return subscribeWebStudioNotifications((notification) => {
+      setDirectKeymap((current) => {
+        if (!current) return current;
+        return notification.kind === "lock-state"
+          ? { ...current, lockState: notification.lockState }
+          : { ...current, hasUnsavedChanges: notification.hasUnsavedChanges };
+      });
+    });
+  }, [isDesktopRuntime, studioConnectionState]);
   const githubDeviceFlowAbortRef = React.useRef<AbortController | null>(null);
   const browserFirmwareOperationRef = React.useRef<BrowserFirmwareOperation>("idle");
   const browserFirmwareRepoBranchInitializedRef = React.useRef(false);
@@ -631,6 +669,25 @@ function App() {
     layers.length > 1 &&
     activeLayerIndex === layers.length - 1 &&
     activeLayerReferences.length === 0;
+  const directLayerEditBlockReason = !directKeymap
+    ? "device に接続してください"
+    : studioConnectionState !== "connected"
+      ? "device に接続してください"
+      : directKeyDraftList.length > 0
+        ? "未書き込みのキー変更を書き込むか破棄してから操作してください"
+        : directDeviceOperation
+          ? `${directDeviceOperation}中です`
+          : "";
+  const directMoveBlockReason = (destIndex: number) => {
+    if (destIndex < 0 || destIndex >= layers.length) return "これ以上移動できません";
+    const references = [
+      ...findLayerReferenceSites(parsedKeymap, activeLayerIndex),
+      ...findLayerReferenceSites(parsedKeymap, destIndex),
+    ];
+    return references.length > 0
+      ? `番号で参照されている layer は並べ替えられません: ${formatLayerReferenceSummary(references)}`
+      : "";
+  };
   const selectedCombos = React.useMemo(
     () => activeCombos.filter((combo) => combo.keyPositions.includes(selectedKeyIndex)),
     [activeCombos, selectedKeyIndex],
@@ -1662,9 +1719,14 @@ function App() {
       return;
     }
 
+    if (directDeviceOperation) {
+      showToast("info", `${directDeviceOperation}中です。終わってから書き込んでください`);
+      return;
+    }
+
     const requestId = ++directWriteRequestRef.current;
-    let nextKeymap = directKeymap;
-    if (!nextKeymap) {
+    const currentKeymap = directKeymap;
+    if (!currentKeymap) {
       const message = "Direct Mode で device を読み込んでから書き込んでください";
       setDirectKeyWriteFeedback({ kind: "error", message });
       showToast("error", message);
@@ -1690,27 +1752,19 @@ function App() {
       return;
     }
 
-    const writtenDrafts: DirectKeyDraft[] = [];
-
     try {
-      for (const [index, draft] of targetDrafts.entries()) {
-        const directLayer = nextKeymap.layers[draft.layerIndex];
+      const writes = targetDrafts.map((draft) => {
+        const directLayer = currentKeymap.layers[draft.layerIndex];
         if (!directLayer) {
           throw new Error(`Layer ${draft.layerIndex} が見つかりません`);
         }
-        setDirectKeyWriteFeedback({
-          kind: "writing",
-          message: `${index + 1}/${targetDrafts.length}: Layer ${draft.layerIndex} / Key ${draft.keyIndex + 1} を書き込み中です`,
-          binding: draft.to,
-        });
-        showToast(
-          "writing",
-          `${index + 1}/${targetDrafts.length}: Layer ${draft.layerIndex} / Key ${draft.keyIndex + 1} を書き込み中です`,
-        );
-        nextKeymap = await writeDirectKeyToDevice(directLayer.id, draft.keyIndex, draft.to);
-        if (requestId !== directWriteRequestRef.current) return;
-        writtenDrafts.push(draft);
-      }
+        return { layerId: directLayer.id, keyPosition: draft.keyIndex, binding: draft.to };
+      });
+      const writingMessage = `${targetDrafts.length} keys をまとめて書き込み中です`;
+      setDirectKeyWriteFeedback({ kind: "writing", message: writingMessage, binding: targetDrafts[0]?.to ?? "" });
+      showToast("writing", writingMessage);
+      const nextKeymap = await writeDirectKeysToDevice(writes);
+      if (requestId !== directWriteRequestRef.current) return;
       setDirectKeymap(nextKeymap);
       setDirectKeyDrafts((current) => {
         const next = { ...current };
@@ -1720,45 +1774,240 @@ function App() {
         return next;
       });
       setBindingDraft(nextKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
-      const message = `Key 変更 ${targetDrafts.length} 件を実機へ書き込みました`;
+      const message = `Key 変更 ${targetDrafts.length} 件を実機へ書き込み、1 回で保存しました`;
       setDirectKeyWriteFeedback({ kind: "success", message });
       showToast("success", message);
       setStatus(message);
     } catch (error) {
       if (requestId !== directWriteRequestRef.current) return;
-      if (writtenDrafts.length > 0) {
-        setDirectKeymap(nextKeymap);
-        setDirectKeyDrafts((current) => {
-          const next = { ...current };
-          for (const draft of writtenDrafts) {
-            delete next[directKeyDraftKey(draft.layerIndex, draft.keyIndex)];
-          }
-          return next;
-        });
-        setBindingDraft(nextKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
-      }
-      const message =
-        writtenDrafts.length > 0
-          ? `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}。${writtenDrafts.length}/${targetDrafts.length} 件は反映済みです`
-          : `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}`;
+      // The device discards a partly staged batch, so nothing was written.
+      const message = `${isDesktopRuntime ? "Direct" : "Web Direct"} 書き込み失敗: ${formatError(error)}。実機の keymap は変更していません`;
       setDirectKeyWriteFeedback({ kind: "error", message });
       showToast("error", message);
       setStatus(message);
     }
   }
 
-  async function writeDirectKeyToDevice(layerId: number, keyPosition: number, binding: string): Promise<StudioKeymap> {
+  async function writeDirectKeysToDevice(writes: WebStudioKeyWrite[]): Promise<StudioKeymap> {
     if (!isDesktopRuntime) {
-      return writeWebStudioKey(layerId, keyPosition, binding);
+      return writeWebStudioKeys(writes);
     }
 
-    return invoke<StudioKeymap>("write_studio_key", {
+    return invoke<StudioKeymap>("write_studio_keys", {
       kind: studioConnectionKind,
       portPath: selectedStudioPort,
-      layerId,
-      keyPosition,
-      binding,
+      writes,
     });
+  }
+
+  function invokeDirectDevice(command: string, args: Record<string, unknown> = {}): Promise<StudioKeymap> {
+    return invoke<StudioKeymap>(command, { kind: studioConnectionKind, portPath: selectedStudioPort, ...args });
+  }
+
+  /**
+   * Run one device operation (layer edit, save, restore, ...) and show the
+   * keymap the device returns. Returns false when it did not run or failed.
+   */
+  async function runDirectDeviceOperation(
+    label: string,
+    operation: () => Promise<StudioKeymap>,
+    successMessage: string | ((keymap: StudioKeymap) => string),
+  ): Promise<boolean> {
+    if (!directKeymap || studioConnectionState !== "connected") {
+      showToast("error", "Direct Mode で device に接続してから操作してください");
+      return false;
+    }
+    if (directDeviceOperation) {
+      return false;
+    }
+    setDirectDeviceOperation(label);
+    showToast("writing", `${label}中です`);
+    try {
+      const keymap = await operation();
+      setDirectKeymap(keymap);
+      const message = typeof successMessage === "function" ? successMessage(keymap) : successMessage;
+      showToast("success", message);
+      setStatus(message);
+      return true;
+    } catch (error) {
+      const message = `${label}に失敗しました: ${formatError(error)}`;
+      showToast("error", message);
+      setStatus(message);
+      return false;
+    } finally {
+      setDirectDeviceOperation("");
+    }
+  }
+
+  function saveDirectDeviceChanges() {
+    void runDirectDeviceOperation(
+      "実機の未保存変更を保存",
+      () => (isDesktopRuntime ? invokeDirectDevice("save_studio_changes") : saveWebStudioDeviceChanges()),
+      "実機の未保存変更を保存しました",
+    );
+  }
+
+  function discardDirectDeviceChanges() {
+    void runDirectDeviceOperation(
+      "実機の未保存変更を破棄",
+      () => (isDesktopRuntime ? invokeDirectDevice("discard_studio_changes") : discardWebStudioDeviceChanges()),
+      "実機の未保存変更を破棄し、保存済みの keymap に戻しました",
+    );
+  }
+
+  async function renameDirectLayer(name: string) {
+    const layer = directKeymap?.layers[activeLayerIndex];
+    const trimmed = name.trim();
+    if (!layer || !trimmed) {
+      return;
+    }
+    const renamed = await runDirectDeviceOperation(
+      "レイヤー名を変更",
+      () =>
+        isDesktopRuntime
+          ? invokeDirectDevice("rename_studio_layer", { layerId: layer.id, name: trimmed })
+          : renameWebStudioLayer(layer.id, trimmed),
+      `Layer ${activeLayerIndex} の名前を「${trimmed}」に変更しました`,
+    );
+    if (renamed) {
+      setIsRenamingDirectLayer(false);
+    }
+  }
+
+  async function addDirectLayer() {
+    const added = await runDirectDeviceOperation(
+      "レイヤーを追加",
+      () => (isDesktopRuntime ? invokeDirectDevice("add_studio_layer") : addWebStudioLayer()),
+      (keymap) => `Layer ${keymap.layers.length - 1} を実機に追加しました`,
+    );
+    if (added && directKeymap) {
+      setActiveLayerIndex(directKeymap.layers.length);
+      setSelectedKeyIndex(0);
+    }
+  }
+
+  async function removeDirectLayer() {
+    const layerIndex = activeLayerIndex;
+    const removed = await runDirectDeviceOperation(
+      "レイヤーを削除",
+      () =>
+        isDesktopRuntime
+          ? invokeDirectDevice("remove_studio_layer", { layerIndex })
+          : removeWebStudioLayer(layerIndex),
+      `Layer ${layerIndex} を実機から削除しました`,
+    );
+    if (removed) {
+      setActiveLayerIndex(Math.max(0, layerIndex - 1));
+      setSelectedKeyIndex(0);
+    }
+  }
+
+  async function moveDirectLayer(offset: -1 | 1) {
+    const startIndex = activeLayerIndex;
+    const destIndex = startIndex + offset;
+    const moved = await runDirectDeviceOperation(
+      "レイヤーを並べ替え",
+      () =>
+        isDesktopRuntime
+          ? invokeDirectDevice("move_studio_layer", { startIndex, destIndex })
+          : moveWebStudioLayer(startIndex, destIndex),
+      `Layer ${startIndex} を ${destIndex} 番目に移動しました`,
+    );
+    if (moved) {
+      setActiveLayerIndex(destIndex);
+    }
+  }
+
+  function exportDirectKeymapBackup() {
+    if (!directKeymap) {
+      return;
+    }
+    const backup = createDirectKeymapBackup(directKeymap);
+    const blob = new Blob([`${JSON.stringify(backup, null, 2)}\n`], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = directKeymapBackupFileName(backup);
+    link.click();
+    URL.revokeObjectURL(url);
+    const message = `実機の keymap (${backup.layers.length} layers) をバックアップしました`;
+    showToast("success", message);
+    setStatus(message);
+  }
+
+  function blockDirectOperationForDrafts(): boolean {
+    if (directKeyDraftList.length === 0) {
+      return false;
+    }
+    showToast("error", "未書き込みのキー変更を書き込むか破棄してから操作してください");
+    return true;
+  }
+
+  async function restoreDirectKeymapBackup(file: File) {
+    if (!directKeymap || blockDirectOperationForDrafts()) {
+      return;
+    }
+    let backup;
+    try {
+      backup = parseDirectKeymapBackup(await file.text());
+    } catch (error) {
+      showToast("error", `復元できません: ${formatError(error)}`);
+      return;
+    }
+    const restoreBackup = backup;
+    let skippedLayerCount = 0;
+    await runDirectDeviceOperation(
+      "バックアップから復元",
+      async () => {
+        let keymap = directKeymap;
+        // Add layers the backup has but the device does not, as far as free slots allow.
+        const missing = Math.max(0, restoreBackup.layers.length - keymap.layers.length);
+        const addable = Math.min(missing, keymap.availableLayers ?? 0);
+        for (let index = 0; index < addable; index += 1) {
+          keymap = isDesktopRuntime ? await invokeDirectDevice("add_studio_layer") : await addWebStudioLayer();
+        }
+        const plan = planDirectKeymapRestore(restoreBackup, keymap);
+        skippedLayerCount = plan.missingLayerCount;
+        for (const rename of plan.renames) {
+          keymap = isDesktopRuntime
+            ? await invokeDirectDevice("rename_studio_layer", { layerId: rename.layerId, name: rename.name })
+            : await renameWebStudioLayer(rename.layerId, rename.name);
+        }
+        if (plan.keyWrites.length > 0) {
+          keymap = await writeDirectKeysToDevice(
+            plan.keyWrites.map((write) => ({
+              layerId: write.layerId,
+              keyPosition: write.keyPosition,
+              binding: write.binding,
+            })),
+          );
+        }
+        return keymap;
+      },
+      () =>
+        skippedLayerCount > 0
+          ? `バックアップから復元しました。空きがないため ${skippedLayerCount} layers は復元できませんでした`
+          : "バックアップから復元しました",
+    );
+  }
+
+  function resetDirectDeviceSettings() {
+    if (blockDirectOperationForDrafts()) {
+      return;
+    }
+    void runDirectDeviceOperation(
+      "実機の設定を初期化",
+      () => (isDesktopRuntime ? invokeDirectDevice("reset_studio_settings") : resetWebStudioSettings()),
+      "実機の Studio 設定を初期化し、ファームウェアの keymap に戻しました",
+    ).then((reset) => {
+      if (reset) {
+        setActiveLayerIndex(0);
+      }
+    });
+  }
+
+  function lockDirectDevice() {
+    void runDirectDeviceOperation("実機をロック", lockWebStudioDevice, "実機をロックしました");
   }
 
   function discardDirectKeyDrafts(targetDrafts: DirectKeyDraft[] = directKeyDraftList) {
@@ -3072,7 +3321,28 @@ function App() {
         <nav className="sidebar" aria-label="Layers">
           <div className="sidebar-heading">
             <h2>レイヤー</h2>
-            {ENABLE_LAYER_STRUCTURE_EDITING ? (
+            {ENABLE_LAYER_STRUCTURE_EDITING && isDirectMode ? (
+              <DirectLayerToolbar
+                activeLayerIndex={activeLayerIndex}
+                availableLayers={directKeymap?.availableLayers}
+                blockReason={directLayerEditBlockReason}
+                deleteBlockReason={
+                  layers.length <= 1
+                    ? "最後の layer は削除できません"
+                    : activeLayerIndex !== layers.length - 1
+                      ? "番号参照のずれを避けるため、最後の layer だけ削除できます"
+                      : activeLayerReferences.length > 0
+                        ? `参照中のため削除できません: ${formatLayerReferenceSummary(activeLayerReferences)}`
+                        : ""
+                }
+                moveDownBlockReason={directMoveBlockReason(activeLayerIndex + 1)}
+                moveUpBlockReason={directMoveBlockReason(activeLayerIndex - 1)}
+                onAdd={() => void addDirectLayer()}
+                onDelete={() => void removeDirectLayer()}
+                onMove={(offset) => void moveDirectLayer(offset)}
+                onRename={() => setIsRenamingDirectLayer(true)}
+              />
+            ) : ENABLE_LAYER_STRUCTURE_EDITING ? (
               <div className="layer-toolbar" role="group" aria-label="Layer controls">
                 <button
                   type="button"
@@ -3110,6 +3380,17 @@ function App() {
               </div>
             ) : null}
           </div>
+          {isDirectMode && isRenamingDirectLayer && activeLayer ? (
+            <DirectLayerRenameForm
+              key={`${activeLayerIndex}-${activeLayer.label}`}
+              busy={Boolean(directDeviceOperation)}
+              initialName={directKeymap?.layers[activeLayerIndex]?.name ?? activeLayer.label}
+              layerIndex={activeLayerIndex}
+              maxLength={directKeymap?.maxLayerNameLength || undefined}
+              onCancel={() => setIsRenamingDirectLayer(false)}
+              onSubmit={(name) => void renameDirectLayer(name)}
+            />
+          ) : null}
           <div className="layer-list">
             {layers.map((layer, index) => (
               <button
@@ -3134,6 +3415,9 @@ function App() {
               keymap={directKeymap}
               portPath={selectedStudioPort}
             />
+          ) : null}
+          {isDirectMode && directKeymap?.hasUnsavedChanges && directKeyWriteFeedback.kind !== "writing" && !directDeviceOperation ? (
+            <DirectDeviceUnsavedBanner onDiscard={discardDirectDeviceChanges} onSave={saveDirectDeviceChanges} />
           ) : null}
           <div className="panel-heading">
             <div className="panel-heading-title">
@@ -3179,12 +3463,18 @@ function App() {
 
           {isDirectMode ? (
             <DirectSummaryPanel
+              busyOperation={directDeviceOperation}
+              canLock={!isDesktopRuntime}
               connectionKind={studioConnectionKind}
               firmwareComboDiffs={directFirmwareComboDiffs}
               firmwareDiffs={directFirmwareDiffs}
               keymap={directKeymap}
               onApplyFirmwareComboDiffs={applyDirectFirmwareComboDiffs}
               onApplyFirmwareDiffs={applyDirectFirmwareDiffs}
+              onExportBackup={exportDirectKeymapBackup}
+              onLock={lockDirectDevice}
+              onReset={resetDirectDeviceSettings}
+              onRestoreBackup={(file) => void restoreDirectKeymapBackup(file)}
               portPath={selectedStudioPort}
             />
           ) : (
@@ -3998,23 +4288,35 @@ function truncateComboLabel(value: string, maxLength: number): string {
 }
 
 function DirectSummaryPanel({
+  busyOperation,
+  canLock,
   connectionKind,
   firmwareComboDiffs,
   firmwareDiffs,
   keymap,
   onApplyFirmwareComboDiffs,
   onApplyFirmwareDiffs,
+  onExportBackup,
+  onLock,
+  onReset,
+  onRestoreBackup,
   portPath,
 }: {
+  busyOperation: string;
+  canLock: boolean;
   connectionKind: StudioConnectionKind;
   firmwareComboDiffs: DirectFirmwareComboDiff[];
   firmwareDiffs: DirectFirmwareKeyDiff[];
   keymap: StudioKeymap | null;
   onApplyFirmwareComboDiffs: (diffs?: DirectFirmwareComboDiff[]) => void;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
+  onExportBackup: () => void;
+  onLock: () => void;
+  onReset: () => void;
+  onRestoreBackup: (file: File) => void;
   portPath: string;
 }) {
-  const [syncTab, setSyncTab] = React.useState<"summary" | "key" | "combo">("summary");
+  const [syncTab, setSyncTab] = React.useState<"summary" | "key" | "combo" | "device">("summary");
 
   if (!keymap) {
     return (
@@ -4032,6 +4334,7 @@ function DirectSummaryPanel({
     { id: "summary", label: "概要" },
     { id: "key", label: "Key 差分", count: firmwareDiffs.length },
     { id: "combo", label: "Combo 差分", count: firmwareComboDiffs.length },
+    { id: "device", label: "バックアップ" },
   ];
 
   return (
@@ -4070,8 +4373,14 @@ function DirectSummaryPanel({
           </div>
           <div>
             <dt>保存状態</dt>
-            <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "自動保存済み"}</dd>
+            <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "保存済み"}</dd>
           </div>
+          {typeof keymap.availableLayers === "number" ? (
+            <div>
+              <dt>レイヤー空き</dt>
+              <dd>{keymap.availableLayers === 0 ? "なし" : `あと ${keymap.availableLayers} layers`}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Key 差分</dt>
             <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
@@ -4088,7 +4397,295 @@ function DirectSummaryPanel({
       {syncTab === "combo" ? (
         <DirectFirmwareComboDiffPanel diffs={firmwareComboDiffs} onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs} />
       ) : null}
+      {syncTab === "device" ? (
+        <DirectDeviceToolsPanel
+          busyOperation={busyOperation}
+          canLock={canLock}
+          lockState={keymap.lockState}
+          onExportBackup={onExportBackup}
+          onLock={onLock}
+          onReset={onReset}
+          onRestoreBackup={onRestoreBackup}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function DirectDeviceToolsPanel({
+  busyOperation,
+  canLock,
+  lockState,
+  onExportBackup,
+  onLock,
+  onReset,
+  onRestoreBackup,
+}: {
+  busyOperation: string;
+  canLock: boolean;
+  lockState: string;
+  onExportBackup: () => void;
+  onLock: () => void;
+  onReset: () => void;
+  onRestoreBackup: (file: File) => void;
+}) {
+  const restoreInputRef = React.useRef<HTMLInputElement>(null);
+  const busy = Boolean(busyOperation);
+
+  return (
+    <div className="direct-device-tools">
+      <section>
+        <h4>バックアップ</h4>
+        <p>実機の keymap（全 layer の名前とキー割り当て）を JSON に保存し、あとで同じ状態に戻せます。</p>
+        <div className="direct-device-tools-actions">
+          <button type="button" onClick={onExportBackup} disabled={busy}>
+            <Download size={14} />
+            バックアップを保存
+          </button>
+          <button type="button" onClick={() => restoreInputRef.current?.click()} disabled={busy}>
+            <Upload size={14} />
+            バックアップから復元
+          </button>
+          <input
+            ref={restoreInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              if (file) {
+                onRestoreBackup(file);
+              }
+              event.currentTarget.value = "";
+            }}
+          />
+        </div>
+      </section>
+      {canLock ? (
+        <section>
+          <h4>ロック</h4>
+          <p>
+            作業を終えたら実機をロックすると、Studio Unlock キーを押すまで設定を変えられなくなります。
+            ファームウェアでロックが無効になっている場合は、押しても変わりません。現在: {lockState}
+          </p>
+          <div className="direct-device-tools-actions">
+            <button type="button" onClick={onLock} disabled={busy || lockState === "LOCKED"}>
+              <Lock size={14} />
+              実機をロック
+            </button>
+          </div>
+        </section>
+      ) : null}
+      <section>
+        <h4>初期化</h4>
+        <p>Direct Mode で書き込んだ変更をすべて消して、ファームウェアの keymap に戻します。元に戻せないので、先にバックアップを保存してください。</p>
+        <div className="direct-device-tools-actions">
+          <ConfirmButton
+            confirmLabel="もう一度押すと初期化します"
+            disabled={busy}
+            icon={<RotateCcw size={14} />}
+            label="実機の設定を初期化"
+            onConfirm={onReset}
+          />
+        </div>
+      </section>
+      {busyOperation ? <p className="direct-device-tools-busy">{busyOperation}中です…</p> : null}
+    </div>
+  );
+}
+
+/** A destructive button that needs a second click within a few seconds. */
+function ConfirmButton({
+  confirmLabel,
+  disabled,
+  icon,
+  label,
+  onConfirm,
+  title,
+}: {
+  confirmLabel: string;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+  label: string;
+  onConfirm: () => void;
+  title?: string;
+}) {
+  const [armed, setArmed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!armed) return undefined;
+    const timer = window.setTimeout(() => setArmed(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [armed]);
+
+  return (
+    <button
+      type="button"
+      className={armed ? "danger" : "danger-ghost"}
+      disabled={disabled}
+      title={title}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+        }
+      }}
+    >
+      {icon}
+      {armed ? confirmLabel : label}
+    </button>
+  );
+}
+
+function DirectDeviceUnsavedBanner({ onDiscard, onSave }: { onDiscard: () => void; onSave: () => void }) {
+  return (
+    <div className="direct-device-unsaved" role="status">
+      <AlertTriangle size={16} />
+      <span>
+        実機に保存されていない変更があります。このまま電源を切ると消えます。
+      </span>
+      <button type="button" className="danger-ghost" onClick={onDiscard}>
+        破棄
+      </button>
+      <button type="button" className="primary" onClick={onSave}>
+        <Save size={14} />
+        保存
+      </button>
+    </div>
+  );
+}
+
+function DirectLayerToolbar({
+  activeLayerIndex,
+  availableLayers,
+  blockReason,
+  deleteBlockReason,
+  moveDownBlockReason,
+  moveUpBlockReason,
+  onAdd,
+  onDelete,
+  onMove,
+  onRename,
+}: {
+  activeLayerIndex: number;
+  availableLayers?: number;
+  blockReason: string;
+  deleteBlockReason: string;
+  moveDownBlockReason: string;
+  moveUpBlockReason: string;
+  onAdd: () => void;
+  onDelete: () => void;
+  onMove: (offset: -1 | 1) => void;
+  onRename: () => void;
+}) {
+  const addBlockReason =
+    blockReason ||
+    (availableLayers === undefined
+      ? "このバージョンでは layer の空きを確認できません"
+      : availableLayers === 0
+        ? "ファームウェアに layer の空きがありません"
+        : "");
+
+  return (
+    <div className="layer-toolbar" role="group" aria-label="Layer controls">
+      <button
+        type="button"
+        onClick={onRename}
+        disabled={Boolean(blockReason)}
+        title={blockReason || "選択中の layer の名前を変更"}
+        aria-label="選択中の layer の名前を変更"
+      >
+        <Pencil size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onMove(-1)}
+        disabled={Boolean(blockReason || moveUpBlockReason)}
+        title={blockReason || moveUpBlockReason || `Layer ${activeLayerIndex} を上へ移動`}
+        aria-label="選択中の layer を上へ移動"
+      >
+        <ArrowUp size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onMove(1)}
+        disabled={Boolean(blockReason || moveDownBlockReason)}
+        title={blockReason || moveDownBlockReason || `Layer ${activeLayerIndex} を下へ移動`}
+        aria-label="選択中の layer を下へ移動"
+      >
+        <ArrowDown size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={Boolean(addBlockReason)}
+        title={addBlockReason || `実機の末尾に layer を追加（空き ${availableLayers}）`}
+        aria-label="Layer を追加"
+      >
+        <Plus size={15} />
+      </button>
+      <button
+        type="button"
+        className="danger"
+        onClick={onDelete}
+        disabled={Boolean(blockReason || deleteBlockReason)}
+        title={blockReason || deleteBlockReason || "選択中の layer を実機から削除"}
+        aria-label="選択中の layer を削除"
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+}
+
+function DirectLayerRenameForm({
+  busy,
+  initialName,
+  layerIndex,
+  maxLength,
+  onCancel,
+  onSubmit,
+}: {
+  busy: boolean;
+  initialName: string;
+  layerIndex: number;
+  maxLength?: number;
+  onCancel: () => void;
+  onSubmit: (name: string) => void;
+}) {
+  const [name, setName] = React.useState(initialName);
+
+  return (
+    <form
+      className="direct-layer-rename"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(name);
+      }}
+    >
+      <label>
+        <span>Layer {layerIndex} の名前</span>
+        <input
+          autoFocus
+          maxLength={maxLength}
+          value={name}
+          onChange={(event) => setName(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") onCancel();
+          }}
+        />
+      </label>
+      <div>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          キャンセル
+        </button>
+        <button type="submit" className="primary" disabled={busy || !name.trim()}>
+          変更
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -4517,6 +5114,12 @@ function DirectCapabilityStrip({
         <span className="capability-label">キー割り当て</span>
         <span className={`capability-state ${keyWritable ? "ok" : "pending"}`}>
           {keyWritable ? "書込可" : "要接続"}
+        </span>
+      </li>
+      <li>
+        <span className="capability-label">レイヤー</span>
+        <span className={`capability-state ${keyWritable ? "ok" : "pending"}`}>
+          {keyWritable ? "名前・追加・並べ替え" : "要接続"}
         </span>
       </li>
       <li>

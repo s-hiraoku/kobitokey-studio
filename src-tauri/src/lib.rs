@@ -427,6 +427,8 @@ fn read_studio_keymap_from_client<T: Read + Write>(
         serial_number: String::from_utf8_lossy(&info.serial_number).to_string(),
         lock_state,
         has_unsaved_changes,
+        available_layers: raw_keymap.available_layers,
+        max_layer_name_length: raw_keymap.max_layer_name_length,
         layers,
     })
 }
@@ -439,35 +441,150 @@ fn write_studio_key(
     key_position: i32,
     binding: String,
 ) -> Result<StudioKeymap, String> {
-    let behavior = parse_direct_behavior(&binding)?;
-    match kind.as_deref().unwrap_or("usb") {
-        "usb" => {
-            let mut client = open_studio_client(&port_path)?;
-            write_studio_key_with_client(&mut client, layer_id, key_position, behavior)?;
-            read_studio_keymap_from_client(&mut client)
-        }
-        "bluetooth" => {
-            ensure_desktop_bluetooth_direct_enabled().map_err(|error| error.message)?;
-            let device = resolve_ble_device(Some(port_path))?;
-            let mut client = open_ble_client_safe(&device.device_id)?;
-            write_studio_key_with_client(&mut client, layer_id, key_position, behavior)?;
-            read_studio_keymap_from_client(&mut client)
-        }
-        other => Err(format!("Unsupported Direct Mode connection kind: {other}")),
-    }
+    write_studio_keys(
+        kind,
+        port_path,
+        vec![StudioKeyWrite {
+            layer_id,
+            key_position,
+            binding,
+        }],
+    )
 }
 
-fn write_studio_key_with_client<T: Read + Write>(
-    client: &mut StudioClient<T>,
+/// Stages every binding, then saves once. A failed binding discards the staged
+/// changes so the device keeps its saved keymap.
+#[tauri::command]
+fn write_studio_keys(
+    kind: Option<String>,
+    port_path: String,
+    writes: Vec<StudioKeyWrite>,
+) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        let catalog = load_behavior_catalog_from_client(client)?;
+        let behaviors = writes
+            .iter()
+            .map(|write| parse_direct_behavior_with_catalog(&write.binding, &catalog))
+            .collect::<Result<Vec<_>, _>>()?;
+        let staged = writes.iter().zip(behaviors).try_for_each(|(write, behavior)| {
+            client
+                .set_key_at(write.layer_id, write.key_position, behavior)
+                .map_err(|error| {
+                    format!(
+                        "Set layer binding failed at layer {} / key {}: {error}",
+                        write.layer_id,
+                        write.key_position + 1
+                    )
+                })
+        });
+        if let Err(message) = staged {
+            let _ = client.discard_changes();
+            return Err(message);
+        }
+        client.save_changes().map_err(|error| error.to_string())?;
+        read_studio_keymap_from_client(client)
+    })
+}
+
+#[tauri::command]
+fn save_studio_changes(kind: Option<String>, port_path: String) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client.save_changes().map_err(|error| error.to_string())?;
+        read_studio_keymap_from_client(client)
+    })
+}
+
+#[tauri::command]
+fn discard_studio_changes(kind: Option<String>, port_path: String) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client.discard_changes().map_err(|error| error.to_string())?;
+        read_studio_keymap_from_client(client)
+    })
+}
+
+#[tauri::command]
+fn rename_studio_layer(
+    kind: Option<String>,
+    port_path: String,
     layer_id: u32,
-    key_position: i32,
-    behavior: Behavior,
-) -> Result<(), String> {
-    client
-        .set_key_at(layer_id, key_position, behavior)
-        .map_err(|error| error.to_string())?;
+    name: String,
+) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client
+            .set_layer_props(layer_id, name)
+            .map_err(|error| error.to_string())?;
+        save_and_read_studio_keymap(client)
+    })
+}
+
+#[tauri::command]
+fn add_studio_layer(kind: Option<String>, port_path: String) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client.add_layer().map_err(|error| error.to_string())?;
+        save_and_read_studio_keymap(client)
+    })
+}
+
+#[tauri::command]
+fn remove_studio_layer(
+    kind: Option<String>,
+    port_path: String,
+    layer_index: u32,
+) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client
+            .remove_layer(layer_index)
+            .map_err(|error| error.to_string())?;
+        save_and_read_studio_keymap(client)
+    })
+}
+
+#[tauri::command]
+fn move_studio_layer(
+    kind: Option<String>,
+    port_path: String,
+    start_index: u32,
+    dest_index: u32,
+) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        client
+            .move_layer(start_index, dest_index)
+            .map_err(|error| error.to_string())?;
+        save_and_read_studio_keymap(client)
+    })
+}
+
+#[tauri::command]
+fn reset_studio_settings(kind: Option<String>, port_path: String) -> Result<StudioKeymap, String> {
+    with_studio_device(kind, port_path, |client| {
+        if !client.reset_settings().map_err(|error| error.to_string())? {
+            return Err("Device refused to reset its settings".to_string());
+        }
+        read_studio_keymap_from_client(client)
+    })
+}
+
+fn save_and_read_studio_keymap<T: Read + Write>(
+    client: &mut StudioClient<T>,
+) -> Result<StudioKeymap, String> {
     client.save_changes().map_err(|error| error.to_string())?;
-    Ok(())
+    read_studio_keymap_from_client(client)
+}
+
+fn with_studio_device<R>(
+    kind: Option<String>,
+    port_path: String,
+    operation: impl FnOnce(&mut StudioClient<&mut dyn StudioIo>) -> Result<R, String>,
+) -> Result<R, String> {
+    let kind = kind.unwrap_or_else(|| "usb".to_string());
+    if kind == "bluetooth" {
+        ensure_desktop_bluetooth_direct_enabled().map_err(|error| error.message)?;
+    }
+    let target = resolve_studio_target(&kind, Some(port_path))?;
+    with_studio_transport(&target, |transport| {
+        let mut client = StudioClient::new(transport);
+        operation(&mut client)
+    })
 }
 
 #[tauri::command]
@@ -1919,6 +2036,60 @@ fn parse_direct_behavior(binding: &str) -> Result<Behavior, String> {
     }
 }
 
+/// Like `parse_direct_behavior`, but also resolves firmware-specific behaviors
+/// (macros, custom hold-taps, ...) by the display name the device reports, and
+/// `&unknown <id> <p1> <p2>` raw bindings.
+fn parse_direct_behavior_with_catalog(
+    binding: &str,
+    catalog: &BehaviorCatalog,
+) -> Result<Behavior, String> {
+    let tokens: Vec<&str> = binding.split_whitespace().collect();
+    let behavior = tokens.first().copied().unwrap_or_default();
+    if behavior == "&unknown" {
+        let behavior_id = parse_u32(required_token(&tokens, 1, "behavior id")?)? as i32;
+        if !catalog.role_by_id.contains_key(&behavior_id)
+            && !catalog.custom_name_by_id.contains_key(&behavior_id)
+        {
+            return Err(format!(
+                "Device firmware does not expose behavior id {behavior_id}"
+            ));
+        }
+        return Ok(Behavior::Unknown {
+            behavior_id,
+            param1: parse_custom_param(tokens.get(2).copied())?,
+            param2: parse_custom_param(tokens.get(3).copied())?,
+        });
+    }
+    let name = behavior.trim_start_matches('&');
+    let custom_id = catalog
+        .custom_name_by_id
+        .iter()
+        .filter(|(_, custom_name)| custom_name.as_str() == name)
+        .map(|(behavior_id, _)| *behavior_id)
+        .min();
+    match custom_id {
+        Some(behavior_id) => {
+            if tokens.len() > 3 {
+                return Err(format!("{behavior} takes at most two parameters"));
+            }
+            Ok(Behavior::Unknown {
+                behavior_id,
+                param1: parse_custom_param(tokens.get(1).copied())?,
+                param2: parse_custom_param(tokens.get(2).copied())?,
+            })
+        }
+        None => parse_direct_behavior(binding),
+    }
+}
+
+fn parse_custom_param(value: Option<&str>) -> Result<u32, String> {
+    match value {
+        None => Ok(0),
+        Some(value) if value.chars().all(|ch| ch.is_ascii_digit()) => parse_u32(value),
+        Some(value) => parse_hid_usage(value).map(|usage| usage.to_hid_usage()),
+    }
+}
+
 fn required_token<'a>(tokens: &'a [&str], index: usize, name: &str) -> Result<&'a str, String> {
     tokens
         .get(index)
@@ -2384,15 +2555,27 @@ impl From<BleDeviceInfo> for StudioBluetoothDevice {
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StudioKeymap {
     device_name: String,
     serial_number: String,
     lock_state: String,
     has_unsaved_changes: bool,
+    available_layers: u32,
+    max_layer_name_length: u32,
     layers: Vec<StudioLayer>,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioKeyWrite {
+    layer_id: u32,
+    key_position: i32,
+    binding: String,
+}
+
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StudioConnection {
     kind: String,
     transport: String,
@@ -2483,6 +2666,14 @@ pub fn run() {
             read_studio_keymap,
             connect_studio_device,
             write_studio_key,
+            write_studio_keys,
+            save_studio_changes,
+            discard_studio_changes,
+            rename_studio_layer,
+            add_studio_layer,
+            remove_studio_layer,
+            move_studio_layer,
+            reset_studio_settings,
             read_studio_trackball_settings,
             write_studio_trackball_settings,
             read_studio_combos,
@@ -2616,6 +2807,34 @@ mod tests {
             ]),
             custom_name_by_id: std::collections::HashMap::from([(22, "zoom_hold".to_string())]),
         }
+    }
+
+    #[test]
+    fn catalog_parser_resolves_custom_behaviors_by_device_name() {
+        let catalog = test_behavior_catalog();
+        assert_eq!(
+            parse_direct_behavior_with_catalog("&zoom_hold 9", &catalog).unwrap(),
+            Behavior::Unknown {
+                behavior_id: 22,
+                param1: 9,
+                param2: 0
+            }
+        );
+        assert_eq!(
+            parse_direct_behavior_with_catalog("&unknown 22 1 2", &catalog).unwrap(),
+            Behavior::Unknown {
+                behavior_id: 22,
+                param1: 1,
+                param2: 2
+            }
+        );
+        assert!(parse_direct_behavior_with_catalog("&unknown 99", &catalog).is_err());
+        assert!(parse_direct_behavior_with_catalog("&zoom_hold 1 2 3", &catalog).is_err());
+        assert!(parse_direct_behavior_with_catalog("&my_macro", &catalog).is_err());
+        assert_eq!(
+            parse_direct_behavior_with_catalog("&mo 3", &catalog).unwrap(),
+            Behavior::MomentaryLayer { layer_id: 3 }
+        );
     }
 
     #[test]

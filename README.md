@@ -44,7 +44,8 @@ For end-user steps, start with the published docs:
 - Render the left half from hand-tuned coordinates and mirror it for the right half
 - Edit common ZMK key actions with structured controls
 - Detect and read ZMK Studio compatible devices over USB serial; Bluetooth is available only when the ZMK Studio device appears
-- Write supported key actions directly to a connected keyboard
+- Write supported key actions directly to a connected keyboard, staged as one batch and saved once
+- Rename, add, reorder, and remove layers on a connected keyboard, and back up, restore, or reset its keymap
 - Display, add, edit, and delete keymap combos
 - Read and edit trackball parameters from the left/right overlay files
 - Preview file-level diffs before saving
