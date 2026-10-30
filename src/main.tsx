@@ -43,6 +43,8 @@ import {
   diffDirectCombosAgainstFirmware,
   diffDirectKeymapAgainstFirmware,
   firmwareCombosToStudioSet,
+  normalizeDirectBindingForDisplay,
+  sameDirectBinding,
   studioKeymapToParsedKeymap,
   type DirectFirmwareComboDiff,
   type DirectFirmwareKeyDiff,
@@ -558,8 +560,12 @@ function App() {
   );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
+  // The device reports some parameters numerically (&bt 3 0, &mkp 1); show them
+  // in the same form as the editor so an untouched key does not look changed.
   const selectedDeviceBinding =
-    isDirectMode ? directKeymap?.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? selectedBinding : selectedBinding;
+    isDirectMode && directKeymap?.layers[activeLayerIndex]?.bindings[selectedKeyIndex] !== undefined
+      ? normalizeDirectBindingForDisplay(directKeymap.layers[activeLayerIndex].bindings[selectedKeyIndex])
+      : selectedBinding;
   const selectedDirectKeyDraft = directKeyDrafts[directKeyDraftKey(activeLayerIndex, selectedKeyIndex)];
   const activeLayerDraftKeyIndexes = React.useMemo(
     () =>
@@ -1263,13 +1269,14 @@ function App() {
       return;
     }
 
-    const from = directKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "";
+    const from = normalizeDirectBindingForDisplay(directKeymap.layers[activeLayerIndex]?.bindings[selectedKeyIndex] ?? "");
     const draftKey = directKeyDraftKey(activeLayerIndex, selectedKeyIndex);
     const trimmedBinding = nextBinding.trim();
+    const isUnchanged = sameDirectBinding(trimmedBinding, from);
     setBindingDraft(trimmedBinding);
     setDirectKeyDrafts((current) => {
       const next = { ...current };
-      if (trimmedBinding === from) {
+      if (isUnchanged) {
         delete next[draftKey];
       } else {
         next[draftKey] = {
@@ -1281,14 +1288,13 @@ function App() {
       }
       return next;
     });
-    const message =
-      trimmedBinding === from
-        ? `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の下書きを取り消しました`
-        : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み予定に追加しました`;
+    const message = isUnchanged
+      ? `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} の下書きを取り消しました`
+      : `Layer ${activeLayerIndex} / Key ${selectedKeyIndex + 1} を書き込み予定に追加しました`;
     setDirectKeyWriteFeedback({ kind: "idle", message });
-    showToast(trimmedBinding === from ? "info" : "success", message);
+    showToast(isUnchanged ? "info" : "success", message);
     setStatus(message);
-    if (trimmedBinding !== from) {
+    if (!isUnchanged) {
       advanceAfterKeyPick(trimmedBinding);
     }
   }

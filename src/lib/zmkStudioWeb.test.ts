@@ -22,6 +22,17 @@ describe("parseHidUsage", () => {
     expect(parseHidUsage("QMARK")).toBe(0x02070038);
   });
 
+  it("accepts ZMK modifier functions", () => {
+    expect(parseHidUsage("LS(N1)")).toBe(0x0207001e);
+    expect(parseHidUsage("LG(LS(N4))")).toBe(0x0a070021);
+    expect(parseHidUsage("RG(A)")).toBe(0x80070004);
+  });
+
+  it("accepts JIS international keys", () => {
+    expect(parseHidUsage("INT_YEN")).toBe(0x00070089);
+    expect(parseHidUsage("INT_RO")).toBe(0x00070087);
+  });
+
   it("keeps right-hand modifier bits unsigned", () => {
     expect(parseHidUsage("0x80000004")).toBe(0x80070004);
   });

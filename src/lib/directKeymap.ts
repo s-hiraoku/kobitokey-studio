@@ -7,6 +7,7 @@ import {
   type KeymapCombo,
   type ParsedKeymap,
 } from "./keymapParser";
+import { parseHidUsage } from "./hidUsage";
 import { normalizeKeycodeName } from "./keycodeAliases";
 
 const STUDIO_KEY_COUNT = 40;
@@ -335,6 +336,10 @@ function uniqueNodeId(baseId: string, existingIds: string[]): string {
   }
 }
 
+export function sameDirectBinding(left: string, right: string): boolean {
+  return sameComparableBinding(left, right);
+}
+
 function sameComparableBinding(left: string, right: string): boolean {
   return (
     normalizeComparableBinding(left) === normalizeComparableBinding(right) ||
@@ -402,8 +407,14 @@ function normalizeComparableParts(parts: string[], keycodeIndexes: number[]): st
 }
 
 function normalizeComparableKeycode(value: string): string {
-  const decimalHidUsage = parseDecimalHidUsage(value);
-  return normalizeKeycodeName(decimalHidUsage ?? value);
+  const keycode = parseDecimalHidUsage(value) ?? value;
+  // Compare encoded usages so the device's numeric form (0x0207001e) matches
+  // names, aliases and modifier functions (EXCL, LS(N1)) in the keymap.
+  try {
+    return `0x${parseHidUsage(keycode).toString(16).padStart(8, "0")}`;
+  } catch {
+    return normalizeKeycodeName(keycode);
+  }
 }
 
 function parseDecimalHidUsage(value: string): string | undefined {
