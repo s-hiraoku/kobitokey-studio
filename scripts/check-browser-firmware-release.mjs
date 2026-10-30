@@ -706,7 +706,7 @@ const checks = [
     pass: () =>
       allIncludes(files.main, [
         'actionLabel="選択キーに反映"',
-        "canApplyBinding={hasPendingFirmwareKeyDraft}",
+        "applyOnPick",
         "Firmwareファイルを保存",
         "Firmwareファイルをダウンロード",
         '<span className="button-label">{projectSaveLabel}</span>',
@@ -720,7 +720,7 @@ const checks = [
       ]) &&
       allIncludes(files.uiSmoke, [
         'getByRole("button", { name: "選択キーに反映" })',
-        "selected key apply action should live in the right key inspector",
+        "picking a key from the palette should apply it without a separate apply button",
         "selected key apply should not be grouped with firmware project actions",
         "project save/export should be grouped with firmware actions",
         "project save/export should not be stranded in the layer heading",

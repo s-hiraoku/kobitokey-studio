@@ -346,14 +346,9 @@ async function inspectKeyBindingEditActions(page, label) {
 
   await clickCurrentElement(page, '.choice-grid button[title="B"]');
   const writeButton = page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" });
-  if ((await writeButton.count()) !== 1) {
-    failures.push(`${label}: selected key apply action should live in the right key inspector`);
-    return failures;
+  if ((await writeButton.count()) !== 0) {
+    failures.push(`${label}: picking a key from the palette should apply it without a separate apply button`);
   }
-  if (await writeButton.isDisabled()) {
-    failures.push(`${label}: selected key apply action should enable after editing a key`);
-  }
-  await writeButton.click();
 
   const afterApply = await readKeyBindingState(page);
   if (afterApply.selectedBinding !== "&kp B") {
@@ -828,17 +823,12 @@ async function inspectFirmwareActionButtons(page, label) {
   const failures = [];
   const actions = page.locator(".firmware-workbench-actions");
   const buildButton = actions.getByRole("button", { name: "Build & Flash" });
-  const writeButton = page.locator(".firmware-key-inspector").getByRole("button", { name: "選択キーに反映" });
   const strayWriteButton = actions.getByRole("button", { name: "選択キーに反映" });
   const exportButton = actions.getByRole("button", { name: "Firmwareファイルをダウンロード" });
   const resetButton = actions.getByRole("button", { name: "編集をリセット" });
 
   if ((await buildButton.count()) !== 1) {
     failures.push(`${label}: Build & Flash should be a firmware action button`);
-    return failures;
-  }
-  if ((await writeButton.count()) !== 1) {
-    failures.push(`${label}: selected key apply should be available in the right key inspector`);
     return failures;
   }
   if ((await strayWriteButton.count()) !== 0) {
@@ -855,8 +845,11 @@ async function inspectFirmwareActionButtons(page, label) {
     failures.push(`${label}: reset edits should be paired with the Build & Flash action`);
     return failures;
   }
-  if ((await actions.locator(".firmware-danger-actions").getByRole("button", { name: "編集をリセット" }).count()) !== 1) {
-    failures.push(`${label}: reset edits should be separated from primary firmware actions`);
+  if ((await actions.locator(".reset-action.danger-ghost").count()) !== 1) {
+    failures.push(`${label}: reset edits should be styled apart from primary firmware actions`);
+  }
+  if ((await actions.getByRole("button", { name: "元に戻す" }).count()) !== 1) {
+    failures.push(`${label}: firmware actions should offer undo`);
   }
   if (await resetButton.isDisabled()) {
     failures.push(`${label}: reset edits should be enabled after firmware edits`);

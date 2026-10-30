@@ -336,3 +336,41 @@ function polar(center: { x: number; y: number }, radius: number, angle: number) 
     y: center.y + radius * Math.sin(angle),
   };
 }
+
+export type KeyDirection = "left" | "right" | "up" | "down";
+
+/**
+ * Finds the nearest key in a direction by physical position, so arrow-key
+ * navigation follows the split/staggered layout instead of the matrix order.
+ */
+export function neighborKeyIndex(index: number, direction: KeyDirection): number {
+  const origin = kobitoKeyPhysicalLayout.find((key) => key.index === index);
+  if (!origin) {
+    return index;
+  }
+  const originCenter = keyCenter(origin);
+  let best: { index: number; score: number } | null = null;
+  for (const candidate of kobitoKeyPhysicalLayout) {
+    if (candidate.index === index) {
+      continue;
+    }
+    const center = keyCenter(candidate);
+    const dx = center.x - originCenter.x;
+    const dy = center.y - originCenter.y;
+    const [primary, secondary] =
+      direction === "left" ? [-dx, dy] : direction === "right" ? [dx, dy] : direction === "up" ? [-dy, dx] : [dy, dx];
+    // Ignore keys that are behind, beside, or more sideways than forward.
+    if (primary <= KEY_UNIT / 4 || Math.abs(secondary) > primary * 1.5) {
+      continue;
+    }
+    const score = primary + Math.abs(secondary) * 2;
+    if (!best || score < best.score) {
+      best = { index: candidate.index, score };
+    }
+  }
+  return best?.index ?? index;
+}
+
+function keyCenter(key: PhysicalKey): { x: number; y: number } {
+  return { x: key.x + key.width / 2, y: key.y + key.height / 2 };
+}
