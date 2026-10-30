@@ -1,17 +1,17 @@
 /* ============================================================
-   KobitoKey Studio — "Workbench" theme (polished)
-   Quieter background · cleaner type scale · tighter rhythm
-   Keycaps + keyboard plate keep their honey/pine identity.
-   Fraunces (display) / Inter (UI) / JetBrains Mono (data)
+   KobitoKey Studio — "Console" theme
+   Graphite chrome · one cobalt accent for actions and focus.
+   Keycaps + keyboard plate keep their honey identity.
+   IBM Plex Sans JP (UI) / IBM Plex Mono (data)
    ============================================================ */
 
 :root {
   /* surfaces — cool, lightly blue-tinted paper */
-  --paper:        #eef1f3;
-  --paper-2:      #e7ebee;
-  --paper-3:      #dde3e7;
-  --card:         #f5f8fa;
-  --card-sunk:    #e7ebee;
+  --paper:        #e9ebee;
+  --paper-2:      #eef0f3;
+  --paper-3:      #e2e5e9;
+  --card:         #f7f8fa;
+  --card-sunk:    #eef0f3;
   /* top face for raised controls (inputs, light buttons) — white on light,
      a lifted slate on dark so they don't glow against the dark chrome. */
   --field-face:   #ffffff;
@@ -19,18 +19,21 @@
      white veil on light, a faint light veil on dark. */
   --glass:        rgba(255, 255, 255, 0.62);
   --glass-soft:   rgba(255, 255, 255, 0.52);
+  /* keyboard canvas behind the plate, with its dot grid */
+  --canvas:       #dfe2e6;
+  --canvas-dot:   rgba(26, 29, 34, 0.08);
 
   /* ink — cool neutral, slight blue undertone */
-  --ink:          #1a1f24;
-  --ink-strong:   #0f1318;
-  --ink-soft:     #3a4450;
-  --ink-muted:    #5e6976;
-  --ink-faint:    #6c7785;
+  --ink:          #1a1d22;
+  --ink-strong:   #0f1115;
+  --ink-soft:     #3a404a;
+  --ink-muted:    #5d6470;
+  --ink-faint:    #697080;
 
   /* hairlines — cool */
-  --hairline:     #c2cad3;
-  --hairline-soft:#d6dde3;
-  --hairline-fine:#e4e9ee;
+  --hairline:     #d3d7dd;
+  --hairline-soft:#dfe2e7;
+  --hairline-fine:#e8eaee;
 
   /* signature honey — reserved for the keyboard body only
      (keycaps, base outline, trackball, combo overlay).
@@ -42,19 +45,18 @@
   --honey-wash:   #f6ecce;
   --honey-tint:   #fbf4dd;
 
-  /* pine — primary action + focus, now a deep blue-teal/slate. The
-     legacy --pine* names are kept for compatibility while the palette
-     shifts toward a cooler tone. */
-  --pine:         #2c4250;
-  --pine-deep:    #1c2c38;
-  --pine-darker:  #14201a;
-  --pine-bright:  #3f6883;
-  --pine-wash:    #e1e9ef;
-  --pine-line:    #b3c2d0;
+  /* pine — primary action + focus. The palette is now cobalt; the legacy
+     --pine* names are kept so component rules need no renames. */
+  --pine:         #2f5bd3;
+  --pine-deep:    #1f43a8;
+  --pine-darker:  #17327f;
+  --pine-bright:  #3f6ae0;
+  --pine-wash:    #e3eafc;
+  --pine-line:    #b9c8f3;
 
   /* on-pine text — soft cool cream that reads cleanly on dark slate. */
-  --on-pine:      #e6ecf1;
-  --on-pine-soft: #c4cdd6;
+  --on-pine:      #ffffff;
+  --on-pine-soft: #dbe4ff;
   /* fills behind --on-pine text (primary buttons, active chips, badges).
      Separate from --pine* because those brighten on dark for use as text. */
   --fill-hi:      var(--pine-bright);
@@ -93,9 +95,10 @@
   --r-xl: 16px;
   --r-full: 999px;
 
-  /* font stacks — Inter for Latin/UI, with system Japanese faces for kana/kanji */
-  --font-ui: "Inter", ui-sans-serif, system-ui, "Hiragino Sans",
+  /* font stacks — IBM Plex Sans JP covers Latin and kana/kanji; system JP faces are the fallback */
+  --font-ui: "IBM Plex Sans JP", ui-sans-serif, system-ui, "Hiragino Sans",
     "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* shadows */
   --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
@@ -103,7 +106,7 @@
   --shadow-3: 0 8px 24px -14px rgba(31, 29, 23, 0.35);
   --focus-ring:
     0 0 0 2px var(--paper),
-    0 0 0 4px rgba(63, 104, 131, 0.55);
+    0 0 0 4px rgba(47, 91, 211, 0.5);
 
   /* motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -111,10 +114,8 @@
 
   color: var(--ink);
   background: var(--paper);
-  /* Inter for Latin/UI; the system Japanese faces render the kana/kanji
-     (Inter has no JP glyphs, so they fall through to these). */
   font-family: var(--font-ui);
-  /* Keep the fallback (and the JP faces) visually matched to Inter's x-height
+  /* Keep the fallback faces visually matched to Plex's x-height
      so the swap on load doesn't shift or shrink text. */
   font-size-adjust: from-font;
   font-synthesis: none;
@@ -140,36 +141,36 @@
    slate. Driven entirely by tokens so component rules need no changes.
    ------------------------------------------------------------ */
 :root[data-color-scheme="dark"] {
-  --paper:        #14181d;
-  --paper-2:      #1b2026;
-  --paper-3:      #232a31;
-  --card:         #1e242b;
-  --card-sunk:    #161b20;
+  --paper:        #111317;
+  --paper-2:      #16191d;
+  --paper-3:      #1d2025;
+  --card:         #1a1d22;
+  --card-sunk:    #14161a;
 
-  --ink:          #e6ecf1;
-  --ink-strong:   #f5f8fa;
-  --ink-soft:     #c4cdd6;
-  --ink-muted:    #98a4b0;
-  --ink-faint:    #6f7c89;
+  --ink:          #e6e8ec;
+  --ink-strong:   #f4f5f7;
+  --ink-soft:     #c3c8d0;
+  --ink-muted:    #959cab;
+  --ink-faint:    #7a8190;
 
-  --hairline:     #38424d;
-  --hairline-soft:#2c343d;
-  --hairline-fine:#242b32;
+  --hairline:     #30353d;
+  --hairline-soft:#272b32;
+  --hairline-fine:#1f2328;
 
   /* pine accent lightens so it reads as "active" on dark slate. --pine-deep
      doubles as text on the dim --pine-wash, so it's kept bright enough to
      clear WCAG AA there. */
-  --pine:         #4a7793;
-  --pine-deep:    #7ba6c2;
-  --pine-darker:  #2c4250;
-  --pine-bright:  #8fb6d0;
-  --pine-wash:    #233039;
-  --pine-line:    #41525f;
-  --on-pine:      #f3f7fa;
-  --on-pine-soft: #cdd8e1;
-  --fill-hi:      #3f6a86;
-  --fill:         #33596f;
-  --fill-lo:      #284859;
+  --pine:         #6f93ff;
+  --pine-deep:    #a3b9ff;
+  --pine-darker:  #2a3f80;
+  --pine-bright:  #8aa7ff;
+  --pine-wash:    #1d2846;
+  --pine-line:    #34467a;
+  --on-pine:      #ffffff;
+  --on-pine-soft: #dbe4ff;
+  --fill-hi:      #4d73e8;
+  --fill:         #3d63d8;
+  --fill-lo:      #3155c4;
 
   --amber-warn:   #f0bf52;
   --amber-warn-line:#9d7627;
@@ -188,42 +189,44 @@
   --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   --shadow-3: 0 10px 28px -14px rgba(0, 0, 0, 0.7);
 
-  --field-face:   #2a323a;
-  --glass:        rgba(180, 200, 220, 0.07);
-  --glass-soft:   rgba(180, 200, 220, 0.05);
+  --field-face:   #22262c;
+  --glass:        rgba(200, 210, 230, 0.06);
+  --glass-soft:   rgba(200, 210, 230, 0.04);
+  --canvas:       #0c0e11;
+  --canvas-dot:   rgba(255, 255, 255, 0.05);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme="light"]) {
-    --paper:        #14181d;
-    --paper-2:      #1b2026;
-    --paper-3:      #232a31;
-    --card:         #1e242b;
-    --card-sunk:    #161b20;
+    --paper:        #111317;
+    --paper-2:      #16191d;
+    --paper-3:      #1d2025;
+    --card:         #1a1d22;
+    --card-sunk:    #14161a;
 
-    --ink:          #e6ecf1;
-    --ink-strong:   #f5f8fa;
-    --ink-soft:     #c4cdd6;
-    --ink-muted:    #98a4b0;
-    --ink-faint:    #6f7c89;
+    --ink:          #e6e8ec;
+    --ink-strong:   #f4f5f7;
+    --ink-soft:     #c3c8d0;
+    --ink-muted:    #959cab;
+    --ink-faint:    #7a8190;
 
-    --hairline:     #38424d;
-    --hairline-soft:#2c343d;
-    --hairline-fine:#242b32;
+    --hairline:     #30353d;
+    --hairline-soft:#272b32;
+    --hairline-fine:#1f2328;
 
     /* pine accent lightens so it reads as "active" on dark slate. --pine-deep
        doubles as text on the dim --pine-wash, so it's kept bright enough to
        clear WCAG AA there. */
-    --pine:         #4a7793;
-    --pine-deep:    #7ba6c2;
-    --pine-darker:  #2c4250;
-    --pine-bright:  #8fb6d0;
-    --pine-wash:    #233039;
-    --pine-line:    #41525f;
-    --on-pine:      #f3f7fa;
-    --on-pine-soft: #cdd8e1;
-    --fill-hi:      #3f6a86;
-    --fill:         #33596f;
-    --fill-lo:      #284859;
+    --pine:         #6f93ff;
+    --pine-deep:    #a3b9ff;
+    --pine-darker:  #2a3f80;
+    --pine-bright:  #8aa7ff;
+    --pine-wash:    #1d2846;
+    --pine-line:    #34467a;
+    --on-pine:      #ffffff;
+    --on-pine-soft: #dbe4ff;
+    --fill-hi:      #4d73e8;
+    --fill:         #3d63d8;
+    --fill-lo:      #3155c4;
 
     --amber-warn:   #f0bf52;
     --amber-warn-line:#9d7627;
@@ -242,15 +245,11 @@
     --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
     --shadow-3: 0 10px 28px -14px rgba(0, 0, 0, 0.7);
 
-    --field-face:   #2a323a;
-    --glass:        rgba(180, 200, 220, 0.07);
-    --glass-soft:   rgba(180, 200, 220, 0.05);
-  }
-  /* The dotted plate background is tuned for light paper; calm it on dark. */
-  :root:not([data-color-scheme="light"]) .keyboard-viewport {
-    background-color: #1a2028;
-    background-image:
-      radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
+    --field-face:   #22262c;
+    --glass:        rgba(200, 210, 230, 0.06);
+    --glass-soft:   rgba(200, 210, 230, 0.04);
+    --canvas:       #0c0e11;
+    --canvas-dot:   rgba(255, 255, 255, 0.05);
   }
   /* The body dot grid uses a dark ink that vanishes on dark; use a light fleck. */
   :root:not([data-color-scheme="light"]) body {
@@ -259,11 +258,6 @@
   }
 }
 
-:root[data-color-scheme="dark"] .keyboard-viewport {
-  background-color: #1a2028;
-  background-image:
-    radial-gradient(circle, rgba(180, 200, 220, 0.06) 1px, transparent 1.4px);
-}
 
 :root[data-color-scheme="dark"] body {
   background-image:
@@ -421,7 +415,7 @@ textarea:disabled {
 
 /* number — hide native spinners (we provide custom feel via larger hit zone) */
 input[type="number"] {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -475,7 +469,7 @@ input[type="url"] {
 .toast-viewport {
   position: fixed;
   z-index: 80;
-  top: 86px;
+  top: 68px;
   right: 24px;
   display: grid;
   width: min(420px, calc(100vw - 48px));
@@ -532,7 +526,7 @@ input[type="url"] {
   padding: 0;
   background: transparent;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
 }
 .app-toast button:hover {
@@ -572,9 +566,8 @@ input[type="url"] {
 .mobile-unsupported h1 {
   margin: 0;
   color: var(--ink-strong);
-  font-family: "Fraunces", Georgia, serif;
+  font-family: var(--font-ui);
   font-size: 30px;
-  font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 36;
   font-weight: 560;
   line-height: 1.1;
 }
@@ -593,300 +586,123 @@ input[type="url"] {
 }
 
 /* ----------------------------------------------------------------
-   Topbar
+   Topbar — one slim row: brand · mode · context · firmware actions · utilities.
+   Save / Build & Flash live here so they stay visible on every screen.
    ---------------------------------------------------------------- */
 .topbar {
-  display: grid;
-  grid-template-columns: minmax(260px, auto) 1fr;
+  display: flex;
   align-items: center;
-  gap: var(--sp-7);
-  padding: var(--sp-3) var(--sp-7);
+  gap: var(--sp-3);
+  min-height: 56px;
+  padding: var(--sp-2) var(--sp-5);
   border-bottom: 1px solid var(--hairline);
-  background: linear-gradient(180deg, var(--card) 0%, var(--paper-2) 100%);
+  background: var(--card);
   position: relative;
+  z-index: 5;
 }
 
-.topbar::after {
+/* Direct Mode edits the live device, so a thin honey line marks it. */
+.topbar.direct-active::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: -1px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--pine-bright) 22%,
-    var(--pine-bright) 78%,
-    transparent 100%
-  );
-  opacity: 0.4;
-}
-
-.topbar.direct-active::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--honey) 22%,
-    var(--honey) 78%,
-    transparent 100%
-  );
-  opacity: 0.7;
+  height: 2px;
+  background: var(--honey);
 }
 
 .topbar h1,
 .panel-heading h2,
 .inspector h2 { margin: 0; }
 
-.topbar > div:first-child {
-  position: relative;
-  padding-left: var(--sp-4);
-}
-.topbar > div:first-child::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--pine-bright), var(--pine-deep));
-}
-
-.topbar h1 {
-  font-family: "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
-  font-weight: 550;
-  font-size: 22px;
-  line-height: 1.15;
-  letter-spacing: -0.018em;
-  color: var(--ink-strong);
-  font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 36;
-}
-
-.topbar-title-row {
+.topbar-brand {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
-}
-
-.app-version-chip {
-  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  min-height: 20px;
-  border: 1px solid var(--hairline-soft);
-  border-radius: var(--r-full);
-  padding: 2px 8px;
-  background: var(--glass-soft);
-  color: var(--ink-muted);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 10px;
+  gap: 10px;
+}
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--honey-glow), var(--honey-deep));
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.topbar h1 {
+  color: var(--ink-strong);
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.topbar-tools {
-  display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sp-3);
-  justify-self: end;
-  width: 100%;
-  max-width: none;
-}
-
-.mode-toggle {
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--card);
-  box-shadow: var(--shadow-1);
-}
-
-.mode-toggle button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 34px;
-  min-width: 92px;
-  border: 0;
-  border-right: 1px solid var(--hairline-soft);
-  border-radius: 0;
-  padding: 0 var(--sp-4);
-  background: transparent;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-.mode-toggle button:hover { background: var(--paper-2); color: var(--ink); }
-.mode-toggle button:last-child { border-right: 0; }
-.mode-toggle button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-.mode-toggle button:disabled:hover {
-  background: transparent;
-  color: var(--ink-muted);
-}
-.mode-toggle-badge {
-  font-family: "JetBrains Mono", monospace;
-  font-style: normal;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-full);
-  padding: 1px 6px;
-  background: var(--paper-2);
-}
-.mode-toggle button.active {
-  background: linear-gradient(180deg, var(--fill) 0%, var(--fill-lo) 100%);
-  color: var(--on-pine);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-}
-.mode-toggle button.active:hover {
-  background: linear-gradient(180deg, var(--pine-deep) 0%, var(--pine-darker) 100%);
-}
-
-.theme-toggle {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(32px, auto));
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--glass-soft);
-  box-shadow: var(--shadow-1);
-}
-
-.theme-toggle button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  min-width: 44px;
-  border: 0;
-  border-right: 1px solid var(--hairline-soft);
-  border-radius: 0;
-  padding: 0 10px;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 11px;
-  font-weight: 650;
   letter-spacing: 0;
   white-space: nowrap;
 }
 
-.theme-toggle button:last-child {
-  border-right: 0;
+.app-version-chip {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.theme-toggle button:hover {
+.topbar-spacer { flex: 1 1 auto; min-width: 0; }
+
+.mode-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 2px;
+  background: var(--paper-2);
+}
+.mode-toggle button {
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 0 var(--sp-3);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.mode-toggle button:hover { background: var(--glass); color: var(--ink); }
+.mode-toggle button.active,
+.mode-toggle button.active:hover {
+  background: var(--card);
+  color: var(--ink-strong);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), inset 0 0 0 1px var(--hairline-soft);
+}
+
+.topbar-utilities {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--hairline-soft);
+}
+.icon-link {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-muted);
+}
+.icon-link:hover {
   background: var(--paper-2);
   color: var(--ink);
 }
 
-.theme-toggle button.active {
-  background: var(--pine-wash);
-  color: var(--pine-active-ink);
-  box-shadow: inset 0 0 0 1px var(--pine-line);
-}
-
-.theme-toggle button svg {
-  flex: 0 0 auto;
-}
-
-.topbar-links {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-
-.topbar-links a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  padding: 0 var(--sp-3);
-  background: var(--glass);
-  color: var(--ink-muted);
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: var(--shadow-1);
-}
-
-.topbar-links a:hover {
-  border-color: var(--pine-line);
-  background: var(--pine-wash);
-  color: var(--pine-deep);
-}
-
-.topbar-links a svg {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 1320px) {
-  .topbar {
-    gap: var(--sp-5);
-  }
-
-  .topbar-tools {
-    gap: var(--sp-2);
-  }
-
-  .topbar-links a {
-    width: 36px;
-    padding: 0;
-  }
-
-  .topbar-links a span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-}
-
 @media (max-width: 1160px) {
-  .topbar {
-    grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
-    padding-inline: var(--sp-5);
-  }
-
-  .theme-toggle button {
-    width: 34px;
-    min-width: 34px;
-    padding: 0;
-  }
-
-  .theme-toggle button span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
+  .topbar { padding-inline: var(--sp-4); gap: var(--sp-2); }
+  .app-version-chip { display: none; }
 
   .connected-reload-button {
     width: 36px;
@@ -910,7 +726,7 @@ input[type="url"] {
 .eyebrow {
   margin: 0 0 6px;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.22em;
@@ -943,7 +759,7 @@ input[type="url"] {
   align-items: center;
   gap: 8px;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.18em;
@@ -958,7 +774,7 @@ input[type="url"] {
   padding: 1px 8px;
   background: var(--pine-wash);
   color: var(--pine-deep);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
   font-style: normal;
@@ -983,7 +799,7 @@ input[type="url"] {
   background-repeat: no-repeat, no-repeat;
   background-position: 0 0, 10px center;
   background-size: 100% 100%, 14px 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   letter-spacing: -0.005em;
   text-align: left;
@@ -1073,12 +889,12 @@ select:focus-visible {
   height: 7px;
   border-radius: 50%;
   background: var(--pine-bright);
-  box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18);
+  box-shadow: 0 0 0 2px rgba(47, 91, 211, 0.18);
   animation: chip-pulse 2.2s var(--ease-in-out) infinite;
 }
 @keyframes chip-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(63, 104, 131, 0.18); }
-  50%      { box-shadow: 0 0 0 4px rgba(63, 104, 131, 0.06); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(47, 91, 211, 0.18); }
+  50%      { box-shadow: 0 0 0 4px rgba(47, 91, 211, 0.06); }
 }
 .connected-chip svg { flex: 0 0 auto; color: var(--pine-deep); }
 .connected-chip strong {
@@ -1088,7 +904,7 @@ select:focus-visible {
   font-weight: 700;
 }
 .connected-chip em {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-style: normal;
   font-size: 10.5px;
   font-weight: 500;
@@ -1109,30 +925,6 @@ select:focus-visible {
   text-overflow: ellipsis;
 }
 
-.topbar-hint {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-  min-width: 0;
-  min-height: 36px;
-  color: var(--ink-muted);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1.35;
-}
-/* Wrap to two lines instead of truncating to an unreadable "Build & Flash ...". */
-.topbar-hint span {
-  display: -webkit-box;
-  min-width: 0;
-  max-width: 280px;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  text-align: left;
-}
-.topbar-hint svg { color: var(--pine-bright); flex: 0 0 auto; }
 
 .primary {
   border-color: var(--pine-deep);
@@ -1166,15 +958,24 @@ select:focus-visible {
    ---------------------------------------------------------------- */
 .workspace {
   display: grid;
-  grid-template-columns: 188px minmax(0, 1fr) 364px;
+  grid-template-columns: 200px minmax(0, 1fr) 360px;
   min-height: 0;
   overflow: hidden;
 }
 .workspace.direct-workspace {
-  grid-template-columns: 188px minmax(0, 1fr) 340px;
+  grid-template-columns: 200px minmax(0, 1fr) 360px;
 }
 .workspace.firmware-build-workspace {
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+@media (max-width: 1180px) {
+  .workspace,
+  .workspace.direct-workspace {
+    grid-template-columns: 168px minmax(0, 1fr) 320px;
+  }
+  .workspace.firmware-build-workspace {
+    grid-template-columns: 168px minmax(0, 1fr);
+  }
 }
 
 /* ----------------------------------------------------------------
@@ -1231,14 +1032,12 @@ select:focus-visible {
 
 .direct-welcome-card h2 {
   margin: 0;
-  font-family: "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
+  font-family: var(--font-ui);
   font-weight: 550;
   font-size: 32px;
   line-height: 1.12;
   letter-spacing: -0.022em;
   color: var(--ink-strong);
-  font-variation-settings: "opsz" 72, "SOFT" 30;
 }
 
 .direct-welcome-card p {
@@ -1275,7 +1074,7 @@ select:focus-visible {
   border-radius: var(--r-full);
   background: var(--fill-lo);
   color: var(--on-pine);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 .direct-connect-steps span {
@@ -1296,7 +1095,7 @@ select:focus-visible {
   display: grid;
   gap: 6px;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.2em;
@@ -1343,7 +1142,7 @@ select:focus-visible {
 }
 .runtime-warning small {
   color: var(--amber-warn-soft);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -1393,7 +1192,7 @@ select:focus-visible {
 .keymap-parse-warning code {
   max-width: 100%;
   color: var(--amber-warn-ink);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -1436,7 +1235,7 @@ select:focus-visible {
   border-radius: var(--r-md);
   background: var(--card);
   color: var(--ink-soft);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0;
 }
@@ -1487,7 +1286,7 @@ select:focus-visible {
 }
 .connect-transport-field > span {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.2em;
@@ -1555,7 +1354,7 @@ select:focus-visible {
 }
 .direct-pending-bar span {
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -1574,7 +1373,7 @@ select:focus-visible {
   color: var(--ink-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0;
 }
@@ -1651,7 +1450,7 @@ select:focus-visible {
   gap: 5px;
   border-radius: var(--r-full);
   padding: 2px 9px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1751,35 +1550,56 @@ select:focus-visible {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
   min-height: 0;
-  padding: 22px 14px 18px;
+  padding: var(--sp-4) var(--sp-3);
   border-right: 1px solid var(--hairline);
-  background:
-    linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
+  background: var(--card);
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-1) var(--sp-1);
+}
+.sidebar-heading h2 {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .layer-toolbar {
   display: grid;
-  grid-template-columns: repeat(3, 32px);
-  gap: 6px;
+  grid-template-columns: repeat(3, 28px);
+  gap: 2px;
   align-items: center;
 }
 
 .layer-toolbar button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-color: transparent;
   padding: 0;
-  border-radius: var(--r-md);
-  background: var(--glass);
+  border-radius: var(--r-sm);
+  background: transparent;
+  box-shadow: none;
   color: var(--ink-muted);
 }
 
-.layer-toolbar button:hover {
-  background: var(--card);
+.layer-toolbar button:hover:not(:disabled) {
+  background: var(--paper-2);
   color: var(--ink);
+}
+.layer-toolbar button:disabled {
+  opacity: 0.35;
 }
 
 .layer-toolbar button svg {
@@ -1806,13 +1626,12 @@ select:focus-visible {
   background: transparent;
   text-align: left;
   font-weight: 600;
-  font-size: 12.5px;
-  color: var(--ink-muted);
-  letter-spacing: -0.005em;
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: 0;
 }
 .layer-list button:hover {
-  background: rgba(246, 236, 206, 0.55);
-  border-color: var(--hairline-soft);
+  background: var(--paper-2);
   color: var(--ink);
 }
 
@@ -1824,7 +1643,7 @@ select:focus-visible {
   border-radius: 5px;
   background: var(--paper-3);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
   transition:
@@ -1833,12 +1652,8 @@ select:focus-visible {
 }
 
 .layer-list button.active {
-  border-color: var(--pine-line);
   background: var(--pine-wash);
   color: var(--pine-active-ink);
-  box-shadow:
-    var(--shadow-1),
-    0 1px 2px rgba(28, 26, 14, 0.08);
 }
 .layer-list button.active span {
   background: var(--fill);
@@ -1849,36 +1664,41 @@ select:focus-visible {
 /* ----------------------------------------------------------------
    Keyboard panel
    ---------------------------------------------------------------- */
+/* The centre column is a canvas: layer title, then the keyboard taking the
+   free height, then a docked panel for Combos / Trackball / Diff. The panel
+   itself never scrolls; only the dock content does. */
 .keyboard-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: var(--sp-3);
   min-width: 0;
   min-height: 0;
-  /* The panel itself never scrolls — only the workbench tabs inside it do. */
   overflow: hidden;
-  padding: 24px 28px 28px;
+  padding: var(--sp-4) var(--sp-5) 0;
+  background-color: var(--canvas);
+  background-image: radial-gradient(circle, var(--canvas-dot) 1px, transparent 1.4px);
+  background-size: 18px 18px;
 }
 
-/* Anything before the workbench section is sized to content; the active
-   edit or Build & Flash workbench takes the remaining height and scrolls
-   internally so the keyboard above stays visible. */
 .keyboard-panel > .workbench-tabs,
-.keyboard-panel > .direct-summary,
+.keyboard-panel > .direct-summary {
+  flex: 0 0 clamp(220px, 38dvh, 400px);
+  min-height: 0;
+  margin-inline: calc(-1 * var(--sp-5));
+  border-top: 1px solid var(--hairline);
+  padding: 0 var(--sp-5);
+  background: var(--card);
+}
 .keyboard-panel > .browser-release-workbench {
   flex: 1 1 0;
   min-height: 0;
-}
-.keyboard-panel > .firmware-workbench-actions {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
 }
 
 .keyboard-panel.firmware-build-mode {
   container: workbench / inline-size;
   gap: var(--sp-3);
   padding-bottom: var(--sp-3);
+  background: var(--paper);
 }
 
 .keyboard-panel.firmware-build-mode .panel-heading,
@@ -1920,7 +1740,7 @@ select:focus-visible {
 }
 .direct-connection-bar strong {
   display: block;
-  font-family: Fraunces, Georgia, serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   font-size: 16px;
   letter-spacing: -0.01em;
@@ -1939,7 +1759,7 @@ select:focus-visible {
   padding: 5px var(--sp-3);
   background: var(--card);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1949,30 +1769,42 @@ select:focus-visible {
 
 .panel-heading {
   display: flex;
-  align-items: flex-end;
+  flex: 0 0 auto;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sp-5);
 }
+.panel-heading-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
+}
 .panel-heading h2 {
-  font-family: "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
-  font-weight: 550;
-  font-size: 26px;
-  line-height: 1.1;
-  letter-spacing: -0.022em;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
   color: var(--ink-strong);
-  font-variation-settings: "opsz" 60, "SOFT" 40;
+}
+.panel-heading-title span {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .panel-heading.compact h3 {
   margin: 0;
-  font-family: "Fraunces", Georgia, serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   font-size: 16px;
   letter-spacing: -0.01em;
 }
 .panel-heading.compact span {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
 }
@@ -1984,11 +1816,13 @@ select:focus-visible {
   position: relative;
   z-index: 0;
   display: flex;
+  flex: 1 1 0;
   justify-content: safe center;
   align-items: safe center;
   width: 100%;
+  min-height: 180px;
   --keyboard-scale: 1;
-  --keyboard-visual-offset-y: 48px;
+  --keyboard-visual-offset-y: 16px;
   /* The physical layout leaves empty margins on both sides; crop them so
      the keys get the available width instead of blank canvas. */
   --keyboard-crop-x: 90px;
@@ -1996,28 +1830,20 @@ select:focus-visible {
   --keyboard-visible-width: var(--keyboard-content-width);
   --keyboard-visible-height: var(--layout-height);
 
-  container-type: inline-size;
+  /* Sized by the column (flex), so the keyboard can scale to fit both ways. */
+  container-type: size;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: var(--sp-3) 0;
-  border: 1px solid var(--hairline-soft);
-  border-radius: var(--r-xl);
-  background-color: #f1f4f7;
-  background-image:
-    radial-gradient(circle, rgba(28, 44, 56, 0.09) 1px, transparent 1.4px);
-  background-size: 20px 20px;
-  background-position: center;
-  box-shadow: inset 0 2px 14px -8px rgba(28, 44, 56, 0.18);
-  min-height: 220px;
 }
 
 @supports (width: 100cqi) {
   .keyboard-viewport {
-    --keyboard-scale: max(0.5, min(1, calc((100cqi - 32px) / 1056px)));
+    --keyboard-scale: max(
+      0.4,
+      min(1, calc((100cqi - 32px) / 1056px), calc((100cqb - var(--keyboard-visual-offset-y) - 16px) / 540px))
+    );
     --keyboard-visible-width: calc(var(--keyboard-content-width) * var(--keyboard-scale));
     --keyboard-visible-height: calc(var(--layout-height) * var(--keyboard-scale));
-
-    min-height: min(220px, calc(var(--keyboard-visible-height) + var(--keyboard-visual-offset-y) + 24px));
   }
   .keyboard-layout {
     transform: scale(var(--keyboard-scale)) translateX(calc(-1 * var(--keyboard-crop-x)));
@@ -2033,21 +1859,6 @@ select:focus-visible {
   width: var(--keyboard-visible-width);
   height: var(--keyboard-visible-height);
   margin-block-start: var(--keyboard-visual-offset-y);
-}
-
-@media (max-height: 760px) and (min-width: 768px) {
-  .keyboard-panel {
-    gap: var(--sp-3);
-    padding-block: var(--sp-3);
-  }
-
-  .keyboard-viewport {
-    --keyboard-visual-offset-y: 12px;
-    align-items: flex-start;
-    max-height: clamp(140px, 24vh, 180px);
-    min-height: 140px;
-    padding-block: var(--sp-2);
-  }
 }
 
 .keyboard-layout {
@@ -2140,7 +1951,7 @@ select:focus-visible {
     0 5px 0 #a86c0c,
     0 8px 10px -4px rgba(120, 86, 8, 0.28);
   text-align: left;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.2;
   transition:
@@ -2305,7 +2116,7 @@ select:focus-visible {
 .combo-label text {
   fill: var(--pine-deep);
   fill-opacity: 0.72;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
   text-anchor: middle;
@@ -2372,7 +2183,7 @@ select:focus-visible {
 }
 .direct-summary dt {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -2439,7 +2250,7 @@ select:focus-visible {
 }
 .direct-firmware-diff-list article strong {
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 .direct-firmware-diff-list article span {
@@ -2468,7 +2279,7 @@ select:focus-visible {
 }
 .direct-firmware-diff-list dt {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2477,7 +2288,7 @@ select:focus-visible {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 700;
   line-height: 1.35;
@@ -2494,7 +2305,7 @@ select:focus-visible {
   padding: 5px 7px;
   background: var(--card);
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   line-height: 1.2;
   vertical-align: middle;
 }
@@ -2566,7 +2377,7 @@ select:focus-visible {
   background: var(--paper-2);
   padding: 2px 5px;
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
 }
@@ -2615,7 +2426,7 @@ select:focus-visible {
   border-bottom: 1px solid var(--hairline);
   padding: var(--sp-2) var(--sp-3);
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-strong);
@@ -2637,7 +2448,7 @@ select:focus-visible {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.6;
 }
@@ -2678,78 +2489,82 @@ select:focus-visible {
 /* ----------------------------------------------------------------
    Workbench tabs (under the keyboard)
    ---------------------------------------------------------------- */
+/* Firmware actions sit in the topbar: state chip · history · save · Build & Flash. */
 .firmware-workbench-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2) var(--sp-3);
-  min-width: 0;
-  border-top: 1px dashed var(--hairline);
-  padding: var(--sp-4) 0 0;
-}
-.firmware-action-state {
-  display: flex;
-  flex-wrap: wrap;
   flex: 0 1 auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   min-width: 0;
 }
-.firmware-action-state span {
+.firmware-action-state {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 26px;
-  border: 1px solid var(--hairline-soft);
   border-radius: var(--r-full);
   padding: 0 10px;
-  background: var(--glass);
-  color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.firmware-action-state .changed {
-  border-color: var(--amber-warn);
+.firmware-action-state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.firmware-action-state.changed {
   background: var(--amber-warn-bg);
   color: var(--amber-warn-ink);
 }
-.firmware-action-state .clean {
-  border-color: var(--pine-line);
-  background: var(--pine-wash);
-  color: var(--pine-deep);
+.firmware-action-state.clean {
+  color: var(--ink-muted);
 }
 .firmware-history-actions {
   display: inline-flex;
-  gap: 4px;
-  padding-left: var(--sp-3);
-  border-left: 1px solid var(--hairline);
+  gap: 2px;
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--hairline-soft);
 }
 .firmware-workbench-actions .icon-button {
-  inline-size: 36px;
-  min-height: 36px;
+  inline-size: 32px;
+  min-height: 32px;
+  border-color: transparent;
   padding: 0;
-  border-color: var(--hairline);
-  background: var(--field-face);
+  background: transparent;
+  box-shadow: none;
   color: var(--ink-soft);
 }
 .firmware-workbench-actions .icon-button:hover:not(:disabled) {
-  border-color: var(--pine-deep);
+  background: var(--paper-2);
   color: var(--ink-strong);
 }
 .firmware-workbench-actions .icon-button:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
+}
+/* Reset is destructive and rare: icon only, the label stays for screen readers. */
+.firmware-workbench-actions .reset-action .button-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.firmware-workbench-actions .reset-action:not(:disabled) {
+  color: var(--danger);
+}
+.firmware-workbench-actions .reset-action:hover:not(:disabled) {
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 .firmware-main-actions {
   display: flex;
-  flex-wrap: wrap;
-  flex: 1 1 auto;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--sp-2);
   min-width: 0;
-  margin-left: auto;
 }
 .firmware-workbench-actions button {
   display: inline-flex;
@@ -2757,8 +2572,8 @@ select:focus-visible {
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  min-height: 38px;
-  padding: 0 var(--sp-4);
+  min-height: 34px;
+  padding: 0 var(--sp-3);
   font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
@@ -2770,28 +2585,30 @@ select:focus-visible {
 }
 .firmware-workbench-actions .project-save-action:hover:not(:disabled) {
   background: var(--field-face);
-  border-color: var(--pine-deep);
+  border-color: var(--pine);
   color: var(--ink-strong);
 }
 .firmware-workbench-actions .project-save-action:disabled {
   opacity: 0.58;
 }
-.firmware-workbench-actions .build-flash-action {
-  min-width: 142px;
+/* On narrower screens the save button keeps only its icon; the label stays
+   as the accessible name and the tooltip explains it. */
+@media (max-width: 1360px) {
+  .firmware-workbench-actions .project-save-action {
+    inline-size: 34px;
+    padding: 0;
+  }
+  .firmware-workbench-actions .project-save-action .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
-.firmware-workbench-actions .reset-action {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--danger);
-}
-.firmware-workbench-actions .reset-action:hover:not(:disabled) {
-  border-color: var(--danger-line);
-  background: var(--danger-wash);
-  color: var(--danger-ink);
-}
-.firmware-workbench-actions .reset-action:disabled {
-  color: var(--ink-faint);
-  opacity: 0.7;
+.firmware-workbench-actions .primary {
+  min-width: 132px;
 }
 .firmware-workbench-actions button svg {
   flex: 0 0 auto;
@@ -2802,6 +2619,7 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .workbench-tabs {
   position: relative;
   z-index: 1;
@@ -2815,7 +2633,7 @@ select:focus-visible {
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--hairline);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
 }
 .workbench-tablist button {
   display: inline-flex;
@@ -2863,7 +2681,7 @@ select:focus-visible {
   background: var(--paper-3);
   color: var(--ink-muted);
   font-style: normal;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
 }
@@ -2880,9 +2698,14 @@ select:focus-visible {
   /* Only the content of the active workbench tab scrolls; the keyboard
      above stays anchored in view. */
   overflow: auto;
-  scroll-padding-block-end: 48px;
+  scroll-padding-block-end: 24px;
   padding-right: 2px;
-  padding-bottom: 48px;
+  padding-bottom: var(--sp-5);
+}
+/* The dock tab already names the panel, so drop the repeated eyebrow. */
+.workbench-panel .section-title-row .eyebrow,
+.workbench-panel .panel-heading .eyebrow {
+  display: none;
 }
 
 .workbench-grid {
@@ -2907,6 +2730,13 @@ select:focus-visible {
   padding-right: 2px;
   padding-bottom: 48px;
 }
+/* A narrow dock stacks list and editor instead of squeezing both. */
+@container workbench (max-width: 600px) {
+  .combo-workbench,
+  .trackball-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @container workbench (min-width: 720px) {
   .build-workbench {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -2927,13 +2757,12 @@ select:focus-visible {
 }
 .workbench-grid > section > h2 {
   margin: 0;
-  font-family: "Fraunces", Georgia, serif;
+  font-family: var(--font-ui);
   font-weight: 550;
   font-size: 17px;
   line-height: 1.2;
   letter-spacing: -0.018em;
   color: var(--ink-strong);
-  font-variation-settings: "opsz" 24, "SOFT" 40;
 }
 .workbench-grid > section .section-title-row h2 { font-size: 15.5px; }
 
@@ -3023,7 +2852,7 @@ select:focus-visible {
   display: grid;
   gap: 5px;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -3057,7 +2886,7 @@ select:focus-visible {
   display: grid;
   gap: 6px;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -3076,7 +2905,7 @@ select:focus-visible {
 }
 .workbench-grid label > input[type="number"],
 .combo-editor label > input[type="number"] {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .workbench-grid .trackball-editor button {
   grid-column: 1 / -1;
@@ -3096,11 +2925,11 @@ select:focus-visible {
 .inspector {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: var(--sp-4);
   min-height: 0;
-  padding: var(--sp-6) var(--sp-5) var(--sp-7);
+  padding: var(--sp-4) var(--sp-5) var(--sp-7);
   border-left: 1px solid var(--hairline);
-  background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper-3) 100%);
+  background: var(--card);
   overflow: auto;
 }
 /* The inspector shell sections (.firmware-inspector / .direct-inspector) stay
@@ -3114,7 +2943,7 @@ select:focus-visible {
   gap: var(--sp-4);
   min-height: 0;
 }
-.firmware-key-inspector > section,
+/* The key inspector fills the panel itself, so it is not boxed again. */
 .combo-panel,
 .combo-reference-panel,
 .trackball-parameters {
@@ -3126,14 +2955,12 @@ select:focus-visible {
 }
 
 .inspector h2 {
-  font-family: "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
+  font-family: var(--font-ui);
   font-weight: 550;
   font-size: 19px;
   line-height: 1.15;
   letter-spacing: -0.02em;
   color: var(--ink-strong);
-  font-variation-settings: "opsz" 36, "SOFT" 40;
 }
 
 .inspector label {
@@ -3141,7 +2968,7 @@ select:focus-visible {
   gap: 6px;
   margin-top: var(--sp-4);
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -3158,7 +2985,7 @@ select:focus-visible {
   text-transform: none;
 }
 .inspector label > input[type="number"] {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .direct-key-editor,
@@ -3183,7 +3010,7 @@ select:focus-visible {
 }
 .direct-key-editor h2,
 .key-editor h2 {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.005em;
@@ -3284,7 +3111,7 @@ select:focus-visible {
   padding: 6px 9px;
   background: var(--paper);
   color: var(--ink-soft);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
@@ -3308,7 +3135,7 @@ select:focus-visible {
 }
 .trackball-reference-summary span {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -3319,7 +3146,7 @@ select:focus-visible {
   color: var(--ink-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0;
 }
@@ -3342,7 +3169,7 @@ select:focus-visible {
   padding: 7px 10px;
   background: var(--paper);
   color: var(--ink-soft);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -3363,7 +3190,7 @@ select:focus-visible {
   padding: 8px 10px;
   background: var(--paper);
   color: var(--ink);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 800;
 }
@@ -3388,7 +3215,7 @@ select:focus-visible {
 }
 .timing-field > div:first-child strong {
   color: var(--ink);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 .timing-field input[type="range"] {
@@ -3430,17 +3257,28 @@ select:focus-visible {
   gap: 8px;
 }
 
-/* the inspector "Key N — &kp X" headline */
+/* the inspector "Key N · 左手 上段" headline */
 .key-inspector-heading {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
 }
 .key-inspector-heading > div { min-width: 0; }
-.inspector .key-inspector-heading h2,
+.inspector .key-inspector-heading h2 {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink-strong);
+}
+.key-inspector-position {
+  margin: 2px 0 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
 .inspector section > h2 {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -3457,15 +3295,21 @@ select:focus-visible {
   color: var(--ink-muted);
   font-size: 11.5px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   user-select: none;
 }
 .auto-advance-toggle input[type="checkbox"] {
+  -webkit-appearance: auto;
+  appearance: auto;
   inline-size: 14px;
   block-size: 14px;
   min-height: 0;
   margin: 0;
+  border: 0;
   padding: 0;
+  background: none;
+  box-shadow: none;
   accent-color: var(--fill);
   cursor: pointer;
 }
@@ -3497,7 +3341,7 @@ select:focus-visible {
   padding: 0 8px;
   background: var(--fill-lo);
   color: var(--on-pine);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -3550,18 +3394,23 @@ select:focus-visible {
 .binding-preview {
   display: grid;
   gap: 4px;
-  border: 1px solid var(--pine-line);
+  border: 1px solid var(--hairline-soft);
   border-radius: var(--r-md);
-  background: linear-gradient(180deg, var(--pine-wash) 0%, var(--card) 100%);
+  background: var(--paper-2);
   padding: var(--sp-3) var(--sp-4);
-  box-shadow:
-    var(--shadow-1),
-    0 1px 2px rgba(28, 44, 56, 0.06);
+}
+.binding-preview.changed {
+  border-color: var(--amber-warn-line);
+  background: var(--amber-warn-bg);
+}
+.binding-preview .binding-summary strong {
+  color: var(--ink-strong);
+  font-size: 20px;
 }
 .binding-preview span,
 .choice-strip > span {
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.2em;
@@ -3575,7 +3424,7 @@ select:focus-visible {
 }
 .binding-summary strong {
   overflow-wrap: anywhere;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13.5px;
   font-weight: 700;
   color: var(--pine-deep);
@@ -3586,7 +3435,7 @@ select:focus-visible {
   color: var(--ink-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0;
@@ -3611,7 +3460,7 @@ select:focus-visible {
 }
 .binding-review span {
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.14em;
@@ -3620,7 +3469,7 @@ select:focus-visible {
 .binding-review .binding-summary strong {
   overflow-wrap: anywhere;
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0;
@@ -3710,7 +3559,7 @@ select:focus-visible {
   opacity: 0.6;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   text-transform: none;
   letter-spacing: 0;
@@ -3723,7 +3572,7 @@ select:focus-visible {
 .advanced-binding summary {
   cursor: pointer;
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -3732,7 +3581,7 @@ select:focus-visible {
 .advanced-binding summary:hover { color: var(--ink-soft); }
 .advanced-binding label { margin-top: var(--sp-3); }
 .advanced-binding input {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-align: left;
 }
@@ -3765,7 +3614,7 @@ select:focus-visible {
   padding: 0 8px;
   background: var(--paper-2);
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0;
@@ -3825,7 +3674,7 @@ select:focus-visible {
   padding: 5px var(--sp-2);
   background: var(--card);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-align: left;
   cursor: pointer;
@@ -3941,7 +3790,7 @@ select:focus-visible {
   padding: 6px 8px;
   background: var(--glass);
   color: var(--amber-warn-ink);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1.45;
   letter-spacing: 0;
@@ -3981,7 +3830,7 @@ select:focus-visible {
 }
 .combo-editor-summary span {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -3992,7 +3841,7 @@ select:focus-visible {
   color: var(--ink-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0;
 }
@@ -4009,7 +3858,7 @@ select:focus-visible {
   border-radius: 5px;
   background: var(--card);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   font-size: 10.5px;
 }
@@ -4053,7 +3902,7 @@ select:focus-visible {
 .settings-list div:last-child { border-bottom: 0; }
 .settings-list strong {
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
 }
@@ -4094,7 +3943,7 @@ select:focus-visible {
 }
 .trackball-setting-group-heading strong {
   color: var(--ink-strong);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -4117,7 +3966,7 @@ select:focus-visible {
 }
 .build-panel ol li::marker {
   color: var(--pine-bright);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
 }
 .build-panel button {
@@ -4199,7 +4048,7 @@ select:focus-visible {
   border-radius: var(--r-full);
   background: var(--paper-2);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 800;
 }
@@ -4424,7 +4273,7 @@ select:focus-visible {
   padding: 0 4px;
   background: var(--glass);
   color: var(--pine-deep);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
@@ -4522,7 +4371,7 @@ select:focus-visible {
 }
 
 .direct-note h2 {
-  font-family: "Fraunces", Georgia, serif;
+  font-family: var(--font-ui);
   font-weight: 500;
 }
 .direct-note p:last-child {
@@ -4546,7 +4395,7 @@ select:focus-visible {
   padding: var(--sp-3);
   background: var(--card);
   color: var(--ink-soft);
-  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -4602,7 +4451,7 @@ select:focus-visible {
   padding: var(--sp-2) var(--sp-3);
   background: var(--card);
   color: var(--ink-soft);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -4626,7 +4475,7 @@ select:focus-visible {
 .build-target {
   margin: var(--sp-2) 0;
   color: var(--ink-soft);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -4639,20 +4488,20 @@ select:focus-visible {
 }
 .build-repo-field > span {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 .build-repo-field > input {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: -0.005em;
 }
 .build-repo-field > small {
   color: var(--ink-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -4685,7 +4534,7 @@ select:focus-visible {
 }
 .build-check-item em {
   overflow-wrap: anywhere;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-style: normal;
   font-size: 10.5px;
 }
@@ -4758,7 +4607,7 @@ select:focus-visible {
   padding: 0 var(--sp-2);
   background: var(--pine-wash);
   color: var(--pine-deep);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 800;
   text-decoration: none;
@@ -4788,7 +4637,7 @@ select:focus-visible {
 .flash-wizard-header span,
 .flash-wizard small {
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -5036,7 +4885,7 @@ select:focus-visible {
   margin: 0;
   overflow: hidden;
   color: var(--ink);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5087,7 +4936,7 @@ select:focus-visible {
   padding: 6px var(--sp-5);
   background: linear-gradient(180deg, var(--card) 0%, var(--paper-2) 100%);
   color: var(--ink-muted);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.02em;
 }

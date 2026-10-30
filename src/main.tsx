@@ -266,8 +266,8 @@ const DEFAULT_FIRMWARE_REPO_URL = "https://github.com/juichi50iii/KobitoKey_QWER
 const USER_GUIDE_URL = "https://s-hiraoku.github.io/kobitokey-studio/user-guide/";
 const MOBILE_UNSUPPORTED_QUERY = "(max-width: 767px)";
 const COLOR_SCHEME_STORAGE_KEY = "kobitokey-color-scheme";
-const DARK_THEME_COLOR = "#14181d";
-const LIGHT_THEME_COLOR = "#2c4250";
+const DARK_THEME_COLOR = "#1a1d22";
+const LIGHT_THEME_COLOR = "#f7f8fa";
 const ENABLE_LAYER_STRUCTURE_EDITING = true;
 const APP_VERSION =
   typeof __KOBITOKEY_APP_VERSION__ === "string" && __KOBITOKEY_APP_VERSION__.trim()
@@ -355,6 +355,35 @@ function useColorSchemePreference() {
   }, []);
 
   return [preference, setPreference] as const;
+}
+
+const COLOR_SCHEME_CYCLE: Record<ColorSchemePreference, { next: ColorSchemePreference; label: string }> = {
+  system: { next: "dark", label: "システム設定に合わせる" },
+  dark: { next: "light", label: "Dark テーマに固定" },
+  light: { next: "system", label: "Light テーマに固定" },
+};
+
+function ColorSchemeButton({
+  onChange,
+  preference,
+}: {
+  onChange: (preference: ColorSchemePreference) => void;
+  preference: ColorSchemePreference;
+}) {
+  const { label, next } = COLOR_SCHEME_CYCLE[preference];
+  const Icon = preference === "dark" ? Moon : preference === "light" ? Sun : Monitor;
+
+  return (
+    <button
+      type="button"
+      className="icon-link theme-cycle"
+      onClick={() => onChange(next)}
+      aria-label={`カラーテーマ: ${label}`}
+      title={`カラーテーマ: ${label}（クリックで「${COLOR_SCHEME_CYCLE[next].label}」）`}
+    >
+      <Icon size={16} />
+    </button>
+  );
 }
 
 function useMobileUnsupported() {
@@ -574,6 +603,7 @@ function App() {
   const showFirmwareLoadingState = !isDirectMode && fixtureLoading && !files && workbenchTab !== "build";
   const showFirmwareEmptyState =
     !isDirectMode && !fixtureLoading && Boolean(fixtureError) && !files && workbenchTab !== "build";
+  const showFirmwareWorkspace = !isDirectMode && !showFirmwareLoadingState && !showFirmwareEmptyState;
   const canEditLayerStructure = ENABLE_LAYER_STRUCTURE_EDITING && !isDirectMode && files !== null;
   const activeLayerReferences = React.useMemo(
     () => [
@@ -2837,78 +2867,38 @@ function App() {
   return (
     <main className="app-shell">
       <header className={`topbar ${isDirectMode ? "direct-active" : ""}`}>
-        <div>
-          <p className="eyebrow">KobitoKey Studio</p>
-          <div className="topbar-title-row">
-            <h1>KobitoKey 設定エディタ</h1>
-            <span className="app-version-chip" title="KobitoKey Studio のアプリバージョン">App v{APP_VERSION}</span>
-          </div>
+        <div className="topbar-brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <h1>KobitoKey Studio</h1>
+          <span className="app-version-chip" title="KobitoKey Studio のアプリバージョン">v{APP_VERSION}</span>
         </div>
-        <div className="topbar-tools">
-          <div className="mode-toggle" role="group" aria-label="Editor mode">
-            <button
-              type="button"
-              className={editorMode === "firmware" ? "active" : ""}
-              aria-pressed={editorMode === "firmware"}
-              aria-controls="editor-workspace"
-              onClick={() => setEditorMode("firmware")}
-            >
-              Firmware
-              {!isDesktopRuntime ? <em className="mode-toggle-badge">GitHub連携</em> : null}
-            </button>
-            <button
-              type="button"
-              className={editorMode === "direct" ? "active" : ""}
-              aria-pressed={editorMode === "direct"}
-              aria-controls="editor-workspace"
-              onClick={() => setEditorMode("direct")}
-            >
-              Direct
-            </button>
-          </div>
-          <div className="theme-toggle" role="group" aria-label="カラーテーマ">
-            <button
-              type="button"
-              className={colorSchemePreference === "system" ? "active" : ""}
-              aria-pressed={colorSchemePreference === "system"}
-              onClick={() => setColorSchemePreference("system")}
-              title="システム設定に合わせる"
-            >
-              <Monitor size={14} />
-              <span>システム</span>
-            </button>
-            <button
-              type="button"
-              className={colorSchemePreference === "dark" ? "active" : ""}
-              aria-pressed={colorSchemePreference === "dark"}
-              onClick={() => setColorSchemePreference("dark")}
-              title="Dark テーマに固定"
-            >
-              <Moon size={14} />
-              <span>Dark</span>
-            </button>
-            <button
-              type="button"
-              className={colorSchemePreference === "light" ? "active" : ""}
-              aria-pressed={colorSchemePreference === "light"}
-              onClick={() => setColorSchemePreference("light")}
-              title="Light テーマに固定"
-            >
-              <Sun size={14} />
-              <span>Light</span>
-            </button>
-          </div>
-          <nav className="topbar-links" aria-label="関連リンク">
-            <a href={firmwareRepoHref} target="_blank" rel="noreferrer" title="Firmware repository を GitHub で開く">
-              <Github size={15} />
-              <span>GitHub</span>
-            </a>
-            <a href={USER_GUIDE_URL} target="_blank" rel="noreferrer" title="ユーザガイドを開く">
-              <BookOpen size={15} />
-              <span>ユーザガイド</span>
-            </a>
-          </nav>
-	          {editorMode === "firmware" && isDesktopRuntime ? (
+        <div className="mode-toggle" role="group" aria-label="Editor mode">
+          <button
+            type="button"
+            className={editorMode === "firmware" ? "active" : ""}
+            aria-pressed={editorMode === "firmware"}
+            aria-controls="editor-workspace"
+            onClick={() => setEditorMode("firmware")}
+            title={
+              isDesktopRuntime
+                ? "keymap ファイルを編集してビルドします"
+                : "keymap を編集し、GitHub でビルドして書き込みます"
+            }
+          >
+            Firmware
+          </button>
+          <button
+            type="button"
+            className={editorMode === "direct" ? "active" : ""}
+            aria-pressed={editorMode === "direct"}
+            aria-controls="editor-workspace"
+            onClick={() => setEditorMode("direct")}
+            title="USB / Bluetooth で接続中の KobitoKey を直接編集します"
+          >
+            Direct
+          </button>
+        </div>
+        {editorMode === "firmware" && isDesktopRuntime ? (
 	            <div className="project-loader" role="group" aria-label="プロジェクトフォルダ">
               <label className="project-loader-field">
                 <span className="project-loader-label">
@@ -2969,12 +2959,7 @@ function App() {
                 }}
               />
             </div>
-	          ) : editorMode === "firmware" ? (
-	            <div className="topbar-hint">
-	              <UploadCloud size={17} />
-	              <span title="Build & Flash ボタンから GitHub repository を読み込みます">Build & Flash ボタンから GitHub repository を読み込みます</span>
-	            </div>
-	          ) : directKeymap ? (
+        ) : editorMode === "direct" && directKeymap ? (
             <div className="studio-loader connected-loader" role="group" aria-label="接続状態">
               <span className="connected-chip">
                 {studioConnectionKind === "bluetooth" ? <Bluetooth size={14} /> : <Usb size={14} />}
@@ -3003,16 +2988,47 @@ function App() {
                 切断
               </button>
             </div>
-          ) : (
-            <div className="topbar-hint">
-              {canUseWebBluetooth ? <Bluetooth size={17} /> : <Usb size={17} />}
-              <span>
-                {canUseWebUsb || canUseWebBluetooth
-                  ? "接続パネルから USB または Bluetooth で KobitoKey に接続します"
-                  : "Web Serial / Web Bluetooth がこのページから見えていません。Chrome/Edge と localhost/HTTPS を確認してください"}
-              </span>
-            </div>
-          )}
+        ) : null}
+        <div className="topbar-spacer" />
+        {showFirmwareWorkspace ? (
+          <FirmwareWorkbenchActions
+            activeTab={workbenchTab}
+            buildFlashHint={isDesktopRuntime ? undefined : "Build & Flash ボタンから GitHub repository を読み込みます"}
+            canRedo={canRedoFirmwareEdit}
+            canReset={keymapDiff.length > 0}
+            canSaveProject={Boolean(files)}
+            canUndo={canUndoFirmwareEdit}
+            diffCount={keymapDiff.length}
+            onBuildFlash={toggleFirmwareBuildFlash}
+            onRedo={() => redoFirmwareEdit() && setStatus("編集をやり直しました")}
+            onReset={resetFirmwareEdits}
+            onUndo={() => undoFirmwareEdit() && setStatus("編集を元に戻しました")}
+            onSaveProject={saveProjectFiles}
+            projectSaveMode={files?.keymapPath || projectDirHandle ? "save" : "export"}
+          />
+        ) : null}
+        <div className="topbar-utilities" role="group" aria-label="表示とリンク">
+          <ColorSchemeButton preference={colorSchemePreference} onChange={setColorSchemePreference} />
+          <a
+            className="icon-link"
+            href={firmwareRepoHref}
+            target="_blank"
+            rel="noreferrer"
+            title="Firmware repository を GitHub で開く"
+            aria-label="GitHub"
+          >
+            <Github size={16} />
+          </a>
+          <a
+            className="icon-link"
+            href={USER_GUIDE_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="ユーザガイドを開く"
+            aria-label="ユーザガイド"
+          >
+            <BookOpen size={16} />
+          </a>
         </div>
       </header>
 
@@ -3048,43 +3064,46 @@ function App() {
 	        }`}
       >
         <nav className="sidebar" aria-label="Layers">
-          {ENABLE_LAYER_STRUCTURE_EDITING ? (
-            <div className="layer-toolbar" role="group" aria-label="Layer controls">
-              <button
-                type="button"
-                onClick={createLayer}
-                disabled={!canEditLayerStructure}
-                title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "末尾に空の layer を追加"}
-                aria-label="Layer を追加"
-              >
-                <Plus size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={duplicateLayer}
-                disabled={!canEditLayerStructure || !activeLayer}
-                title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "選択中の layer を複製"}
-                aria-label="選択中の layer を複製"
-              >
-                <Copy size={15} />
-              </button>
-              <button
-                type="button"
-                className="danger"
-                onClick={removeActiveLayer}
-                disabled={!canDeleteActiveLayer}
-                title={
-                  isDirectMode
-                    ? "Direct Mode では layer 構造を変更できません"
-                    : activeLayerDeletionBlockReason ||
-                      "番号参照のずれを避けるため、最後の layer だけ削除できます"
-                }
-                aria-label="選択中の layer を削除"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ) : null}
+          <div className="sidebar-heading">
+            <h2>レイヤー</h2>
+            {ENABLE_LAYER_STRUCTURE_EDITING ? (
+              <div className="layer-toolbar" role="group" aria-label="Layer controls">
+                <button
+                  type="button"
+                  onClick={createLayer}
+                  disabled={!canEditLayerStructure}
+                  title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "末尾に空の layer を追加"}
+                  aria-label="Layer を追加"
+                >
+                  <Plus size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={duplicateLayer}
+                  disabled={!canEditLayerStructure || !activeLayer}
+                  title={isDirectMode ? "Direct Mode では layer 構造を変更できません" : "選択中の layer を複製"}
+                  aria-label="選択中の layer を複製"
+                >
+                  <Copy size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={removeActiveLayer}
+                  disabled={!canDeleteActiveLayer}
+                  title={
+                    isDirectMode
+                      ? "Direct Mode では layer 構造を変更できません"
+                      : activeLayerDeletionBlockReason ||
+                        "番号参照のずれを避けるため、最後の layer だけ削除できます"
+                  }
+                  aria-label="選択中の layer を削除"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="layer-list">
             {layers.map((layer, index) => (
               <button
@@ -3111,9 +3130,11 @@ function App() {
             />
           ) : null}
           <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Layer {activeLayerIndex}</p>
+            <div className="panel-heading-title">
               <h2>{activeLayer?.label ?? "No layer"}</h2>
+              <span>
+                Layer {activeLayerIndex} · キーをクリックして編集
+              </span>
             </div>
             {isDirectMode ? (
               <button type="button" className="primary" onClick={() => readStudioDevice()}>
@@ -3162,20 +3183,6 @@ function App() {
             />
           ) : (
             <>
-              <FirmwareWorkbenchActions
-                activeTab={workbenchTab}
-                canRedo={canRedoFirmwareEdit}
-                canReset={keymapDiff.length > 0}
-                canSaveProject={Boolean(files)}
-                canUndo={canUndoFirmwareEdit}
-                diffCount={keymapDiff.length}
-                onBuildFlash={toggleFirmwareBuildFlash}
-                onRedo={() => redoFirmwareEdit() && setStatus("編集をやり直しました")}
-                onReset={resetFirmwareEdits}
-                onUndo={() => undoFirmwareEdit() && setStatus("編集を元に戻しました")}
-                onSaveProject={saveProjectFiles}
-                projectSaveMode={files?.keymapPath || projectDirHandle ? "save" : "export"}
-              />
               {workbenchTab === "build" && !isDesktopRuntime ? (
                 <BrowserFirmwareReleaseWorkbench
                   artifacts={browserFirmwareArtifacts}
@@ -4775,7 +4782,6 @@ function FirmwareKeyInspector({
       <section>
         <KeyInspectorHeading
           autoAdvance={autoAdvance}
-          binding={selectedBinding}
           keyIndex={keyIndex}
           onAutoAdvanceChange={onAutoAdvanceChange}
         />
@@ -4795,20 +4801,18 @@ function FirmwareKeyInspector({
 
 function KeyInspectorHeading({
   autoAdvance,
-  binding,
   keyIndex,
   onAutoAdvanceChange,
 }: {
   autoAdvance: boolean;
-  binding: string;
   keyIndex: number;
   onAutoAdvanceChange: (value: boolean) => void;
 }) {
   return (
     <div className="key-inspector-heading">
       <div>
-        <p className="eyebrow">Key {keyIndex + 1}</p>
-        <h2>{binding}</h2>
+        <h2>Key {keyIndex + 1}</h2>
+        <p className="key-inspector-position">{physicalKeyPositionLabel(keyIndex)}</p>
       </div>
       <label className="auto-advance-toggle" title="通常キーを選んだら、右隣のキーへ自動で移動します">
         <input
@@ -4820,6 +4824,16 @@ function KeyInspectorHeading({
       </label>
     </div>
   );
+}
+
+const PHYSICAL_ROW_LABELS = ["上段", "中段", "下段", "最下段・親指"];
+
+function physicalKeyPositionLabel(keyIndex: number): string {
+  const key = kobitoKeyPhysicalLayout.find((candidate) => candidate.index === keyIndex);
+  if (!key) return "";
+  const side = key.side === "left" ? "左手" : "右手";
+  const row = key.kind === "thumb" ? "親指" : PHYSICAL_ROW_LABELS[Math.floor(keyIndex / 10)] ?? "";
+  return `${side} ${row}`;
 }
 
 function DirectInspectorTabs({
@@ -4905,7 +4919,6 @@ function DirectInspectorTabs({
         <div className="direct-key-editor">
           <KeyInspectorHeading
             autoAdvance={autoAdvance}
-            binding={selectedBinding}
             keyIndex={keyIndex}
             onAutoAdvanceChange={onAutoAdvanceChange}
           />
@@ -5171,6 +5184,7 @@ const WORKBENCH_TABS: Array<{ id: WorkbenchTabId; label: string }> = [
 
 function FirmwareWorkbenchActions({
   activeTab,
+  buildFlashHint,
   canRedo,
   canReset,
   canSaveProject,
@@ -5184,6 +5198,7 @@ function FirmwareWorkbenchActions({
   projectSaveMode,
 }: {
   activeTab: WorkbenchTabId;
+  buildFlashHint?: string;
   canRedo: boolean;
   canReset: boolean;
   canSaveProject: boolean;
@@ -5197,8 +5212,7 @@ function FirmwareWorkbenchActions({
   projectSaveMode: "save" | "export";
 }) {
   const isBuildPanelOpen = activeTab === "build";
-  const firmwareState = diffCount > 0 ? "Firmware 未保存" : "Firmware 保存済み";
-  const diffState = diffCount > 0 ? `Diff ${diffCount}` : "Diff なし";
+  const firmwareState = diffCount > 0 ? `未保存の変更 ${diffCount}` : "保存済み";
   const projectSaveLabel = projectSaveMode === "save" ? "Firmwareファイルを保存" : "Firmwareファイルをダウンロード";
   const modKey = isApplePlatform() ? "⌘" : "Ctrl+";
 
@@ -5208,10 +5222,13 @@ function FirmwareWorkbenchActions({
       role="group"
       aria-label="Firmware actions"
     >
-      <div className="firmware-action-state" aria-live="polite">
-        <span className={diffCount > 0 ? "changed" : "clean"}>{firmwareState}</span>
-        <span>{diffState}</span>
-      </div>
+      <span
+        className={`firmware-action-state ${diffCount > 0 ? "changed" : "clean"}`}
+        aria-live="polite"
+        title={diffCount > 0 ? "Diff タブで変更内容を確認できます" : "読み込み時点から変更はありません"}
+      >
+        {firmwareState}
+      </span>
       {!isBuildPanelOpen ? (
         <div className="firmware-history-actions" role="group" aria-label="編集履歴">
           <button
@@ -5234,19 +5251,19 @@ function FirmwareWorkbenchActions({
           >
             <Redo2 size={16} />
           </button>
+          <button
+            type="button"
+            className="icon-button danger-ghost reset-action"
+            onClick={onReset}
+            disabled={!canReset}
+            title="保存済みの状態まですべての編集を破棄します"
+          >
+            <RotateCcw size={15} />
+            <span className="button-label">編集をリセット</span>
+          </button>
         </div>
       ) : null}
       <div className="firmware-main-actions">
-        <button
-          type="button"
-          className="danger-ghost reset-action"
-          onClick={onReset}
-          disabled={!canReset}
-          title="保存済みの状態まですべての編集を破棄します"
-        >
-          <RotateCcw size={15} />
-          <span className="button-label">編集をリセット</span>
-        </button>
         {!isBuildPanelOpen ? (
           <button
             type="button"
@@ -5259,7 +5276,12 @@ function FirmwareWorkbenchActions({
             <span className="button-label">{projectSaveLabel}</span>
           </button>
         ) : null}
-        <button type="button" className={isBuildPanelOpen ? "primary active" : "primary build-flash-action"} onClick={onBuildFlash}>
+        <button
+          type="button"
+          className={isBuildPanelOpen ? "primary active" : "primary build-flash-action"}
+          onClick={onBuildFlash}
+          title={isBuildPanelOpen ? "キー編集の画面に戻ります" : buildFlashHint}
+        >
           {isBuildPanelOpen ? <Undo2 size={16} /> : <UploadCloud size={16} />}
           <span className="button-label">{isBuildPanelOpen ? "編集に戻る" : "Build & Flash"}</span>
         </button>
@@ -6717,8 +6739,8 @@ function BindingEditor({
           </div>
         </div>
       ) : (
-        <div className="binding-preview">
-          <span>設定後の動作</span>
+        <div className={`binding-preview ${hasPendingEdit ? "changed" : ""}`}>
+          <span>{hasPendingEdit ? "反映前の動作" : "割り当て中の動作"}</span>
           <BindingSummary binding={builtBinding} />
         </div>
       )}
