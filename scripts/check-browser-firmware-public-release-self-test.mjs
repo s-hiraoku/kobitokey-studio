@@ -223,7 +223,7 @@ function createPreviewReport() {
 
 function createInvalidPublicOriginReport() {
   const report = JSON.parse(readFileSync(templateReport, "utf8"));
-  report.production.url = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
-  report.production.fetchUrl = "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware";
+  report.production.url = "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
+  report.production.fetchUrl = "https://kobito-key-studio.hiraoku.dev/?mode=firmware";
   return report;
 }

@@ -5,7 +5,7 @@ lang: ja
 # 独自レイアウトを使うため Jekyll の minima テーマは使いません。
 # GitHub Pages の Jekyll build がそのまま docs/ 配下を処理します。
 
-app_url: https://kobitokey-studio.s-hiraoku.workers.dev/
+app_url: https://kobito-key-studio.hiraoku.dev/
 
 # ヘッダーのナビゲーション
 nav:

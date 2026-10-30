@@ -119,7 +119,7 @@ function renderEnvTemplate(status, releaseGateRunUrl) {
   const env = {
     ...process.env,
     BROWSER_FIRMWARE_E2E_PRODUCTION_URL:
-      status.productionUrl || "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      status.productionUrl || "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
     BROWSER_FIRMWARE_E2E_CI_RUN_URL:
       releaseGateRunUrl || "https://github.com/s-hiraoku/kobitokey-studio/actions/runs/<release-gate-run-id>",
     BROWSER_FIRMWARE_E2E_APP_COMMIT_SHA: status.headSha || "<kobitokey-studio-app-commit-sha>",

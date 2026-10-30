@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 
-const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
+const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobito-key-studio.hiraoku.dev";
 const APP_REPOSITORY = "s-hiraoku/kobitokey-studio";
 const REQUIRED_PUBLIC_ENTRY_PATHS = [
   "/?mode=firmware",

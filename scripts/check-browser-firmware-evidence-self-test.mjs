@@ -181,8 +181,8 @@ function createValidReport() {
     verifiedAt: "2026-05-27T00:13:00Z",
     tester: "release-qa",
     production: {
-      url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
-      fetchUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+      url: "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
+      fetchUrl: "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
       appCommitSha: "89abcdef0123456789abcdef0123456789abcdef",
       workerDeviceCodeRouteChecked: true,
       workerAccessTokenRouteChecked: true,
@@ -404,7 +404,7 @@ function createInvalidReport() {
 }
 
 function publicEntryUrls() {
-  const origin = "https://kobitokey-studio.s-hiraoku.workers.dev";
+  const origin = "https://kobito-key-studio.hiraoku.dev";
   return [
     "/?mode=firmware",
     "/?mode=firmware&tab=combos",

@@ -3,6 +3,13 @@
   "name": "kobitokey-studio",
   "compatibility_date": "2026-05-17",
   "main": "./src/worker.ts",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "kobito-key-studio.hiraoku.dev",
+      "custom_domain": true
+    }
+  ],
   "observability": {
     "enabled": true
   },

@@ -137,12 +137,12 @@
     "artifactProvenanceMatchesBuildArtifacts": false,
     "publicEntryLinksPassed": false,
     "publicEntryUrls": [
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=combos",
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=trackball",
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=diff",
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
-      "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct"
+      "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
+      "https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=combos",
+      "https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=trackball",
+      "https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=diff",
+      "https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build",
+      "https://kobito-key-studio.hiraoku.dev/?mode=direct"
     ],
     "smokeCommand": "npm run check:browser-firmware:ui",
     "smokeViewportCount": 2

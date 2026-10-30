@@ -84,12 +84,12 @@ function assertHandoff(markdown) {
     "npm run collect:browser-firmware:e2e-report -- --print-env-template > /tmp/browser-firmware-e2e.env",
     "export VITE_GITHUB_OAUTH_CLIENT_ID='<GitHub OAuth App client id>'",
     "### BLOCKER external E2E evidence",
-    "[Production URL](https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware)",
+    "[Production URL](https://kobito-key-studio.hiraoku.dev/?mode=firmware)",
     "[Release Plan](https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md)",
     "source /tmp/browser-firmware-e2e.env",
     "## External E2E Evidence Checklist",
-    "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware&tab=build",
-    "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=direct",
+    "https://kobito-key-studio.hiraoku.dev/?mode=firmware&tab=build",
+    "https://kobito-key-studio.hiraoku.dev/?mode=direct",
     "ISO UTC flash timestamps",
     "verifiedAt must be the same as or later than both",
     "`ui.publicEntryLinksPassed: true`",
@@ -127,7 +127,7 @@ function createStatusFixture() {
     headSha: "abc123456789abcdef0123456789abcdef012345",
     shortHead: "abc1234",
     branch: "feature/firmware-mode",
-    productionUrl: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware",
+    productionUrl: "https://kobito-key-studio.hiraoku.dev/?mode=firmware",
     blockerCount: 3,
     warningCount: 2,
     nextActions: [
@@ -152,7 +152,7 @@ function createStatusFixture() {
           "npm run check:browser-firmware:release-status -- --json --e2e-report path/to/report.json",
         ],
         links: [
-          { label: "Production URL", url: "https://kobitokey-studio.s-hiraoku.workers.dev/?mode=firmware" },
+          { label: "Production URL", url: "https://kobito-key-studio.hiraoku.dev/?mode=firmware" },
           {
             label: "Release Plan",
             url: "https://github.com/s-hiraoku/kobitokey-studio/blob/main/docs/browser-firmware-release-plan.md",

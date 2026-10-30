@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobitokey-studio.s-hiraoku.workers.dev";
+const DEFAULT_EXPECTED_PRODUCTION_ORIGIN = "https://kobito-key-studio.hiraoku.dev";
 const expectedProductionOrigin =
   process.env.BROWSER_FIRMWARE_EXPECTED_PRODUCTION_ORIGIN?.trim() || DEFAULT_EXPECTED_PRODUCTION_ORIGIN;
 const scriptDir = dirname(fileURLToPath(import.meta.url));

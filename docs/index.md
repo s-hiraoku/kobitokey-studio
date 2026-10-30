@@ -12,7 +12,7 @@ description: KobitoKey Studio の使い方ガイド。Firmware Mode と Direct M
       <h1>キーマップを、迷わず変える。</h1>
       <p class="lead">KobitoKey のキー配列・Combo・トラックボール・ファームウェアを、PC のブラウザだけでまとめて設定できる専用エディタです。やりたいことに合わせて <strong>2 つのモード</strong> を選ぶだけ。</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="https://kobitokey-studio.s-hiraoku.workers.dev/" target="_blank" rel="noopener">アプリを開く ↗</a>
+        <a class="btn btn-primary" href="https://kobito-key-studio.hiraoku.dev/" target="_blank" rel="noopener">アプリを開く ↗</a>
         <a class="btn btn-ghost" href="#modes">どっちのモード？</a>
       </div>
     </div>
@@ -80,7 +80,7 @@ description: KobitoKey Studio の使い方ガイド。Firmware Mode と Direct M
 <section class="home-section">
   <div class="wrap">
     <h2>最短ルート</h2>
-    <p class="section-lead">PC の <strong>Chrome / Edge</strong> で <a href="https://kobitokey-studio.s-hiraoku.workers.dev/" target="_blank" rel="noopener">アプリ</a> を開いて始めます。スマホブラウザは未対応です。</p>
+    <p class="section-lead">PC の <strong>Chrome / Edge</strong> で <a href="https://kobito-key-studio.hiraoku.dev/" target="_blank" rel="noopener">アプリ</a> を開いて始めます。スマホブラウザは未対応です。</p>
 
     <div class="routes">
       <div class="route">
