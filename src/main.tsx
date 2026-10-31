@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   FolderOpen,
+  GitCompare,
   Github,
   Loader2,
   Lock,
@@ -837,16 +838,18 @@ function App() {
   const activeCombos = combos;
   const displayedDirectComboSource: DirectComboSource = directComboSource === "device" ? "device" : "firmware";
   const displayedDirectMaxCombos = directKeymap ? directMaxCombos : activeCombos.length;
+  // The bundled sample keymap is not what the device runs, so comparing against
+  // it only produces noise; diffs start once the user's own keymap is loaded.
   const directFirmwareDiffs = React.useMemo(
-    () => diffDirectKeymapAgainstFirmware(directKeymap, firmwareParsedKeymap),
-    [directKeymap, firmwareParsedKeymap],
+    () => (firmwareIsSample ? [] : diffDirectKeymapAgainstFirmware(directKeymap, firmwareParsedKeymap)),
+    [directKeymap, firmwareIsSample, firmwareParsedKeymap],
   );
   const directFirmwareComboDiffs = React.useMemo(
     () =>
-      directKeymap && directComboSource === "device"
+      !firmwareIsSample && directKeymap && directComboSource === "device"
         ? diffDirectCombosAgainstFirmware(directCombos, firmwareParsedKeymap.combos)
         : [],
-    [directComboSource, directCombos, directKeymap, firmwareParsedKeymap.combos],
+    [directComboSource, directCombos, directKeymap, firmwareIsSample, firmwareParsedKeymap.combos],
   );
   const activeLayer = layers[activeLayerIndex] ?? layers[0];
   const selectedBinding = activeLayer?.bindings[selectedKeyIndex] ?? "";
@@ -3707,17 +3710,26 @@ function App() {
             <DirectSummaryPanel
               busyOperation={directDeviceOperation}
               canLock={!isDesktopRuntime}
+              canWriteDrafts={studioConnectionState === "connected"}
               connectionKind={studioConnectionKind}
+              draftWriting={directKeyWriteFeedback.kind === "writing"}
+              drafts={directKeyDraftList}
               firmwareComboDiffs={directFirmwareComboDiffs}
               firmwareDiffs={directFirmwareDiffs}
               firmwareIsSample={firmwareIsSample}
               keymap={directKeymap}
               onApplyFirmwareComboDiffs={applyDirectFirmwareComboDiffs}
               onApplyFirmwareDiffs={applyDirectFirmwareDiffs}
+              onDiscardDrafts={(drafts) => discardDirectKeyDrafts(drafts)}
               onExportBackup={exportDirectKeymapBackup}
               onLock={lockDirectDevice}
               onReset={resetDirectDeviceSettings}
               onRestoreBackup={(file) => void restoreDirectKeymapBackup(file)}
+              onSelectKey={(layerIndex, keyIndex) => {
+                setActiveLayerIndex(layerIndex);
+                setSelectedKeyIndex(keyIndex);
+              }}
+              onWriteDrafts={(drafts) => void writeDirectKeyDrafts(drafts)}
               portPath={selectedStudioPort}
             />
           ) : (
@@ -4551,35 +4563,48 @@ function truncateComboLabel(value: string, maxLength: number): string {
 function DirectSummaryPanel({
   busyOperation,
   canLock,
+  canWriteDrafts,
   connectionKind,
+  draftWriting,
+  drafts,
   firmwareComboDiffs,
   firmwareDiffs,
   firmwareIsSample,
   keymap,
   onApplyFirmwareComboDiffs,
   onApplyFirmwareDiffs,
+  onDiscardDrafts,
   onExportBackup,
   onLock,
   onReset,
   onRestoreBackup,
+  onSelectKey,
+  onWriteDrafts,
   portPath,
 }: {
   busyOperation: string;
   canLock: boolean;
+  canWriteDrafts: boolean;
   connectionKind: StudioConnectionKind;
+  draftWriting: boolean;
+  drafts: DirectKeyDraft[];
   firmwareComboDiffs: DirectFirmwareComboDiff[];
   firmwareDiffs: DirectFirmwareKeyDiff[];
   firmwareIsSample: boolean;
   keymap: StudioKeymap | null;
   onApplyFirmwareComboDiffs: (diffs?: DirectFirmwareComboDiff[]) => void;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
+  onDiscardDrafts: (drafts?: DirectKeyDraft[]) => void;
   onExportBackup: () => void;
   onLock: () => void;
   onReset: () => void;
   onRestoreBackup: (file: File) => void;
+  onSelectKey: (layerIndex: number, keyIndex: number) => void;
+  onWriteDrafts: (drafts?: DirectKeyDraft[]) => void;
   portPath: string;
 }) {
-  const [syncTab, setSyncTab] = React.useState<"summary" | "key" | "combo" | "device">("summary");
+  const [syncTab, setSyncTab] = React.useState<"summary" | "edits" | "device">("summary");
+  const [comparingKeymap, setComparingKeymap] = React.useState(false);
 
   if (!keymap) {
     return (
@@ -4593,12 +4618,15 @@ function DirectSummaryPanel({
     );
   }
 
+  // "編集差分" is what this session changed on top of the device. Comparing
+  // with a keymap file is opt-in, and only offered once the user's own keymap
+  // is loaded: the bundled sample is not what the device runs.
   const syncTabs: Array<{ id: typeof syncTab; label: string; count?: number }> = [
     { id: "summary", label: "概要" },
-    { id: "key", label: "Key 差分", count: firmwareDiffs.length },
-    { id: "combo", label: "Combo 差分", count: firmwareComboDiffs.length },
+    { id: "edits", label: "編集差分", count: drafts.length },
     { id: "device", label: "バックアップ" },
   ];
+  const showKeymapComparison = comparingKeymap && !firmwareIsSample;
 
   return (
     <section className="direct-summary">
@@ -4646,26 +4674,49 @@ function DirectSummaryPanel({
               </div>
             ) : null}
             <div>
-              <dt>Key 差分</dt>
-              <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
-            </div>
-            <div>
-              <dt>Combo 差分</dt>
-              <dd>{firmwareComboDiffs.length === 0 ? "差分なし" : `${firmwareComboDiffs.length} combos`}</dd>
+              <dt>編集差分</dt>
+              <dd>{drafts.length === 0 ? "なし" : `未書き込み ${drafts.length} keys`}</dd>
             </div>
           </dl>
           <DirectCapabilityStrip compact />
         </div>
       ) : null}
-      {syncTab === "key" ? (
-        <DirectFirmwareDiffPanel
-          diffs={firmwareDiffs}
-          firmwareIsSample={firmwareIsSample}
-          onApplyFirmwareDiffs={onApplyFirmwareDiffs}
-        />
-      ) : null}
-      {syncTab === "combo" ? (
-        <DirectFirmwareComboDiffPanel diffs={firmwareComboDiffs} onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs} />
+      {syncTab === "edits" ? (
+        <>
+          <DirectEditDiffPanel
+            canWrite={canWriteDrafts}
+            drafts={drafts}
+            isWriting={draftWriting}
+            keymap={keymap}
+            onDiscard={onDiscardDrafts}
+            onSelectKey={onSelectKey}
+            onWrite={onWriteDrafts}
+          />
+          {firmwareIsSample ? null : (
+            <div className="direct-keymap-compare">
+              <button
+                type="button"
+                className="ghost compact-action"
+                aria-expanded={showKeymapComparison}
+                onClick={() => setComparingKeymap((current) => !current)}
+                title="実機の keymap を、Firmware モードで読み込んだ keymap ファイルと比べます"
+              >
+                <GitCompare size={14} />
+                {showKeymapComparison ? "keymap との比較を閉じる" : "keymap と比較"}
+              </button>
+              <small>実機で変えた内容を keymap ファイルに書き戻してからビルドしたいときに使います。</small>
+            </div>
+          )}
+          {showKeymapComparison ? (
+            <>
+              <DirectFirmwareDiffPanel diffs={firmwareDiffs} onApplyFirmwareDiffs={onApplyFirmwareDiffs} />
+              <DirectFirmwareComboDiffPanel
+                diffs={firmwareComboDiffs}
+                onApplyFirmwareComboDiffs={onApplyFirmwareComboDiffs}
+              />
+            </>
+          ) : null}
+        </>
       ) : null}
       {syncTab === "device" ? (
         <DirectDeviceToolsPanel
@@ -4961,11 +5012,9 @@ function DirectLayerRenameForm({
 
 function DirectFirmwareDiffPanel({
   diffs,
-  firmwareIsSample,
   onApplyFirmwareDiffs,
 }: {
   diffs: DirectFirmwareKeyDiff[];
-  firmwareIsSample: boolean;
   onApplyFirmwareDiffs: (diffs?: DirectFirmwareKeyDiff[]) => void;
 }) {
   return (
@@ -4985,12 +5034,6 @@ function DirectFirmwareDiffPanel({
           キー差分を Firmware に取り込む
         </button>
       </div>
-      {firmwareIsSample ? (
-        <p className="direct-firmware-note sample-source">
-          比較している Firmware 側は、アプリに同梱されているサンプルの keymap です。自分の keymap と比べるには、Firmware
-          モードで GitHub かフォルダから読み込んでください。
-        </p>
-      ) : null}
       {diffs.length === 0 ? (
         <p className="diff-empty compact-empty">Direct keymap と firmware keymap のキー動作は一致しています。</p>
       ) : (
@@ -5021,6 +5064,88 @@ function DirectFirmwareDiffPanel({
             ))}
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+function DirectEditDiffPanel({
+  canWrite,
+  drafts,
+  isWriting,
+  keymap,
+  onDiscard,
+  onSelectKey,
+  onWrite,
+}: {
+  canWrite: boolean;
+  drafts: DirectKeyDraft[];
+  isWriting: boolean;
+  keymap: StudioKeymap;
+  onDiscard: (drafts?: DirectKeyDraft[]) => void;
+  onSelectKey: (layerIndex: number, keyIndex: number) => void;
+  onWrite: (drafts?: DirectKeyDraft[]) => void;
+}) {
+  return (
+    <section className="direct-firmware-diff-panel direct-edit-diff-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h3>実機との編集差分</h3>
+          <span>{drafts.length === 0 ? "変更なし" : `未書き込み ${drafts.length} keys`}</span>
+        </div>
+        <button
+          type="button"
+          className="primary compact-action"
+          disabled={drafts.length === 0 || !canWrite || isWriting}
+          onClick={() => onWrite()}
+        >
+          <Save size={15} />
+          すべて書き込み
+        </button>
+      </div>
+      {drafts.length === 0 ? (
+        <p className="diff-empty compact-empty">
+          まだ編集していません。キーを選んで変更すると、接続時に読み込んだ実機の状態との違いがここに並びます。
+        </p>
+      ) : (
+        <div className="direct-firmware-diff-list">
+          {drafts.map((draft) => (
+            <article key={directKeyDraftKey(draft.layerIndex, draft.keyIndex)}>
+              <header>
+                <button
+                  type="button"
+                  className="direct-edit-diff-target"
+                  onClick={() => onSelectKey(draft.layerIndex, draft.keyIndex)}
+                  title="このキーを選択します"
+                >
+                  <strong>
+                    Layer {draft.layerIndex} / Key {draft.keyIndex + 1}
+                  </strong>
+                  <span>{keymap.layers[draft.layerIndex]?.name || `Layer ${draft.layerIndex}`}</span>
+                </button>
+                <div className="direct-edit-diff-actions">
+                  <button type="button" className="compact-action ghost" disabled={isWriting} onClick={() => onDiscard([draft])}>
+                    <Undo2 size={14} />
+                    戻す
+                  </button>
+                  <button
+                    type="button"
+                    className="compact-action"
+                    disabled={!canWrite || isWriting}
+                    onClick={() => onWrite([draft])}
+                  >
+                    <Save size={14} />
+                    書き込み
+                  </button>
+                </div>
+              </header>
+              <dl>
+                <BindingDiffValue label="実機" binding={draft.from} />
+                <BindingDiffValue label="編集後" binding={draft.to} />
+              </dl>
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );
