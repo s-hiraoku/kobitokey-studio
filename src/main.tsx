@@ -19,7 +19,12 @@ import {
   Monitor,
   MousePointer,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Pencil,
+  PencilLine,
   Plus,
   Redo2,
   RefreshCw,
@@ -293,8 +298,8 @@ const DOCK_HEIGHT_STORAGE_KEY = "kobitokey-dock-height";
 const DOCK_MIN_HEIGHT = 160;
 /** Space the keyboard keeps above the dock while it is resized. */
 const DOCK_KEYBOARD_RESERVE = 140;
-const DARK_THEME_COLOR = "#1a1d22";
-const LIGHT_THEME_COLOR = "#f7f8fa";
+const DARK_THEME_COLOR = "#1f1c17";
+const LIGHT_THEME_COLOR = "#fffdf8";
 const ENABLE_LAYER_STRUCTURE_EDITING = true;
 const APP_VERSION =
   typeof __KOBITOKEY_APP_VERSION__ === "string" && __KOBITOKEY_APP_VERSION__.trim()
@@ -441,6 +446,67 @@ function useDockHeight() {
   }, []);
 
   return [height, setHeight] as const;
+}
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "kobitokey-sidebar-collapsed";
+const INSPECTOR_COLLAPSED_STORAGE_KEY = "kobitokey-inspector-collapsed";
+
+/** A side drawer's open/closed state, remembered per browser. */
+function useDrawerCollapsed(storageKey: string) {
+  const [collapsed, setCollapsedState] = React.useState(() => {
+    try {
+      return browserLocalStorage()?.getItem(storageKey) === "collapsed";
+    } catch {
+      return false;
+    }
+  });
+
+  const setCollapsed = React.useCallback(
+    (next: boolean) => {
+      setCollapsedState(next);
+      try {
+        const storage = browserLocalStorage();
+        if (next) {
+          storage?.setItem(storageKey, "collapsed");
+        } else {
+          storage?.removeItem(storageKey);
+        }
+      } catch {
+        // The drawer still toggles for this tab when storage is unavailable.
+      }
+    },
+    [storageKey],
+  );
+
+  return [collapsed, setCollapsed] as const;
+}
+
+function DrawerToggle({
+  collapsed,
+  label,
+  onToggle,
+  side,
+}: {
+  collapsed: boolean;
+  label: string;
+  onToggle: () => void;
+  side: "left" | "right";
+}) {
+  const Icon =
+    side === "left" ? (collapsed ? PanelLeftOpen : PanelLeftClose) : collapsed ? PanelRightOpen : PanelRightClose;
+  const shortcut = side === "left" ? "[" : "]";
+  return (
+    <button
+      type="button"
+      className={`drawer-toggle drawer-toggle-${side}`}
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? `${label}を開く` : `${label}を畳む`}
+      title={`${collapsed ? `${label}を開く` : `${label}を畳む`}（${shortcut} キー）`}
+    >
+      <Icon size={16} />
+    </button>
+  );
 }
 
 /**
@@ -635,6 +701,8 @@ function App() {
   const [status, setStatus] = React.useState("fixture を読み込み中");
   const [fixtureLoading, setFixtureLoading] = React.useState(true);
   const [dockHeight, setDockHeight] = useDockHeight();
+  const [sidebarCollapsed, setSidebarCollapsed] = useDrawerCollapsed(SIDEBAR_COLLAPSED_STORAGE_KEY);
+  const [inspectorCollapsed, setInspectorCollapsed] = useDrawerCollapsed(INSPECTOR_COLLAPSED_STORAGE_KEY);
   const keyboardPanelRef = React.useRef<HTMLElement>(null);
   // True while the firmware side is the bundled sample keymap rather than the user's own project.
   const [firmwareIsSample, setFirmwareIsSample] = React.useState(true);
@@ -1161,6 +1229,15 @@ function App() {
         focusPhysicalKey(nextIndex, event.target);
         return;
       }
+      if (event.key === "[" || event.key === "]") {
+        event.preventDefault();
+        if (event.key === "[") {
+          setSidebarCollapsed(!sidebarCollapsed);
+        } else {
+          setInspectorCollapsed(!inspectorCollapsed);
+        }
+        return;
+      }
       if (/^[0-9]$/.test(event.key) && !event.shiftKey) {
         const layerIndex = Number(event.key);
         if (layerIndex < layers.length) {
@@ -1180,6 +1257,10 @@ function App() {
     selectedKeyIndex,
     undoFirmwareEdit,
     workbenchTab,
+    inspectorCollapsed,
+    setInspectorCollapsed,
+    setSidebarCollapsed,
+    sidebarCollapsed,
   ]);
 
   const hasUnsavedEdits = isDirectMode ? directKeyDraftList.length > 0 : keymapDiff.length > 0;
@@ -3442,10 +3523,16 @@ function App() {
 	      <section
 	        className={`workspace ${isDirectMode ? "direct-workspace" : ""} ${
 	          !isDirectMode && workbenchTab === "build" ? "firmware-build-workspace" : ""
-	        }`}
+	        } ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
       >
         <nav className="sidebar" aria-label="Layers">
           <div className="sidebar-heading">
+            <DrawerToggle
+              collapsed={sidebarCollapsed}
+              label="レイヤー一覧"
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              side="left"
+            />
             <h2>レイヤー</h2>
             {ENABLE_LAYER_STRUCTURE_EDITING && isDirectMode ? (
               <DirectLayerToolbar
@@ -3527,7 +3614,7 @@ function App() {
                 title={index < 10 ? `${layer.label}（数字キー ${index}）` : layer.label}
               >
                 <span>{index}</span>
-                {layer.label}
+                <em className="layer-name">{layer.label}</em>
               </button>
             ))}
           </div>
@@ -3538,14 +3625,6 @@ function App() {
           className={`keyboard-panel ${!isDirectMode && workbenchTab === "build" ? "firmware-build-mode" : ""}`}
           style={dockHeight === null ? undefined : ({ "--dock-height": `${dockHeight}px` } as React.CSSProperties)}
         >
-          {isDirectMode ? (
-            <DirectConnectionBar
-              connectionKind={studioConnectionKind}
-              connectionState={studioConnectionState}
-              keymap={directKeymap}
-              portPath={selectedStudioPort}
-            />
-          ) : null}
           {isDirectMode && directKeymap?.hasUnsavedChanges && directKeyWriteFeedback.kind !== "writing" && !directDeviceOperation ? (
             <DirectDeviceUnsavedBanner onDiscard={discardDirectDeviceChanges} onSave={saveDirectDeviceChanges} />
           ) : null}
@@ -3556,12 +3635,6 @@ function App() {
                 Layer {activeLayerIndex} · キーをクリックして編集
               </span>
             </div>
-            {isDirectMode ? (
-              <button type="button" className="primary" onClick={() => readStudioDevice()}>
-                <RefreshCw size={17} />
-                再読み込み
-              </button>
-            ) : null}
           </div>
 
           <KeyboardGrid
@@ -3710,6 +3783,24 @@ function App() {
 
         {!isDirectMode && workbenchTab === "build" ? null : (
         <aside className="inspector">
+          <div className="inspector-drawer-bar">
+            <DrawerToggle
+              collapsed={inspectorCollapsed}
+              label="キー設定"
+              onToggle={() => setInspectorCollapsed(!inspectorCollapsed)}
+              side="right"
+            />
+            {inspectorCollapsed ? (
+              <button
+                type="button"
+                className="inspector-rail-label"
+                onClick={() => setInspectorCollapsed(false)}
+                title="キー設定を開く"
+              >
+                Key {selectedKeyIndex + 1}
+              </button>
+            ) : null}
+          </div>
           {isDirectMode ? (
             <DirectInspectorTabs
               autoAdvance={autoAdvanceKey}
@@ -4494,38 +4585,41 @@ function DirectSummaryPanel({
       </div>
 
       {syncTab === "summary" ? (
-        <dl>
-          <div>
-            <dt>デバイス</dt>
-            <dd>{keymap.deviceName || "不明な ZMK デバイス"}</dd>
-          </div>
-          <div>
-            <dt>{connectionKind === "usb" ? "ポート" : "接続先"}</dt>
-            <dd>{portPath || "-"}</dd>
-          </div>
-          <div>
-            <dt>ロック</dt>
-            <dd>{keymap.lockState}</dd>
-          </div>
-          <div>
-            <dt>保存状態</dt>
-            <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "保存済み"}</dd>
-          </div>
-          {typeof keymap.availableLayers === "number" ? (
+        <div className="direct-overview">
+          <dl>
             <div>
-              <dt>レイヤー空き</dt>
-              <dd>{keymap.availableLayers === 0 ? "なし" : `あと ${keymap.availableLayers} layers`}</dd>
+              <dt>デバイス</dt>
+              <dd>{keymap.deviceName || "不明な ZMK デバイス"}</dd>
             </div>
-          ) : null}
-          <div>
-            <dt>Key 差分</dt>
-            <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
-          </div>
-          <div>
-            <dt>Combo 差分</dt>
-            <dd>{firmwareComboDiffs.length === 0 ? "差分なし" : `${firmwareComboDiffs.length} combos`}</dd>
-          </div>
-        </dl>
+            <div>
+              <dt>{connectionKind === "usb" ? "ポート" : "接続先"}</dt>
+              <dd>{portPath || "-"}</dd>
+            </div>
+            <div>
+              <dt>ロック</dt>
+              <dd>{keymap.lockState}</dd>
+            </div>
+            <div>
+              <dt>保存状態</dt>
+              <dd>{keymap.hasUnsavedChanges ? "未保存あり" : "保存済み"}</dd>
+            </div>
+            {typeof keymap.availableLayers === "number" ? (
+              <div>
+                <dt>レイヤー空き</dt>
+                <dd>{keymap.availableLayers === 0 ? "なし" : `あと ${keymap.availableLayers} layers`}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Key 差分</dt>
+              <dd>{firmwareDiffs.length === 0 ? "差分なし" : `${firmwareDiffs.length} keys`}</dd>
+            </div>
+            <div>
+              <dt>Combo 差分</dt>
+              <dd>{firmwareComboDiffs.length === 0 ? "差分なし" : `${firmwareComboDiffs.length} combos`}</dd>
+            </div>
+          </dl>
+          <DirectCapabilityStrip compact />
+        </div>
       ) : null}
       {syncTab === "key" ? (
         <DirectFirmwareDiffPanel
@@ -5123,38 +5217,6 @@ function KeymapParseWarningPanel({ warnings }: { warnings: KeymapParseWarning[] 
   );
 }
 
-function DirectConnectionBar({
-  connectionKind,
-  connectionState,
-  keymap,
-  portPath,
-}: {
-  connectionKind: StudioConnectionKind;
-  connectionState: StudioConnectionState;
-  keymap: StudioKeymap | null;
-  portPath: string;
-}) {
-  return (
-    <div className="direct-connection-bar">
-      <div className="direct-connection-main">
-        <div>
-          <p className="eyebrow">接続中のキーボード</p>
-          <strong>{keymap?.deviceName || "ZMK Studio デバイス"}</strong>
-        </div>
-        <div className="direct-connection-meta">
-          <span>{connectionKind.toUpperCase()}</span>
-          <span>{portPath || "デバイス未選択"}</span>
-          <span>{keymap ? `${keymap.layers.length} レイヤー` : "未読み込み"}</span>
-          <span>{connectionState === "connected" ? keymap?.lockState ?? "不明" : "未接続"}</span>
-        </div>
-      </div>
-      <DirectCapabilityStrip
-        compact
-      />
-    </div>
-  );
-}
-
 function DirectPendingChangesBar({
   canWrite,
   changes,
@@ -5175,20 +5237,26 @@ function DirectPendingChangesBar({
   selectedDraft?: DirectKeyDraft;
 }) {
   const hasChanges = changes.length > 0;
-  const writeDisabled = !canWrite || !hasChanges || isWriting;
+
+  if (!hasChanges) {
+    return (
+      <p className="direct-pending-hint">
+        <PencilLine size={14} />
+        キーを選んで右側で変更すると、ここに下書きがたまります。まとめて書き込むまで実機は変わりません。
+      </p>
+    );
+  }
 
   return (
-    <div className={`direct-pending-bar ${hasChanges ? "has-changes" : ""}`}>
-      <div>
-        <span>{hasChanges ? `未書き込み ${changes.length} keys` : "未書き込み変更なし"}</span>
-        <strong>
-          {selectedDraft
-            ? `選択中: Layer ${selectedDraft.layerIndex} / Key ${selectedDraft.keyIndex + 1}`
-            : hasChanges
-              ? "色付きのキーが下書き変更です"
-              : "キー編集は下書きに入り、まとめて書き込めます"}
-        </strong>
-        {hasChanges ? (
+    <div className="direct-pending-bar has-changes" role="region" aria-label="未書き込みの変更">
+      <div className="direct-pending-summary">
+        <span className="direct-pending-count">{changes.length}</span>
+        <div>
+          <strong>
+            {selectedDraft
+              ? `未書き込み ${changes.length} keys · 選択中 Layer ${selectedDraft.layerIndex} / Key ${selectedDraft.keyIndex + 1}`
+              : `未書き込み ${changes.length} keys`}
+          </strong>
           <small>
             {changes
               .slice(0, 3)
@@ -5196,54 +5264,53 @@ function DirectPendingChangesBar({
               .join(" · ")}
             {changes.length > 3 ? ` · +${changes.length - 3}` : ""}
           </small>
-        ) : null}
+        </div>
       </div>
       <div className="direct-pending-actions">
-        <div className="direct-pending-group" role="group" aria-label="下書きを破棄">
+        {selectedDraft ? (
           <button
             type="button"
-            className="danger-ghost"
-            disabled={!selectedDraft || isWriting}
+            className="ghost"
+            disabled={isWriting}
             onClick={onDiscardSelected}
             title="選択中のキーの下書きを破棄します"
           >
             <Undo2 size={14} />
             選択を破棄
           </button>
-          <button
-            type="button"
-            className="danger-ghost"
-            disabled={!hasChanges || isWriting}
-            onClick={onDiscardAll}
-            title="すべての下書きを破棄します"
-          >
-            <Trash2 size={14} />
-            すべて破棄
-          </button>
-        </div>
-        <span className="direct-pending-divider" aria-hidden="true" />
-        <div className="direct-pending-group" role="group" aria-label="キーボードへ書き込み">
+        ) : null}
+        <button
+          type="button"
+          className="danger-ghost"
+          disabled={isWriting}
+          onClick={onDiscardAll}
+          title="すべての下書きを破棄します"
+        >
+          <Trash2 size={14} />
+          すべて破棄
+        </button>
+        {selectedDraft ? (
           <button
             type="button"
             className="primary-ghost"
-            disabled={!selectedDraft || !canWrite || isWriting}
+            disabled={!canWrite || isWriting}
             onClick={onWriteSelected}
             title="選択中のキーの下書きをキーボードへ書き込みます"
           >
             <Save size={14} />
             選択を書き込み
           </button>
-          <button
-            type="button"
-            className="primary"
-            disabled={writeDisabled}
-            onClick={onWriteAll}
-            title="すべての下書きをキーボードへ書き込みます"
-          >
-            {isWriting ? <Loader2 size={15} /> : <Save size={15} />}
-            すべて書き込み
-          </button>
-        </div>
+        ) : null}
+        <button
+          type="button"
+          className="primary"
+          disabled={!canWrite || isWriting}
+          onClick={onWriteAll}
+          title="すべての下書きをキーボードへ書き込みます"
+        >
+          {isWriting ? <Loader2 size={15} /> : <Save size={15} />}
+          すべて書き込み
+        </button>
       </div>
     </div>
   );
@@ -5376,29 +5443,45 @@ function DirectWelcome({
   const selectedTransportAvailable = isDesktopRuntime || (connectionKind === "usb" ? canUseWebUsb : canUseWebBluetooth);
   const connectDisabled = isConnecting || !selectedTransportAvailable;
 
+  const transportOptions: Array<{
+    kind: StudioConnectionKind;
+    label: string;
+    detail: string;
+    available: boolean;
+    icon: React.ReactNode;
+  }> = [
+    { kind: "usb", label: "USB", detail: "推奨・データ転送用ケーブル", available: isDesktopRuntime || canUseWebUsb, icon: <Usb size={18} /> },
+    {
+      kind: "bluetooth",
+      label: "Bluetooth",
+      detail: "実験的・ZMK Studio 用デバイスのみ",
+      available: isDesktopRuntime || canUseWebBluetooth,
+      icon: <Bluetooth size={18} />,
+    },
+  ];
+
   return (
     <section className="direct-welcome">
       <div className="direct-welcome-card">
-        <div>
+        <div className="direct-welcome-intro">
           <p className="eyebrow">Direct Mode</p>
           <h2>キーボードを接続</h2>
           <p>
-            USB 推奨です。Bluetooth も使えますが、ZMK Studio 用のデバイスが表示される場合のみ接続できます。読み込んだ後は、
-            複数の key を書き込み予定として調整してから、まとめて実機へ書き込めます。
+            KobitoKey をつなぐと、実機の keymap をそのまま編集できます。変更は下書きとしてたまり、まとめて書き込むまで実機は変わりません。
           </p>
         </div>
         <ol className="direct-connect-steps">
           <li>
             <strong>1</strong>
-            <span>USB data cable で接続します。Bluetooth は ZMK Studio 用 device が見える場合だけ使います。</span>
+            <span>USB でつなぐ</span>
           </li>
           <li>
             <strong>2</strong>
-            <span>接続方法を選び、{isDesktopRuntime ? "必要なら device を検出してから" : "ブラウザの選択ダイアログで"} KobitoKey を選びます。</span>
+            <span>{isDesktopRuntime ? "デバイスを選んで接続" : "接続して KobitoKey を選ぶ"}</span>
           </li>
           <li>
             <strong>3</strong>
-            <span>読み込み後に key を選び、右側の Key Config で書き込み予定に追加してからまとめて書き込みます。</span>
+            <span>キーを変えてまとめて書き込む</span>
           </li>
         </ol>
         <div className="direct-connect-controls">
@@ -5408,74 +5491,64 @@ function DirectWelcome({
               <span>Chrome/Edgeで、localhost または HTTPS から開いてください。ブラウザ版では事前一覧検出ではなく、Connectボタンで接続ダイアログを開きます。</span>
             </div>
           ) : null}
-          {!isDesktopRuntime && canUseAnyWebConnection ? (
-            <div className="runtime-notice">
-              <strong>USB 接続を推奨します</strong>
-              <span>Bluetooth は実験的対応です。通常のキーボード接続ではなく、ZMK Studio 用として表示されるデバイスが見つかる場合だけ使えます。見つからない場合は USB を選んでください。</span>
-            </div>
-          ) : null}
-          {!isDesktopRuntime ? (
-            <div className="runtime-diagnostics" aria-label="Web runtime diagnostics">
-              <span>secure: {webDiagnostics.secure ? "yes" : "no"}</span>
-              <span>serial: {webDiagnostics.serial ? "yes" : "no"}</span>
-              <span>bluetooth: {webDiagnostics.bluetooth ? "yes" : "no"}</span>
-              <span>url: {webDiagnostics.url}</span>
-            </div>
-          ) : null}
           {connectionState === "error" && connectionError ? (
             <DirectConnectionErrorPanel issue={connectionError} />
           ) : null}
-          <div className="direct-connect-grid">
-            <label className="connect-transport-field">
-              <span>接続方法</span>
-              <select
-                id="direct-connection-kind"
-                name="directConnectionKind"
-                value={connectionKind}
+          <div className="direct-transport-picker" role="radiogroup" aria-label="接続方法">
+            {transportOptions.map((option) => (
+              <button
+                type="button"
+                key={option.kind}
+                role="radio"
+                aria-checked={connectionKind === option.kind}
+                className={connectionKind === option.kind ? "active" : ""}
                 disabled={isConnecting}
-                onChange={(event) => onTransportChange(event.target.value as StudioConnectionKind)}
+                onClick={() => onTransportChange(option.kind)}
               >
-                <option value="usb">USB</option>
-                <option value="bluetooth">Bluetooth</option>
+                {option.icon}
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.available ? option.detail : "このブラウザでは使えません"}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {isDesktopRuntime && connectionKind === "usb" ? (
+            <label className="direct-device-field">
+              <span>USB デバイス</span>
+              <select
+                id="direct-usb-device"
+                name="directUsbDevice"
+                value={selectedPort}
+                onChange={(event) => onPortChange(event.target.value)}
+              >
+                <option value="">USB device 未選択</option>
+                {ports.map((port) => (
+                  <option key={port.path} value={port.path}>
+                    {port.label} ({port.path})
+                  </option>
+                ))}
               </select>
             </label>
-            {isDesktopRuntime && connectionKind === "usb" ? (
-              <label>
-                USB デバイス
-                <select
-                  id="direct-usb-device"
-                  name="directUsbDevice"
-                  value={selectedPort}
-                  onChange={(event) => onPortChange(event.target.value)}
-                >
-                  <option value="">USB device 未選択</option>
-                  {ports.map((port) => (
-                    <option key={port.path} value={port.path}>
-                      {port.label} ({port.path})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {isDesktopRuntime && connectionKind === "bluetooth" ? (
-              <label>
-                Bluetooth デバイス
-                <select
-                  id="direct-bluetooth-device"
-                  name="directBluetoothDevice"
-                  value={selectedBluetoothDevice}
-                  onChange={(event) => onBluetoothDeviceChange(event.target.value)}
-                >
-                  <option value="">Bluetooth device 未選択</option>
-                  {bluetoothDevices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-          </div>
+          ) : null}
+          {isDesktopRuntime && connectionKind === "bluetooth" ? (
+            <label className="direct-device-field">
+              <span>Bluetooth デバイス</span>
+              <select
+                id="direct-bluetooth-device"
+                name="directBluetoothDevice"
+                value={selectedBluetoothDevice}
+                onChange={(event) => onBluetoothDeviceChange(event.target.value)}
+              >
+                <option value="">Bluetooth device 未選択</option>
+                {bluetoothDevices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {!selectedTransportAvailable ? (
             <div className="runtime-warning">
               <strong>{connectionKind === "usb" ? "Web Serial" : "Web Bluetooth"} が使えません</strong>
@@ -5502,13 +5575,24 @@ function DirectWelcome({
             ) : null}
           </div>
         </div>
-        <DirectCapabilityStrip
-          keyWritable={selectedTransportAvailable}
-        />
+        <div className="direct-welcome-capabilities">
+          <p className="eyebrow">接続するとできること</p>
+          <DirectCapabilityStrip keyWritable={selectedTransportAvailable} />
+        </div>
         {!isDesktopRuntime ? (
-          <p className="direct-capability-note">
-            ブラウザ版では key の Direct 書き込みを試せます。コンボとトラックボールは読み込み専用です。USB 接続を推奨します。
-          </p>
+          <details className="direct-welcome-help">
+            <summary>うまく接続できないとき</summary>
+            <p>
+              Chrome か Edge で、HTTPS（または localhost）のページから開いてください。Bluetooth は通常のキーボード接続ではなく、ZMK Studio
+              用として表示されるデバイスが見つかる場合だけ使えます。見つからない場合は USB を選んでください。
+            </p>
+            <div className="runtime-diagnostics" aria-label="Web runtime diagnostics">
+              <span>secure: {webDiagnostics.secure ? "yes" : "no"}</span>
+              <span>serial: {webDiagnostics.serial ? "yes" : "no"}</span>
+              <span>bluetooth: {webDiagnostics.bluetooth ? "yes" : "no"}</span>
+              <span>url: {webDiagnostics.url}</span>
+            </div>
+          </details>
         ) : null}
       </div>
     </section>
@@ -6243,6 +6327,22 @@ function BrowserFirmwareReleaseWorkbench({
   const visibleBuildStatus = isBusy ? `${busyLabel}: ${buildStatus}` : buildStatus;
   const buildStatusTone = classifyBuildStatusTone(visibleBuildStatus, isBusy);
   const BuildStatusIcon = buildStatusTone === "busy" ? Loader2 : buildStatusTone === "error" ? AlertTriangle : buildStatusTone === "success" ? CheckCircle2 : Clock;
+  // The button for the step the user is on gets the primary style, so the next click is obvious.
+  const currentAction =
+    readiness.step === "load-files"
+      ? "load"
+      : readiness.step === "review-diff"
+        ? "diff"
+        : readiness.step === "commit"
+          ? "commit"
+          : readiness.step === "build"
+            ? "build"
+            : readiness.step === "download-artifact"
+              ? "artifact"
+              : readiness.step === "connect-github"
+                ? "connect"
+                : "";
+  const actionClass = (action: string) => (currentAction === action ? "primary" : undefined);
 
   return (
     <div className="workbench-grid build-workbench browser-release-workbench" aria-busy={isBusy}>
@@ -6250,132 +6350,9 @@ function BrowserFirmwareReleaseWorkbench({
       <section className="build-panel">
         <div className="build-panel-heading">
           <div>
-            <p className="eyebrow">Browser Firmware</p>
+            <p className="eyebrow">Build</p>
             <h2>GitHub Commit & Build</h2>
           </div>
-        </div>
-        <label className="build-repo-field" htmlFor="browser-firmware-repository">
-          <span>Firmware repository</span>
-          <input
-            id="browser-firmware-repository"
-            name="browserFirmwareRepository"
-            type="text"
-            placeholder="juichi50iii/KobitoKey_QWERTY"
-            value={repoUrl}
-            onChange={(event) => onRepoUrlChange(event.target.value)}
-            disabled={isBusy}
-            spellCheck={false}
-            autoComplete="off"
-            aria-describedby="browser-firmware-repository-help"
-          />
-          <small id="browser-firmware-repository-help">
-            {repoRef ? `対象: ${formatGitHubRepositoryRef(repoRef)}。このブラウザに保存します。` : "owner/repo または GitHub URL を入力"}
-          </small>
-        </label>
-        <label className="build-repo-field" htmlFor="browser-firmware-branch">
-          <span>Branch</span>
-          <input
-            id="browser-firmware-branch"
-            name="browserFirmwareBranch"
-            type="text"
-            value={branch}
-            onChange={(event) => onBranchChange(event.target.value)}
-            disabled={isBusy}
-            spellCheck={false}
-            autoComplete="off"
-            aria-describedby="browser-firmware-branch-help"
-          />
-          <small id="browser-firmware-branch-help">commit と workflow dispatch に使います。このブラウザに保存します。</small>
-        </label>
-        <label className="build-repo-field" htmlFor="browser-firmware-token">
-          <span>GitHub token</span>
-          <input
-            id="browser-firmware-token"
-            name="browserFirmwareToken"
-            type="password"
-            value={token}
-            onChange={(event) => onTokenChange(event.target.value)}
-            disabled={isBusy}
-            autoComplete="new-password"
-            placeholder="fine-grained token / OAuth token"
-            aria-describedby="browser-firmware-token-help"
-          />
-          <small id="browser-firmware-token-help">
-            token はメモリ上だけで使います。fine-grained token は Contents write と Actions write を付けます。
-          </small>
-        </label>
-        <div className="build-actions">
-          <button
-            type="button"
-            onClick={onConnectGithub}
-            disabled={isBusy || !githubOAuthAvailable}
-            aria-describedby={!githubOAuthAvailable ? "browser-firmware-oauth-help" : undefined}
-          >
-            <UploadCloud size={16} />
-            <span className="button-label">GitHub で接続</span>
-          </button>
-          {userCode ? (
-            <button type="button" onClick={onCancelGithubConnection}>
-              <span className="button-label">認証をキャンセル</span>
-            </button>
-          ) : null}
-          {token.trim() ? (
-            <button type="button" onClick={onClearToken} disabled={isBusy && !userCode}>
-              <span className="button-label">token を消去</span>
-            </button>
-          ) : null}
-        </div>
-        {!githubOAuthAvailable ? (
-          <p className="build-note oauth-config-note" id="browser-firmware-oauth-help">
-            GitHub OAuth はこの公開 build では未設定です。GitHub token を入力して読み込み、または公開管理者が OAuth client id
-            を設定して再デプロイしてください。
-          </p>
-        ) : null}
-        {userCode ? (
-          <p className="build-note">
-            GitHub device code: <strong>{userCode}</strong>
-            {verificationUri ? (
-              <>
-                {" / "}
-                <a href={verificationUri} target="_blank" rel="noreferrer">
-                  GitHub 認証を開く
-                </a>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-        <p className={`build-status ${buildStatusTone}`} role="status" aria-live="polite" aria-atomic="true">
-          <BuildStatusIcon size={14} className={buildStatusTone === "busy" ? "spin" : undefined} />
-          <span>{visibleBuildStatus}</span>
-        </p>
-        <BrowserReleaseGateList readiness={readiness} />
-        <div className="build-actions">
-          <button type="button" onClick={onLoadProject} disabled={isBusy || !token.trim() || !repoRef || !branch.trim()}>
-            <Download size={16} />
-            <span className="button-label">GitHub から読み込み</span>
-          </button>
-          <button type="button" onClick={onDiffReviewed} disabled={isBusy || readiness.step !== "review-diff"}>
-            <CheckCircle2 size={16} />
-            <span className="button-label">Diff 確認済み</span>
-          </button>
-          <button type="button" className="primary" onClick={onCommitBuild} disabled={isBusy || !readiness.canCommit}>
-            <UploadCloud size={16} />
-            <span className="button-label">Commit & Build</span>
-          </button>
-          <button type="button" onClick={onTriggerBuild} disabled={isBusy || !readiness.canBuild}>
-            <UploadCloud size={16} />
-            <span className="button-label">Build 起動</span>
-          </button>
-          <button type="button" onClick={onRefreshRun} disabled={isBusy || !readiness.canBuild}>
-            <span className="button-label">最新 run</span>
-          </button>
-          <button type="button" onClick={onDownloadArtifacts} disabled={isBusy || !canDownloadArtifacts}>
-            <span className="button-label">Artifact 取得</span>
-          </button>
-          <button type="button" onClick={onImportArtifactFolder} disabled={isBusy}>
-            <FolderOpen size={16} />
-            <span className="button-label">Artifact フォルダから再開</span>
-          </button>
         </div>
         <div className="browser-release-meta">
           <div className="release-next-action" aria-label="次の操作">
@@ -6394,6 +6371,149 @@ function BrowserFirmwareReleaseWorkbench({
             </a>
           ) : null}
         </div>
+        <p className={`build-status ${buildStatusTone}`} role="status" aria-live="polite" aria-atomic="true">
+          <BuildStatusIcon size={14} className={buildStatusTone === "busy" ? "spin" : undefined} />
+          <span>{visibleBuildStatus}</span>
+        </p>
+        <fieldset className="build-connection">
+          <legend>GitHub 接続</legend>
+          <label className="build-repo-field" htmlFor="browser-firmware-repository">
+            <span>Firmware repository</span>
+            <input
+              id="browser-firmware-repository"
+              name="browserFirmwareRepository"
+              type="text"
+              placeholder="juichi50iii/KobitoKey_QWERTY"
+              value={repoUrl}
+              onChange={(event) => onRepoUrlChange(event.target.value)}
+              disabled={isBusy}
+              spellCheck={false}
+              autoComplete="off"
+              aria-describedby="browser-firmware-repository-help"
+            />
+            <small id="browser-firmware-repository-help">
+              {repoRef ? `対象: ${formatGitHubRepositoryRef(repoRef)}。このブラウザに保存します。` : "owner/repo または GitHub URL を入力"}
+            </small>
+          </label>
+          <div className="build-field-row">
+            <label className="build-repo-field" htmlFor="browser-firmware-branch">
+              <span>Branch</span>
+              <input
+                id="browser-firmware-branch"
+                name="browserFirmwareBranch"
+                type="text"
+                value={branch}
+                onChange={(event) => onBranchChange(event.target.value)}
+                disabled={isBusy}
+                spellCheck={false}
+                autoComplete="off"
+                aria-describedby="browser-firmware-branch-help"
+              />
+              <small id="browser-firmware-branch-help">commit と workflow dispatch に使います。このブラウザに保存します。</small>
+            </label>
+            <label className="build-repo-field" htmlFor="browser-firmware-token">
+              <span>GitHub token</span>
+              <input
+                id="browser-firmware-token"
+                name="browserFirmwareToken"
+                type="password"
+                value={token}
+                onChange={(event) => onTokenChange(event.target.value)}
+                disabled={isBusy}
+                autoComplete="new-password"
+                placeholder="fine-grained token / OAuth token"
+                aria-describedby="browser-firmware-token-help"
+              />
+              <small id="browser-firmware-token-help">
+                token はメモリ上だけで使います。fine-grained token は Contents write と Actions write を付けます。
+              </small>
+            </label>
+          </div>
+          <div className="build-actions build-connection-actions">
+            <button
+              type="button"
+              className={githubOAuthAvailable ? actionClass("connect") : undefined}
+              onClick={onConnectGithub}
+              disabled={isBusy || !githubOAuthAvailable}
+              aria-describedby={!githubOAuthAvailable ? "browser-firmware-oauth-help" : undefined}
+            >
+              <UploadCloud size={16} />
+              <span className="button-label">GitHub で接続</span>
+            </button>
+            {userCode ? (
+              <button type="button" onClick={onCancelGithubConnection}>
+                <span className="button-label">認証をキャンセル</span>
+              </button>
+            ) : null}
+            {token.trim() ? (
+              <button type="button" onClick={onClearToken} disabled={isBusy && !userCode}>
+                <span className="button-label">token を消去</span>
+              </button>
+            ) : null}
+          </div>
+          {!githubOAuthAvailable ? (
+            <p className="build-note oauth-config-note" id="browser-firmware-oauth-help">
+              GitHub OAuth はこの公開 build では未設定です。GitHub token を入力して読み込み、または公開管理者が OAuth client id
+              を設定して再デプロイしてください。
+            </p>
+          ) : null}
+          {userCode ? (
+            <p className="build-note">
+              GitHub device code: <strong>{userCode}</strong>
+              {verificationUri ? (
+                <>
+                  {" / "}
+                  <a href={verificationUri} target="_blank" rel="noreferrer">
+                    GitHub 認証を開く
+                  </a>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+        </fieldset>
+        <div className="build-actions build-step-actions">
+          <button
+            type="button"
+            className={actionClass("load")}
+            onClick={onLoadProject}
+            disabled={isBusy || !token.trim() || !repoRef || !branch.trim()}
+          >
+            <Download size={16} />
+            <span className="button-label">GitHub から読み込み</span>
+          </button>
+          <button type="button" className={actionClass("diff")} onClick={onDiffReviewed} disabled={isBusy || readiness.step !== "review-diff"}>
+            <CheckCircle2 size={16} />
+            <span className="button-label">Diff 確認済み</span>
+          </button>
+          <button type="button" className={actionClass("commit")} onClick={onCommitBuild} disabled={isBusy || !readiness.canCommit}>
+            <UploadCloud size={16} />
+            <span className="button-label">Commit & Build</span>
+          </button>
+          <button type="button" className={actionClass("build")} onClick={onTriggerBuild} disabled={isBusy || !readiness.canBuild}>
+            <UploadCloud size={16} />
+            <span className="button-label">Build 起動</span>
+          </button>
+          <button
+            type="button"
+            className={actionClass("artifact")}
+            onClick={onDownloadArtifacts}
+            disabled={isBusy || !canDownloadArtifacts}
+          >
+            <Download size={16} />
+            <span className="button-label">Artifact 取得</span>
+          </button>
+        </div>
+        <div className="build-actions build-secondary-actions">
+          <button type="button" onClick={onRefreshRun} disabled={isBusy || !readiness.canBuild}>
+            <RefreshCw size={14} />
+            <span className="button-label">最新 run</span>
+          </button>
+          <button type="button" onClick={onImportArtifactFolder} disabled={isBusy}>
+            <FolderOpen size={14} />
+            <span className="button-label">Artifact フォルダから再開</span>
+          </button>
+        </div>
+        <BrowserReleaseGateList readiness={readiness} />
       </section>
       <section className="flash-panel">
         <div>
@@ -6401,16 +6521,6 @@ function BrowserFirmwareReleaseWorkbench({
           <h2>UF2 → Bootloader</h2>
         </div>
         <FirmwareWriteGuide />
-        <div className="artifact-folder-import">
-          <div>
-            <strong>Artifact フォルダからFlash</strong>
-            <span>GitHub以外で取得したartifactや、以前ダウンロードしたartifactフォルダから左右UF2を読み込めます。</span>
-          </div>
-          <button type="button" onClick={onImportArtifactFolder} disabled={isBusy}>
-            <FolderOpen size={14} />
-            <span className="button-label">フォルダを選択</span>
-          </button>
-        </div>
         <FlashSequenceGuide artifacts={artifacts} readiness={readiness} resetDone={resetDone} />
         <div className="flash-wizard">
           <div className="flash-wizard-header">
@@ -6471,6 +6581,16 @@ function BrowserFirmwareReleaseWorkbench({
                 }`
               : "成功した build の artifact を取得すると左右 UF2 を分類します"}
           </small>
+        </div>
+        <div className="artifact-folder-import">
+          <div>
+            <strong>Artifact フォルダからFlash</strong>
+            <span>GitHub以外で取得したartifactや、以前ダウンロードしたartifactフォルダから左右UF2を読み込めます。</span>
+          </div>
+          <button type="button" onClick={onImportArtifactFolder} disabled={isBusy}>
+            <FolderOpen size={14} />
+            <span className="button-label">フォルダを選択</span>
+          </button>
         </div>
       </section>
     </div>
@@ -6534,58 +6654,51 @@ function FirmwareFlowStepper({ current }: { current: "build" | "flash" }) {
   return (
     <section className="release-flow-guide firmware-flow-stepper" aria-label="Build & Flash までの流れ">
       <div className="release-flow-heading">
-        <div>
-          <p className="eyebrow">Build &amp; Flash</p>
-          <h2>編集から Flash までの順番</h2>
-        </div>
+        <h2>編集から Flash までの順番</h2>
       </div>
       <ol className="release-flow-steps">
         {steps.map((step, index) => {
           const state: ReleaseGateState = index < currentIndex ? "done" : index === currentIndex ? "current" : "pending";
-          const Icon = state === "done" ? CheckCircle2 : state === "current" ? AlertTriangle : Clock;
           return (
-            <li className={state} key={step.label} aria-current={state === "current" ? "step" : undefined}>
-              <span className="release-flow-index">{index + 1}</span>
-              <Icon size={15} />
-              <div>
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-              </div>
+            <li className={state} key={step.label} aria-current={state === "current" ? "step" : undefined} title={step.detail}>
+              <span className="release-flow-index">{state === "done" ? <CheckCircle2 size={14} /> : index + 1}</span>
+              <strong>{step.label}</strong>
             </li>
           );
         })}
       </ol>
+      <p className="release-flow-current">{steps[currentIndex]?.detail}</p>
     </section>
   );
 }
 
 function BrowserFirmwareFlowGuide({ readiness }: { readiness: FirmwareReleaseReadiness }) {
   const steps = releaseFlowSteps(readiness);
+  const currentStep = steps.find((step) => step.state === "current");
 
   return (
     <section className="release-flow-guide" aria-label="Flash までの流れ">
       <div className="release-flow-heading">
-        <div>
-          <p className="eyebrow">Release Flow</p>
-          <h2>Flash までの順番</h2>
-        </div>
+        <h2>Flash までの順番</h2>
         <p>{releaseFlowSummary(readiness)}</p>
       </div>
       <ol className="release-flow-steps">
         {steps.map((step, index) => {
-          const Icon = step.state === "done" ? CheckCircle2 : step.state === "current" ? AlertTriangle : Clock;
+          const Icon = step.state === "done" ? CheckCircle2 : null;
           return (
-            <li className={step.state} key={step.label} aria-current={step.state === "current" ? "step" : undefined}>
-              <span className="release-flow-index">{index + 1}</span>
-              <Icon size={15} />
-              <div>
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-              </div>
+            <li
+              className={step.state}
+              key={step.label}
+              aria-current={step.state === "current" ? "step" : undefined}
+              title={step.detail}
+            >
+              <span className="release-flow-index">{Icon ? <Icon size={14} /> : index + 1}</span>
+              <strong>{step.label}</strong>
             </li>
           );
         })}
       </ol>
+      {currentStep ? <p className="release-flow-current">{currentStep.detail}</p> : null}
     </section>
   );
 }
@@ -7089,12 +7202,7 @@ function FirmwareWriteGuide() {
     <div className="flash-guide">
       <strong>左右の書き込み</strong>
       <p>
-        Firmware は左右別の UF2 を焼きます。左側を USB で bootloader に入れて left UF2 をコピーし、
-        次に右側へ USB を差し替えて right UF2 をコピーします。
-      </p>
-      <p>
-        Direct Mode は UF2 ではなく、USB / Bluetooth で接続中の Studio device に設定を保存します。
-        接続していない側の firmware までは書き換えません。
+        左右それぞれを USB で bootloader に入れて、UF2 を Chrome から直接コピーします。片側が終わったら USB を反対側へ差し替えます。
       </p>
     </div>
   );
