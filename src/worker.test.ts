@@ -413,6 +413,13 @@ describe("worker GitHub API proxy", () => {
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
   });
 
+  it("lets other origins embed the link-preview image", async () => {
+    const response = await worker.fetch(new Request("https://app.example/og-image.png"), env);
+
+    expect(response.headers.get("Cross-Origin-Resource-Policy")).toBe("cross-origin");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+  });
+
   it("allows Vite dev preamble under local development hosts", async () => {
     const ipv6Response = await worker.fetch(new Request("http://[::1]:1420/"), env);
     expect(ipv6Response.headers.get("Content-Security-Policy")).toContain("'unsafe-eval'");
