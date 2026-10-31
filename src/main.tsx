@@ -342,6 +342,11 @@ function applyColorSchemePreference(preference: ColorSchemePreference) {
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;
+  // Flip every colour in one frame; transitions resume two frames later.
+  root.classList.add("theme-switching");
+  window.requestAnimationFrame(() =>
+    window.requestAnimationFrame(() => root.classList.remove("theme-switching")),
+  );
   const colorSchemeMeta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
   const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 
@@ -479,6 +484,26 @@ function useDrawerCollapsed(storageKey: string) {
   );
 
   return [collapsed, setCollapsed] as const;
+}
+
+/**
+ * How the next drawer change moves: the [ / ] shortcuts snap, the buttons
+ * slide, and a drawer opened from a button briefly fades its contents in.
+ */
+type DrawerMotion = "instant" | "slide" | "reveal-sidebar" | "reveal-inspector";
+
+function useDrawerMotion() {
+  const [motion, setMotion] = React.useState<DrawerMotion>("instant");
+
+  React.useEffect(() => {
+    if (motion !== "reveal-sidebar" && motion !== "reveal-inspector") return;
+    // Only the opening itself fades; content that mounts later appears as usual.
+    const timer = window.setTimeout(() => setMotion("slide"), 360);
+    return () => window.clearTimeout(timer);
+  }, [motion]);
+
+  const className = motion === "instant" ? "drawer-instant" : motion === "slide" ? "" : motion;
+  return [className, setMotion] as const;
 }
 
 function DrawerToggle({
@@ -703,6 +728,15 @@ function App() {
   const [dockHeight, setDockHeight] = useDockHeight();
   const [sidebarCollapsed, setSidebarCollapsed] = useDrawerCollapsed(SIDEBAR_COLLAPSED_STORAGE_KEY);
   const [inspectorCollapsed, setInspectorCollapsed] = useDrawerCollapsed(INSPECTOR_COLLAPSED_STORAGE_KEY);
+  const [drawerMotionClass, setDrawerMotion] = useDrawerMotion();
+  const toggleSidebarFromButton = () => {
+    setDrawerMotion(sidebarCollapsed ? "reveal-sidebar" : "slide");
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+  const toggleInspectorFromButton = () => {
+    setDrawerMotion(inspectorCollapsed ? "reveal-inspector" : "slide");
+    setInspectorCollapsed(!inspectorCollapsed);
+  };
   const keyboardPanelRef = React.useRef<HTMLElement>(null);
   // True while the firmware side is the bundled sample keymap rather than the user's own project.
   const [firmwareIsSample, setFirmwareIsSample] = React.useState(true);
@@ -1231,6 +1265,7 @@ function App() {
       }
       if (event.key === "[" || event.key === "]") {
         event.preventDefault();
+        setDrawerMotion("instant");
         if (event.key === "[") {
           setSidebarCollapsed(!sidebarCollapsed);
         } else {
@@ -1258,6 +1293,7 @@ function App() {
     undoFirmwareEdit,
     workbenchTab,
     inspectorCollapsed,
+    setDrawerMotion,
     setInspectorCollapsed,
     setSidebarCollapsed,
     sidebarCollapsed,
@@ -3523,14 +3559,14 @@ function App() {
 	      <section
 	        className={`workspace ${isDirectMode ? "direct-workspace" : ""} ${
 	          !isDirectMode && workbenchTab === "build" ? "firmware-build-workspace" : ""
-	        } ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
+	        } ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""} ${drawerMotionClass}`}
       >
         <nav className="sidebar" aria-label="Layers">
           <div className="sidebar-heading">
             <DrawerToggle
               collapsed={sidebarCollapsed}
               label="レイヤー一覧"
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onToggle={toggleSidebarFromButton}
               side="left"
             />
             <h2>レイヤー</h2>
@@ -3787,14 +3823,14 @@ function App() {
             <DrawerToggle
               collapsed={inspectorCollapsed}
               label="キー設定"
-              onToggle={() => setInspectorCollapsed(!inspectorCollapsed)}
+              onToggle={toggleInspectorFromButton}
               side="right"
             />
             {inspectorCollapsed ? (
               <button
                 type="button"
                 className="inspector-rail-label"
-                onClick={() => setInspectorCollapsed(false)}
+                onClick={toggleInspectorFromButton}
                 title="キー設定を開く"
               >
                 Key {selectedKeyIndex + 1}
