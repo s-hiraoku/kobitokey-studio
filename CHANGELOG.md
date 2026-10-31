@@ -6,6 +6,7 @@ This project uses SemVer for app version metadata.
 ## [0.2.0] - 2026-10-31
 
 - New "Soft" look: Outfit + Zen Maru Gothic with DM Mono, warm paper surfaces, a teal accent, rounder controls and a new app mark, in light and dark.
+- Motion polish: buttons answer a press with a small scale, drawers slide and fade their contents in (the `[` / `]` shortcuts snap instantly), toasts, the Direct draft bar and the flash confirm dialog ease in, the selected key gets a clear teal halo, and reduced-motion keeps fades while dropping movement.
 - Layer list and key inspector are drawers that collapse to a slim rail (toggle buttons or the `[` / `]` keys), remembered per browser.
 - Direct Mode: the connect screen is shorter, with a USB / Bluetooth picker; the connected screen drops the duplicated device card and reload button so the keyboard gets the space, and drafts show as a compact bar only once there is something to write.
 - Direct Mode can batch-save, add / rename / reorder / delete layers, back up and restore the keymap, and warns about changes not yet saved on the device.
