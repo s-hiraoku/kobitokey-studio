@@ -3,6 +3,10 @@
 All notable changes to this project are tracked here.
 This project uses SemVer for app version metadata.
 
+## [Unreleased]
+
+- Direct Mode's diff tab now shows what you edited against the device as read on connect ("編集差分"), with per-key revert / write; comparing with a keymap file is now an opt-in "keymap と比較" button that only appears once your own keymap is loaded, never against the bundled sample.
+
 ## [0.2.0] - 2026-10-31
 
 - New "Soft" look: Outfit + Zen Maru Gothic with DM Mono, warm paper surfaces, a teal accent, rounder controls and a new app mark, in light and dark.

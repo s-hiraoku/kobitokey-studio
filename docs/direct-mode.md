@@ -133,4 +133,6 @@ Direct Mode で書き込める主なキー動作は次のとおりです。フ�
   <div><strong>Direct Mode で書いた変更は、リポジトリのファイルへは自動で戻りません。</strong> 次回ファームウェアを作り直したときに同じ状態を残したいなら、Firmware Mode の keymap にも同じ設定を入れておく必要があります。</div>
 </div>
 
-Direct Mode で device を読み込むと、実機の keymap と Firmware Mode 側の keymap のキー差分を **Direct summary** で確認できます。差分行の `このキー差分を取り込む`(またはパネル上部の `キー差分を Firmware に取り込む`)を押すと、Direct 側の差分を Firmware keymap に取り込めます。ファイルへの保存・commit は Firmware Mode 側で実行します。
+Direct summary の `編集差分` タブには、接続時に読み込んだ実機の状態と、このセッションで編集した内容(未書き込みの下書き)の違いが並びます。行ごとに `戻す` / `書き込み` ができ、行の見出しを押すとそのキーを選択します。
+
+自分の keymap を Firmware Mode で GitHub かフォルダから読み込んでいるときだけ、`編集差分` タブの `keymap と比較` ボタンで実機の keymap と keymap ファイルのキー / Combo 差分も確認できます(同梱サンプルの keymap とは比較しません)。差分行の `このキー差分を取り込む`(またはパネル上部の `キー差分を Firmware に取り込む`)を押すと、Direct 側の差分を Firmware keymap に取り込めます。ファイルへの保存・commit は Firmware Mode 側で実行します。

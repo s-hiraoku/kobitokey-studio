@@ -2495,6 +2495,40 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.direct-firmware-diff-list .direct-edit-diff-target {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.direct-firmware-diff-list .direct-edit-diff-target:hover strong {
+  color: var(--pine-deep);
+}
+.direct-keymap-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: var(--sp-3);
+}
+.direct-keymap-compare .compact-action {
+  min-height: 28px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+.direct-keymap-compare small {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.direct-firmware-diff-list article > header > .direct-edit-diff-actions {
+  display: flex;
+  gap: 6px;
+}
 .direct-firmware-diff-list article .compact-action {
   min-height: 28px;
   padding-inline: 10px;
