@@ -68,7 +68,7 @@ Direct Mode は、ブラウザの Web Serial / Web Bluetooth で実機につな�
   </div></div>
   <div class="step is-direct"><div>
     <h3>接続方法を選んで接続</h3>
-    <p>接続パネルの「接続方法」で <strong>USB</strong> を選び、<strong>USB で接続</strong> を押します。ブラウザのデバイス選択ダイアログが開くので KobitoKey を選びます。</p>
+    <p>接続画面で <strong>USB</strong> を選び(最初から選ばれています)、<strong>USB で接続</strong> を押します。ブラウザのデバイス選択ダイアログが開くので KobitoKey を選びます。</p>
   </div></div>
   <div class="step is-direct"><div>
     <h3>接続完了</h3>
@@ -87,7 +87,7 @@ Direct Mode は、ブラウザの Web Serial / Web Bluetooth で実機につな�
   <div class="step is-direct"><div><h3>layer と key を選ぶ</h3><p>layer を選び、中央のキーボードで key を選びます。</p></div></div>
   <div class="step is-direct"><div><h3>動作を確認する</h3><p>右の <strong>Key Config</strong> で、現在の動作と書き込み予定の動作を確認します。</p></div></div>
   <div class="step is-direct"><div><h3>予定に追加</h3><p><strong>書き込み予定に追加</strong> を押します。複数のキーをまとめて予定に入れられます。</p></div></div>
-  <div class="step is-direct"><div><h3>実機へ書き込み</h3><p><strong>実機へ書き込み</strong> を押すと実機に保存され、keymap が再読み込みされます。</p></div></div>
+  <div class="step is-direct"><div><h3>実機へ書き込み</h3><p>キーボードの下に出る下書きバーの <strong>すべて書き込み</strong> を押すと実機に保存され、keymap が再読み込みされます。</p></div></div>
 </div>
 
 まとめて書き込むと、全部のキーを実機に送ってから **1 回だけ保存** します。途中のキーで失敗した場合は送った分も取り消すので、実機の keymap が中途半端な状態になることはありません。
@@ -97,6 +97,7 @@ Direct Mode は、ブラウザの Web Serial / Web Bluetooth で実機につな�
 ## レイヤーとバックアップ
 {: #レイヤーとバックアップ}
 
+- **表示の切り替え**: 左のレイヤー一覧と右のキー設定は、上端のボタン(または `[` / `]` キー)で細く畳めます。畳んだ状態でもレイヤー番号は選べます。
 - **レイヤー**: 左のレイヤー一覧の上にあるボタンで、選択中の layer の名前変更・上下の並べ替え・末尾への追加・削除ができます。追加はファームウェアに空き(概要タブの「レイヤー空き」)があるときだけ、削除は番号参照のずれを避けるため最後の layer だけです。他のキーから番号で参照されている layer は並べ替え・削除できません。未書き込みのキー変更がある間は、先に書き込むか破棄してください。
 - **バックアップ**: 下のパネルの **バックアップ** タブで、実機の keymap を JSON に保存できます。**バックアップから復元** を選ぶと、違うキーと layer 名だけを書き戻します。
 - **初期化**: 同じタブの **実機の設定を初期化** は、Direct Mode で書き込んだ変更をすべて消してファームウェアの keymap に戻します。元に戻せないので、先にバックアップを保存してください(ボタンは 2 回押すと実行されます)。
